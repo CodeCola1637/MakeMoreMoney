@@ -1,0 +1,10 @@
+{
+  "symbol": "700.HK",
+  "current_date": "2025-04-03",
+  "predict_date": "2025-04-06",
+  "current_price": 497.8,
+  "predicted_change_pct": 0.0632902419715908,
+  "predicted_price": 498.1150588245345,
+  "days": 1,
+  "model": "existing"
+}
