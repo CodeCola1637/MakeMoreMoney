@@ -1,0 +1,11 @@
+{
+  "signal_id": "dual_ma_5_20_20250405_152635_1743837995",
+  "strategy_id": "dual_ma_5_20_20250405_152635",
+  "symbol": "700.HK",
+  "direction": "buy",
+  "price": 479.98,
+  "quantity": 100,
+  "order_type": "limit",
+  "reason": "dual_ma_5_20_20250405_152635\u7b56\u7565\u4fe1\u53f7",
+  "create_time": "2025-04-05T15:26:35.846174"
+}

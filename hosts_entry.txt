@@ -1,0 +1,2 @@
+88.191.249.182 openapi.longportapp.com
+88.191.249.182 openapi-quote.longportapp.com 
