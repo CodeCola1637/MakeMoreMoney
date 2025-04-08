@@ -77,16 +77,26 @@ class LSTMModelTrainer:
         
         # 获取历史K线数据
         try:
-            data_dict = self.data_loader.get_multiple_candlesticks(
+            # 调用get_multiple_candlesticks并等待结果
+            data_dict = await self.data_loader.get_multiple_candlesticks(
                 symbols, 
                 period, 
                 count, 
                 getattr(AdjustType, adjust_type)
             )
             
+            # 检查每个股票的数据
+            for symbol, df in data_dict.items():
+                if df.empty:
+                    self.logger.warning(f"股票 {symbol} 的历史数据为空")
+                else:
+                    self.logger.info(f"成功加载 {symbol} 的历史数据，共 {len(df)} 条记录")
+            
             return data_dict
         except Exception as e:
             self.logger.error(f"加载训练数据失败: {e}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def prepare_train_data(self, data_dict: Dict[str, pd.DataFrame]) -> Tuple[np.ndarray, np.ndarray]:
@@ -182,7 +192,7 @@ class LSTMModelTrainer:
         self.logger.info(f"准备训练模型，使用股票: {symbols}")
         
         try:
-            # 加载训练数据
+            # 加载训练数据 - 添加await
             data_dict = await self.load_training_data(symbols)
             
             # 准备训练数据
@@ -199,47 +209,48 @@ class LSTMModelTrainer:
             input_shape = (X_train.shape[1], X_train.shape[2])
             model = self.build_model(input_shape)
             
-            # 设置回调函数
-            callbacks = [
-                EarlyStopping(patience=10, restore_best_weights=True),
-                ModelCheckpoint(
-                    self.model_path, 
-                    save_best_only=True, 
-                    save_weights_only=False
-                )
-            ]
+            # 设置早停回调
+            early_stopping = EarlyStopping(
+                monitor="val_loss",
+                patience=10,
+                restore_best_weights=True
+            )
+            
+            # 设置模型检查点
+            checkpoint = ModelCheckpoint(
+                self.model_path,
+                monitor="val_loss",
+                save_best_only=True,
+                save_weights_only=False,
+                verbose=1
+            )
             
             # 训练模型
-            start_time = time.time()
             self.logger.info("开始训练模型...")
-            
             history = model.fit(
                 X_train, y_train,
                 epochs=self.epochs,
                 batch_size=self.batch_size,
                 validation_data=(X_test, y_test),
-                callbacks=callbacks,
+                callbacks=[early_stopping, checkpoint],
                 verbose=1
             )
-            
-            training_time = time.time() - start_time
-            self.logger.info(f"模型训练完成，耗时: {training_time:.2f} 秒")
-            
-            # 评估模型
-            test_loss = model.evaluate(X_test, y_test, verbose=0)
-            self.logger.info(f"测试集损失: {test_loss:.6f}")
             
             # 保存训练历史
             self._save_training_history(history)
             
-            # 保存模型
-            model.save(self.model_path)
-            self.logger.info(f"模型已保存至: {self.model_path}")
+            # 评估模型
+            test_loss = model.evaluate(X_test, y_test, verbose=0)
+            self.logger.info(f"测试集损失: {test_loss}")
             
+            # 保存模型
             self.model = model
+            
             return model
         except Exception as e:
             self.logger.error(f"训练模型失败: {e}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -273,8 +284,8 @@ class LSTMModelTrainer:
             预测结果字典
         """
         try:
-            # 获取历史K线数据
-            df = self.data_loader.get_candlesticks(
+            # 获取历史K线数据 - 添加await
+            df = await self.data_loader.get_candlesticks(
                 symbol, 
                 period, 
                 self.lookback_period + 10,  # 多获取一些数据
@@ -282,6 +293,7 @@ class LSTMModelTrainer:
             )
             
             if df.empty:
+                self.logger.warning(f"{symbol} 历史数据为空")
                 return {"symbol": symbol, "error": "无法获取K线数据"}
                 
             # 准备特征数据
@@ -293,6 +305,7 @@ class LSTMModelTrainer:
                 )
                 
                 if len(X) == 0:
+                    self.logger.warning(f"{symbol} 特征数据为空")
                     return {"symbol": symbol, "error": "无法准备预测特征"}
                     
                 # 获取最新的一组特征
@@ -308,6 +321,8 @@ class LSTMModelTrainer:
                 predicted_change_pct = pred * 100  # 转换为百分比
                 predicted_price = latest_price * (1 + pred)
                 
+                self.logger.info(f"{symbol} 预测变化: {predicted_change_pct:.2f}%, 价格: {predicted_price:.2f}")
+                
                 result = {
                     "symbol": symbol,
                     "timestamp": df.iloc[-1]["timestamp"],
@@ -320,9 +335,13 @@ class LSTMModelTrainer:
                 return result
             except Exception as e:
                 self.logger.error(f"预测 {symbol} 时出错: {e}")
+                import traceback
+                traceback.print_exc()
                 return {"symbol": symbol, "error": str(e)}
         except Exception as e:
             self.logger.error(f"获取 {symbol} 历史数据失败: {e}")
+            import traceback
+            traceback.print_exc()
             return {"symbol": symbol, "error": str(e)}
     
     def _save_training_history(self, history):

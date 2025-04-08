@@ -28,15 +28,23 @@ def create_signal_handler(order_mgr):
     """创建交易信号处理函数"""
     async def on_signal(signal_obj: Signal):
         """处理交易信号"""
-        symbol = signal_obj.symbol
-        signal_type = signal_obj.signal_type
-        price = signal_obj.price
-        quantity = signal_obj.quantity
-        
-        logger.info(f"收到交易信号: {symbol} {signal_type.value} {quantity}股 @ {price}")
-        
-        # 触发订单执行
-        await order_mgr.process_signal(signal_obj)
+        try:
+            symbol = signal_obj.symbol
+            signal_type = signal_obj.signal_type
+            # 安全地获取signal_type的value属性
+            signal_type_val = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
+            price = signal_obj.price
+            quantity = signal_obj.quantity
+            
+            # 使用安全获取的枚举值字符串进行信息记录
+            logger.info(f"收到交易信号: {symbol} {signal_type_val} {quantity}股 @ {price}")
+            
+            # 触发订单执行
+            await order_mgr.process_signal(signal_obj)
+        except Exception as e:
+            logger.error(f"处理信号时出错: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     return on_signal
 

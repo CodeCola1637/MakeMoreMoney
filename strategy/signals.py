@@ -33,8 +33,8 @@ class Signal:
         price: float, 
         confidence: float = 0.0,
         quantity: int = 0,
-        timestamp: Optional[datetime] = None,
-        extra_data: Optional[Dict[str, Any]] = None
+        extra_data: Dict[str, Any] = None,
+        strategy_name: str = "default"
     ):
         """
         初始化交易信号
@@ -45,27 +45,32 @@ class Signal:
             price: 信号价格
             confidence: 信号置信度，0-1之间
             quantity: 建议交易数量
-            timestamp: 信号生成时间，如为None则使用当前时间
             extra_data: 额外数据
+            strategy_name: 策略名称
         """
         self.symbol = symbol
         self.signal_type = signal_type
         self.price = price
         self.confidence = confidence
         self.quantity = quantity
-        self.timestamp = timestamp or datetime.now()
         self.extra_data = extra_data or {}
+        self.strategy_name = strategy_name
+        self.created_at = datetime.now()
+        # 生成唯一ID
+        self.id = f"{symbol}_{signal_type.value}_{self.created_at.strftime('%Y%m%d%H%M%S%f')}"
         
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
+            'id': self.id,
             "symbol": self.symbol,
             "signal_type": self.signal_type.value,
             "price": self.price,
             "confidence": self.confidence,
             "quantity": self.quantity,
-            "timestamp": self.timestamp.isoformat(),
-            "extra_data": self.extra_data
+            "extra_data": self.extra_data,
+            "strategy_name": self.strategy_name,
+            "created_at": self.created_at.isoformat()
         }
         
     def __str__(self) -> str:
@@ -206,35 +211,48 @@ class SignalGenerator:
                     signal_type = SignalType.BUY
                 elif predicted_change_pct <= sell_threshold:
                     signal_type = SignalType.SELL
-                    
-                # 计算建议交易数量
-                position_pct = self.config.get("execution.risk_control.position_pct", 2.0)
-                max_position_size = self.config.get("execution.max_position_size", 10000)
                 
-                # 假设按照账户总值的position_pct比例计算交易数量
-                suggested_value = max_position_size * (position_pct / 100) * confidence
-                quantity = int(suggested_value / latest_price) if latest_price else 0
-                
-                if quantity <= 0 and signal_type != SignalType.HOLD:
-                    quantity = 1  # 至少交易1股
+                try:
+                    # 确保数值类型正确
+                    try:
+                        # 确保是浮点数
+                        position_pct = float(self.config.get("execution.risk_control.position_pct", 2.0))
+                        max_position_size = float(self.config.get("execution.max_position_size", 10000))
+                        confidence = float(confidence)
+                        latest_price = float(latest_price) if latest_price else 0.0
+                        
+                        # 计算建议交易数量
+                        suggested_value = max_position_size * (position_pct / 100) * confidence
+                        quantity = int(suggested_value / latest_price) if latest_price > 0 else 0
+                    except Exception as e:
+                        self.logger.error(f"计算交易数量时出错: {e}")
+                        quantity = 0
                     
-                # 创建信号对象
-                if signal_type != SignalType.HOLD:
-                    signal = Signal(
-                        symbol=symbol,
-                        signal_type=signal_type,
-                        price=latest_price,
-                        confidence=confidence,
-                        quantity=quantity,
-                        timestamp=now,
-                        extra_data={
-                            "predicted_change_pct": predicted_change_pct,
-                            "model": "LSTM"
-                        }
-                    )
-                    return signal
-                else:
-                    self.logger.info(f"{symbol} 预测变化不足以触发交易信号")
+                    if quantity <= 0 and signal_type != SignalType.HOLD:
+                        quantity = 1  # 至少交易1股
+                        
+                    # 创建信号对象
+                    if signal_type != SignalType.HOLD:
+                        signal = Signal(
+                            symbol=symbol,
+                            signal_type=signal_type,  # 使用 SignalType 枚举值
+                            price=latest_price,
+                            confidence=confidence,
+                            quantity=quantity,
+                            extra_data={
+                                "predicted_change_pct": predicted_change_pct,
+                                "model": "LSTM"
+                            },
+                            strategy_name="default"
+                        )
+                        return signal
+                    else:
+                        self.logger.info(f"{symbol} 预测变化不足以触发交易信号")
+                        return None
+                except Exception as e:
+                    self.logger.error(f"创建信号对象时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
                     return None
                     
             except Exception as e:

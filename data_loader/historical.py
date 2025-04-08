@@ -72,7 +72,7 @@ class HistoricalDataLoader:
         count: int = 100, 
         adjust_type: AdjustType = AdjustType.NoAdjust,
         use_cache: bool = True
-    ):
+    ) -> pd.DataFrame:
         """
         获取K线数据
         
@@ -92,6 +92,9 @@ class HistoricalDataLoader:
         if isinstance(period, str):
             period = getattr(Period, period)
             
+        # 获取period名称，用于日志和缓存文件名
+        period_name = str(period).replace("Period.", "")
+            
         # 检查缓存
         cache_file = self._get_cache_filename(symbol, period, adjust_type)
         if use_cache and os.path.exists(cache_file):
@@ -100,14 +103,13 @@ class HistoricalDataLoader:
             
             # 如果缓存是当天的，且数据量足够，直接使用缓存
             if cache_age < timedelta(days=1) and len(cache_df) >= count:
-                self.logger.info(f"使用缓存数据: {symbol}, {period.name}")
+                self.logger.info(f"使用缓存数据: {symbol}, {period_name}")
                 return cache_df.tail(count).reset_index(drop=True)
         
-        self.logger.info(f"从API获取K线数据: {symbol}, {period.name}, count={count}")
+        self.logger.info(f"从API获取K线数据: {symbol}, {period_name}, count={count}")
         
         try:
-            # 从API获取K线数据
-            # 去掉await关键字
+            # 从API获取K线数据 - 注意API调用是同步的，不需要await
             candlesticks = self.quote_ctx.candlesticks(symbol, period, count, adjust_type)
             
             # 转换为DataFrame
@@ -130,7 +132,7 @@ class HistoricalDataLoader:
         count: int = 100, 
         adjust_type: AdjustType = AdjustType.NoAdjust,
         use_cache: bool = True
-    ):
+    ) -> Dict[str, pd.DataFrame]:
         """
         批量获取多个股票的K线数据
         
@@ -144,18 +146,22 @@ class HistoricalDataLoader:
         Returns:
             字典，键为股票代码，值为对应的K线DataFrame
         """
+        self.logger.info(f"批量获取K线数据: {symbols}")
         result = {}
         tasks = []
         
+        # 创建所有异步任务
         for symbol in symbols:
             task = asyncio.create_task(
                 self.get_candlesticks(symbol, period, count, adjust_type, use_cache)
             )
             tasks.append((symbol, task))
-            
+        
+        # 等待所有任务完成
         for symbol, task in tasks:
             try:
                 result[symbol] = await task
+                self.logger.debug(f"成功获取 {symbol} 的K线数据，共 {len(result[symbol])} 条")
             except Exception as e:
                 self.logger.error(f"获取 {symbol} 的K线数据失败: {e}")
                 result[symbol] = pd.DataFrame()
@@ -293,12 +299,24 @@ class HistoricalDataLoader:
         return pd.DataFrame(data)
     
     def _get_cache_filename(self, symbol: str, period: Period, adjust_type: AdjustType) -> str:
-        """生成缓存文件名"""
-        symbol_safe = symbol.replace(".", "_")
-        return os.path.join(
-            self.cache_dir, 
-            f"{symbol_safe}_{period.name}_{adjust_type.name}.csv"
-        )
+        """
+        获取缓存文件名
+        
+        Args:
+            symbol: 股票代码
+            period: K线周期
+            adjust_type: 复权类型
+            
+        Returns:
+            缓存文件路径
+        """
+        # 获取period和adjust_type的字符串表示
+        period_str = str(period).replace("Period.", "")
+        adjust_str = str(adjust_type).replace("AdjustType.", "")
+        
+        # 构建缓存文件名
+        filename = f"{symbol}_{period_str}_{adjust_str}.csv"
+        return os.path.join(self.cache_dir, filename)
     
     async def close(self):
         """关闭行情上下文"""

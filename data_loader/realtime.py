@@ -178,14 +178,11 @@ class RealtimeDataManager:
         
         # 订阅行情
         try:
-            # API 可能需要单独处理每个股票
+            # 直接传递整个符号列表
+            self.quote_ctx.subscribe(symbols, enum_sub_types, is_first_push)
             for symbol in symbols:
-                try:
-                    self.quote_ctx.subscribe([symbol], enum_sub_types, is_first_push)
-                    self.subscribed_symbols.add(symbol)
-                    self.logger.debug(f"成功订阅 {symbol}")
-                except Exception as e:
-                    self.logger.error(f"订阅 {symbol} 失败: {e}")
+                self.subscribed_symbols.add(symbol)
+                self.logger.debug(f"成功订阅 {symbol}")
             
             # 尝试获取并保存最新行情
             for symbol in symbols:
@@ -200,7 +197,17 @@ class RealtimeDataManager:
             return True
         except Exception as e:
             self.logger.error(f"订阅行情失败: {e}")
-            return False
+            # 尝试单独订阅每个股票
+            success = False
+            for symbol in symbols:
+                try:
+                    self.quote_ctx.subscribe([symbol], enum_sub_types, is_first_push)
+                    self.subscribed_symbols.add(symbol)
+                    self.logger.debug(f"成功单独订阅 {symbol}")
+                    success = True
+                except Exception as sub_e:
+                    self.logger.error(f"单独订阅 {symbol} 失败: {sub_e}")
+            return success
     
     async def unsubscribe(self, symbols: List[str], sub_types: List[Union[str, SubType]]):
         """
@@ -229,20 +236,27 @@ class RealtimeDataManager:
         
         # 取消订阅行情
         try:
-            # API 可能需要单独处理每个股票
+            # 直接传递整个符号列表
+            self.quote_ctx.unsubscribe(symbols, enum_sub_types)
+            for symbol in symbols:
+                if symbol in self.subscribed_symbols:
+                    self.subscribed_symbols.remove(symbol)
+                self.logger.debug(f"成功取消订阅 {symbol}")
+            return True
+        except Exception as e:
+            self.logger.error(f"取消订阅行情失败: {e}")
+            # 尝试单独取消订阅每个股票
+            success = False
             for symbol in symbols:
                 try:
                     self.quote_ctx.unsubscribe([symbol], enum_sub_types)
                     if symbol in self.subscribed_symbols:
                         self.subscribed_symbols.remove(symbol)
-                    self.logger.debug(f"成功取消订阅 {symbol}")
-                except Exception as e:
-                    self.logger.error(f"取消订阅 {symbol} 失败: {e}")
-                    
-            return True
-        except Exception as e:
-            self.logger.error(f"取消订阅行情失败: {e}")
-            return False
+                    self.logger.debug(f"成功单独取消订阅 {symbol}")
+                    success = True
+                except Exception as sub_e:
+                    self.logger.error(f"单独取消订阅 {symbol} 失败: {sub_e}")
+            return success
     
     async def get_quote(self, symbols: List[str]):
         """
@@ -443,12 +457,16 @@ class RealtimeDataManager:
                     symbols = list(self.subscribed_symbols)
                     self.logger.info(f"取消所有订阅: {symbols}")
                     try:
-                        self.quote_ctx.unsubscribe(symbols)
+                        # 提供订阅类型参数
+                        from longport.openapi import SubType
+                        sub_types = [SubType.Quote, SubType.Depth, SubType.Brokers, SubType.Trade]
+                        self.quote_ctx.unsubscribe(symbols, sub_types)
                     except Exception as e:
                         self.logger.warning(f"取消订阅失败: {e}")
                 
                 # 关闭上下文
                 self.logger.info("关闭行情上下文")
+                # SDK的QuoteContext没有提供close方法，只需要设置为None
                 self.quote_ctx = None
             except Exception as e:
                 self.logger.error(f"关闭行情上下文失败: {e}")
