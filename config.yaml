@@ -1,0 +1,52 @@
+# 长桥API配置
+api:
+  app_key: ${LONG_PORT_APP_KEY}
+  app_secret: ${LONG_PORT_APP_SECRET}
+  access_token: ${LONG_PORT_ACCESS_TOKEN}
+  quote_ws_url: ${API_WS_URL}
+  base_url: ${API_BASE_URL}
+
+# 行情订阅配置
+quote:
+  symbols:
+    - "700.HK"  # 腾讯控股
+    - "9988.HK"  # 阿里巴巴
+    - "9999.HK"  # 网易
+    - "AAPL.US"  # 苹果
+    - "TSLA.US"  # 特斯拉
+    - "NVDA.US"  # 英伟达
+  sub_types:
+    - "Quote"      # 实时报价
+    - "Depth"      # 盘口
+    - "Brokers"    # 经纪队列
+    - "Trade"      # 逐笔成交
+
+# 策略配置
+strategy:
+  model_path: "./models/lstm_model.h5"
+  lookback_period: 30  # 回溯周期
+  training:
+    epochs: 100
+    batch_size: 32
+    test_size: 0.2
+    features:
+      - "close"
+      - "volume"
+      - "high"
+      - "low"
+
+# 交易执行配置
+execution:
+  max_position_size: ${MAX_POSITION_SIZE}  # 最大仓位
+  max_drawdown_pct: ${MAX_DRAWDOWN_PCT}    # 最大回撤百分比
+  trailing_stop_pct: ${TRAILING_STOP_PCT}  # 追踪止损百分比
+  order_types:
+    default: "LO"  # 限价单
+  risk_control:
+    position_pct: 2.0  # 单笔交易不超过账户资金的2%
+    daily_loss_pct: 5.0  # 单日亏损达到5%停止交易
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "./logs/trading.log"
