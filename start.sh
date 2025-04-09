@@ -47,6 +47,7 @@ fi
 # 运行参数
 SYMBOLS="700.HK"
 TRAIN=""
+NO_MOCK=""
 
 # 检查命令行参数
 while [[ $# -gt 0 ]]; do
@@ -58,6 +59,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --train)
             TRAIN="--train"
+            shift
+            ;;
+        --no-mock)
+            NO_MOCK="--no-mock"
             shift
             ;;
         *)
@@ -73,8 +78,11 @@ echo -e "${GREEN}交易标的: ${SYMBOLS}${NC}"
 if [ -n "$TRAIN" ]; then
     echo -e "${GREEN}将在启动时训练模型${NC}"
 fi
+if [ -n "$NO_MOCK" ]; then
+    echo -e "${GREEN}禁用本地模拟数据${NC}"
+fi
 
-python main.py --symbols $SYMBOLS $TRAIN
+python main.py --symbols $SYMBOLS $TRAIN $NO_MOCK
 
 # 检查退出状态
 EXIT_STATUS=$?

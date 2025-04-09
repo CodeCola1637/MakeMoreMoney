@@ -75,6 +75,36 @@ class ConfigLoader:
                 return default
                 
         return value
+        
+    def update_config(self, key: str, value: Any) -> bool:
+        """
+        更新指定键的配置值
+        
+        Args:
+            key: 配置键，支持点号分隔的路径，如 "quote.use_mock_data"
+            value: 新的配置值
+            
+        Returns:
+            更新是否成功
+        """
+        keys = key.split(".")
+        config = self.config
+        
+        # 定位到最后一级的父节点
+        for i in range(len(keys) - 1):
+            k = keys[i]
+            if isinstance(config, dict) and k in config:
+                config = config[k]
+            else:
+                return False
+        
+        # 更新最后一个键的值
+        last_key = keys[-1]
+        if isinstance(config, dict) and last_key in config:
+            config[last_key] = value
+            return True
+        
+        return False
 
 def setup_logger(name: str, level: str = "INFO", log_file: Optional[str] = None) -> logging.Logger:
     """

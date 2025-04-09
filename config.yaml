@@ -20,6 +20,7 @@ quote:
     - "Depth"      # 盘口
     - "Brokers"    # 经纪队列
     - "Trade"      # 逐笔成交
+  use_mock_data: false  # 禁止使用本地mock数据
 
 # 策略配置
 strategy:

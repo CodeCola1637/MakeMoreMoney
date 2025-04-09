@@ -77,6 +77,7 @@ async def main():
     parser = argparse.ArgumentParser(description="量化交易系统")
     parser.add_argument("--train", action="store_true", help="训练模型")
     parser.add_argument("--symbols", nargs="+", default=["700.HK"], help="要交易的股票代码")
+    parser.add_argument("--no-mock", action="store_true", help="禁止使用模拟数据，使用实时行情")
     args = parser.parse_args()
     
     # 加载环境变量
@@ -94,6 +95,11 @@ async def main():
     
     # 加载配置
     config = ConfigLoader()
+    
+    # 设置禁用模拟数据
+    if args.no_mock:
+        config.update_config('quote.use_mock_data', False)
+        logger.info("已禁用模拟数据，使用实时行情")
     
     # 初始化数据库
     init_db()
