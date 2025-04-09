@@ -69,7 +69,7 @@ class HistoricalDataLoader:
         self, 
         symbol: str, 
         period: Union[str, Period] = Period.Day, 
-        count: int = 100, 
+        count: int = None,  # 修改为可选参数
         adjust_type: AdjustType = AdjustType.NoAdjust,
         use_cache: bool = True
     ) -> pd.DataFrame:
@@ -79,7 +79,7 @@ class HistoricalDataLoader:
         Args:
             symbol: 股票代码
             period: K线周期，可以是字符串或Period枚举
-            count: 获取的K线数量
+            count: 获取的K线数量，如果为None则使用配置中的historical_days
             adjust_type: 复权类型
             use_cache: 是否使用缓存
             
@@ -94,6 +94,11 @@ class HistoricalDataLoader:
             
         # 获取period名称，用于日志和缓存文件名
         period_name = str(period).replace("Period.", "")
+        
+        # 如果count为None，使用配置中的historical_days
+        if count is None:
+            count = self.config.get("quote.historical_days", 1250)  # 默认5年数据
+            self.logger.info(f"使用配置的历史数据天数: {count}")
             
         # 检查缓存
         cache_file = self._get_cache_filename(symbol, period, adjust_type)
@@ -109,11 +114,44 @@ class HistoricalDataLoader:
         self.logger.info(f"从API获取K线数据: {symbol}, {period_name}, count={count}")
         
         try:
-            # 从API获取K线数据 - 注意API调用是同步的，不需要await
-            candlesticks = self.quote_ctx.candlesticks(symbol, period, count, adjust_type)
+            # 将大量数据请求分成多个小批次
+            batch_size = 500  # 每批次请求500条数据
+            all_candlesticks = []
+            
+            # 计算需要多少个批次
+            num_batches = (count + batch_size - 1) // batch_size
+            
+            for batch in range(num_batches):
+                # 计算当前批次的起始位置和数量
+                start_idx = batch * batch_size
+                current_batch_size = min(batch_size, count - start_idx)
+                
+                self.logger.info(f"获取第 {batch + 1}/{num_batches} 批次数据，数量: {current_batch_size}")
+                
+                # 从API获取K线数据
+                candlesticks = self.quote_ctx.candlesticks(
+                    symbol, 
+                    period, 
+                    current_batch_size, 
+                    adjust_type
+                )
+                
+                if not candlesticks:
+                    self.logger.warning(f"第 {batch + 1} 批次没有数据")
+                    break
+                    
+                all_candlesticks.extend(candlesticks)
+                
+                # 如果不是最后一个批次，等待一小段时间避免请求过于频繁
+                if batch < num_batches - 1:
+                    await asyncio.sleep(1)
+            
+            if not all_candlesticks:
+                self.logger.error(f"没有获取到任何K线数据: {symbol}")
+                return pd.DataFrame()
             
             # 转换为DataFrame
-            df = self._convert_candlesticks_to_df(candlesticks)
+            df = self._convert_candlesticks_to_df(all_candlesticks)
             
             # 保存到缓存
             if use_cache and not df.empty:

@@ -14,7 +14,7 @@ from utils import ConfigLoader, setup_logger
 from data_loader.realtime import RealtimeDataManager
 from data_loader.historical import HistoricalDataLoader
 from strategy.train import LSTMModelTrainer
-from longport.openapi import PushQuote, SubType
+from longport.openapi import SubType
 
 class SignalType(Enum):
     """交易信号类型"""
@@ -301,7 +301,7 @@ class SignalGenerator:
                 
         return new_signals
     
-    def _on_quote_update(self, symbol: str, quote: PushQuote):
+    def _on_quote_update(self, symbol: str, quote: Any):
         """
         行情更新回调函数
         

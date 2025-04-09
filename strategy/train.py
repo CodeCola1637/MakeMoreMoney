@@ -150,33 +150,57 @@ class LSTMModelTrainer:
         Returns:
             构建好的模型
         """
-        model = Sequential([
-            LSTM(units=50, return_sequences=True, input_shape=input_shape),
-            Dropout(0.2),
-            LSTM(units=50, return_sequences=False),
-            Dropout(0.2),
-            Dense(units=25),
-            Dense(units=1)
-        ])
+        # 获取模型架构配置
+        lstm_units = self.config.get("strategy.training.model_architecture.lstm_units", [128, 64])
+        dropout_rate = self.config.get("strategy.training.model_architecture.dropout_rate", 0.3)
+        learning_rate = self.config.get("strategy.training.model_architecture.learning_rate", 0.0005)
         
+        # 构建模型
+        model = Sequential()
+        
+        # 第一层LSTM
+        model.add(LSTM(
+            units=lstm_units[0],
+            return_sequences=True,
+            input_shape=input_shape
+        ))
+        model.add(Dropout(dropout_rate))
+        
+        # 第二层LSTM（如果有的话）
+        if len(lstm_units) > 1:
+            model.add(LSTM(
+                units=lstm_units[1],
+                return_sequences=False
+            ))
+            model.add(Dropout(dropout_rate))
+        
+        # 全连接层
+        model.add(Dense(units=25))
+        model.add(Dense(units=1))
+        
+        # 编译模型
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
             loss="mean_squared_error"
         )
         
         return model
     
-    async def train_model(self, symbols: Optional[List[str]] = None, force_retrain: bool = False):
+    async def train_model(self, symbols: Optional[List[str]] = None, force_retrain: Optional[bool] = None):
         """
         训练模型
         
         Args:
             symbols: 用于训练的股票代码列表，如果为None则使用配置中的股票
-            force_retrain: 是否强制重新训练，即使模型文件已存在
+            force_retrain: 是否强制重新训练，如果为None则使用配置中的设置
             
         Returns:
             训练好的模型
         """
+        # 从配置中获取force_retrain参数
+        if force_retrain is None:
+            force_retrain = self.config.get("strategy.training.force_retrain", False)
+            
         # 检查是否需要重新训练
         if os.path.exists(self.model_path) and not force_retrain:
             self.logger.info(f"加载已有模型: {self.model_path}")
@@ -366,3 +390,21 @@ class LSTMModelTrainer:
         plt.savefig(os.path.join(history_dir, f"training_history_{timestamp}.png"))
         self.logger.info(f"训练历史已保存到图表")
         plt.close()
+
+if __name__ == "__main__":
+    # 初始化配置和数据加载器
+    config = ConfigLoader()
+    data_loader = HistoricalDataLoader(config)
+    
+    # 创建模型训练器
+    trainer = LSTMModelTrainer(config, data_loader)
+    
+    # 获取训练股票列表
+    symbols = config.get("quote.symbols", ["AAPL.US"])
+    
+    # 运行训练
+    async def main():
+        await trainer.train_model(symbols=symbols)
+        
+    # 运行异步主函数
+    asyncio.run(main())

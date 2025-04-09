@@ -9,42 +9,54 @@ api:
 # 行情订阅配置
 quote:
   symbols:
-    - "700.HK"  # 腾讯控股
-    - "9988.HK"  # 阿里巴巴
-    - "9999.HK"  # 网易
     - "AAPL.US"  # 苹果
-    - "TSLA.US"  # 特斯拉
-    - "NVDA.US"  # 英伟达
   sub_types:
     - "Quote"      # 实时报价
     - "Depth"      # 盘口
     - "Brokers"    # 经纪队列
     - "Trade"      # 逐笔成交
   use_mock_data: false  # 禁止使用本地mock数据
+  historical_days: 1250  # 5年的交易日数量
 
 # 策略配置
 strategy:
   model_path: "./models/lstm_model.h5"
-  lookback_period: 30  # 回溯周期
+  lookback_period: 60  # 增加回溯周期到60天
   training:
-    epochs: 100
-    batch_size: 32
-    test_size: 0.2
+    epochs: 200  # 增加训练轮数
+    batch_size: 64  # 增加批次大小
+    test_size: 0.15  # 减少测试集比例
     features:
       - "close"
       - "volume"
       - "high"
       - "low"
+      - "turnover"  # 添加成交额特征
+    force_retrain: true  # 强制重新训练
+    model_architecture:
+      lstm_units: [128, 64]  # 增加LSTM单元数量
+      dropout_rate: 0.3  # 增加dropout率
+      learning_rate: 0.0005  # 降低学习率
 
 # 交易执行配置
 execution:
-  max_position_size: ${MAX_POSITION_SIZE}  # 最大仓位
-  max_drawdown_pct: ${MAX_DRAWDOWN_PCT}    # 最大回撤百分比
-  trailing_stop_pct: ${TRAILING_STOP_PCT}  # 追踪止损百分比
+  initial_capital: 15000.0  # 初始资金15,000美元
+  max_position_size: 15000.0  # 最大仓位
+  max_drawdown_pct: 10.0    # 最大回撤百分比
+  trailing_stop_pct: 2.0  # 追踪止损百分比
   order_types:
     default: "LO"  # 限价单
+  # 限价单价格优化
+  price_adjust_rate:
+    buy: 0.003  # 买入价格上浮0.3%
+    sell: 0.003  # 卖出价格下浮0.3%
+  # 订单跟踪配置
+  order_tracking:
+    check_interval: 60  # 订单状态检查间隔(秒)
+    timeout: 300        # 订单超时时间(秒)
+    retry_count: 3      # 失败重试次数
   risk_control:
-    position_pct: 2.0  # 单笔交易不超过账户资金的2%
+    position_pct: 100.0  # 单笔交易可以使用全部资金
     daily_loss_pct: 5.0  # 单日亏损达到5%停止交易
 
 # 日志配置

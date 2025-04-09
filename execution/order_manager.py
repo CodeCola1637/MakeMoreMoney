@@ -336,41 +336,195 @@ class OrderManager:
         self.order_callbacks = []
         
     async def initialize(self):
-        """初始化交易上下文"""
-        # 如果已经初始化，则直接返回
-        if self.trade_ctx:
-            return
+        """初始化订单管理器"""
+        # 初始化状态
+        self._trade_ctx_initialized = False
+        self.active_orders = {}  # 活跃订单字典，key为订单ID
+        self.order_update_time = {}  # 订单更新时间，用于订单超时判断
         
-        self.logger.info("正在初始化交易上下文...")
+        # 获取订单跟踪配置
+        self.order_check_interval = self.config.get("execution.order_tracking.check_interval", 60)
+        self.order_timeout = self.config.get("execution.order_tracking.timeout", 300)
+        self.retry_count = self.config.get("execution.order_tracking.retry_count", 3)
         
-        # 重试逻辑
-        max_retries = 3
-        retry_delay = 5  # 秒
+        # 初始化交易上下文
+        await self._init_trade_context()
         
-        for attempt in range(1, max_retries + 1):
+        # 启动订单状态跟踪任务
+        self._start_order_tracking()
+        
+        return True
+
+    def _start_order_tracking(self):
+        """启动订单状态跟踪任务"""
+        self.logger.info("启动订单状态跟踪任务...")
+        self.order_tracking_task = asyncio.create_task(self._track_orders())
+        
+    async def _track_orders(self):
+        """持续跟踪和更新所有活跃订单的状态"""
+        self.logger.info(f"订单状态跟踪任务已启动，检查间隔: {self.order_check_interval}秒")
+        
+        while True:
             try:
-                self.logger.info(f"尝试创建交易上下文 (尝试 {attempt}/{max_retries})...")
+                # 等待指定间隔
+                await asyncio.sleep(self.order_check_interval)
                 
-                # 创建交易上下文
-                self.trade_ctx = TradeContext(self.longport_config)
+                # 检查是否有活跃订单
+                if not self.active_orders:
+                    continue
+                    
+                self.logger.info(f"检查活跃订单状态，共{len(self.active_orders)}个订单")
+                current_time = datetime.now()
                 
-                # 验证连接 - 尝试获取账户余额来验证连接是否成功
-                try:
-                    balance = self.trade_ctx.account_balance()
-                    self.logger.info(f"成功获取账户余额，API连接正常")
-                except Exception as e:
-                    self.logger.warning(f"获取账户余额失败，但上下文已创建: {e}")
+                # 收集需要处理的订单
+                orders_to_check = list(self.active_orders.items())
                 
-                self.logger.info("交易上下文初始化完成")
-                return
+                for order_id, order in orders_to_check:
+                    try:
+                        # 获取最新订单状态
+                        latest_order = await self._get_order_status(order_id)
+                        
+                        if not latest_order:
+                            self.logger.warning(f"无法获取订单状态: {order_id}")
+                            continue
+                            
+                        # 更新订单状态
+                        if latest_order.status != order.status:
+                            self.logger.info(f"订单状态更新: {order_id}, {order.status} -> {latest_order.status}")
+                            order.status = latest_order.status
+                            
+                            # 如果订单已完成（成交、取消、拒绝），从活跃订单中移除
+                            if order.is_filled() or order.is_canceled() or order.is_rejected():
+                                self.logger.info(f"订单已完成: {order_id}, 状态: {order.status}")
+                                del self.active_orders[order_id]
+                                if order_id in self.order_update_time:
+                                    del self.order_update_time[order_id]
+                                    
+                                # 通知回调
+                                self._notify_order_update(order)
+                            
+                        # 检查订单是否超时
+                        if (not order.is_filled() and not order.is_canceled() and not order.is_rejected() and
+                                order_id in self.order_update_time):
+                            elapsed = (current_time - self.order_update_time[order_id]).total_seconds()
+                            
+                            if elapsed > self.order_timeout:
+                                self.logger.warning(f"订单超时: {order_id}, 已等待{elapsed:.1f}秒")
+                                
+                                # 尝试取消并重新提交
+                                await self._handle_timeout_order(order)
+                    except Exception as e:
+                        self.logger.error(f"处理订单{order_id}状态时出错: {e}")
+                
+            except asyncio.CancelledError:
+                self.logger.info("订单状态跟踪任务被取消")
+                break
             except Exception as e:
-                self.logger.error(f"交易上下文初始化失败 (尝试 {attempt}/{max_retries}): {e}")
-                if attempt < max_retries:
-                    self.logger.info(f"等待 {retry_delay} 秒后重试...")
-                    await asyncio.sleep(retry_delay)
+                self.logger.error(f"订单状态跟踪任务出错: {e}")
+                self.logger.error(f"Traceback:\n{traceback.format_exc()}")
+                # 短暂暂停后继续
+                await asyncio.sleep(10)
+
+    async def _get_order_status(self, order_id: str):
+        """获取订单最新状态"""
+        try:
+            # 检查交易上下文是否初始化
+            if not self._trade_ctx_initialized:
+                await self._init_trade_context()
+                
+            if not self._trade_ctx_initialized:
+                self.logger.error("无法获取订单状态：交易上下文未初始化")
+                return None
+                
+            # 获取订单详情
+            order_info = self.trade_ctx.order_detail(order_id)
+            if not order_info:
+                self.logger.warning(f"无法获取订单详情: {order_id}")
+                return None
+                
+            # 更新订单时间
+            self.order_update_time[order_id] = datetime.now()
+            
+            return order_info
+        except Exception as e:
+            self.logger.error(f"获取订单状态失败: {order_id}, 错误: {e}")
+            return None
+
+    async def _handle_timeout_order(self, order):
+        """处理超时订单，尝试取消并重新提交"""
+        if not order or not order.order_id:
+            return
+            
+        try:
+            order_id = order.order_id
+            
+            # 尝试取消订单
+            self.logger.info(f"尝试取消超时订单: {order_id}")
+            cancel_result = await self._cancel_order(order_id)
+            
+            if cancel_result:
+                self.logger.info(f"成功取消订单: {order_id}")
+                
+                # 等待短暂时间确保取消生效
+                await asyncio.sleep(2)
+                
+                # 获取最新价格
+                symbol = order.symbol
+                quote = self.realtime_mgr.get_latest_quote(symbol) if hasattr(self, 'realtime_mgr') else None
+                
+                if quote:
+                    latest_price = quote.last_done
+                    self.logger.info(f"获取{symbol}最新价格: {latest_price}")
+                    
+                    # 创建新订单
+                    side = "buy" if order.side == OrderSide.Buy else "sell"
+                    await self._submit_order(
+                        symbol=symbol,
+                        price=latest_price,  # 使用最新价格
+                        quantity=order.quantity,
+                        order_type=side,
+                        strategy_name=order.strategy_name
+                    )
                 else:
-                    self.logger.error("已达到最大重试次数，无法初始化交易上下文")
-                    raise
+                    self.logger.warning(f"无法获取{symbol}最新价格，未重新提交订单")
+            else:
+                self.logger.warning(f"取消订单失败: {order_id}")
+                
+        except Exception as e:
+            self.logger.error(f"处理超时订单时出错: {e}")
+            self.logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    async def _cancel_order(self, order_id: str) -> bool:
+        """
+        取消订单
+        
+        Args:
+            order_id: 订单ID
+            
+        Returns:
+            bool: 取消是否成功
+        """
+        try:
+            # 检查交易上下文是否初始化
+            if not self._trade_ctx_initialized:
+                await self._init_trade_context()
+                
+            if not self._trade_ctx_initialized:
+                self.logger.error("无法取消订单：交易上下文未初始化")
+                return False
+                
+            # 取消订单
+            self.trade_ctx.cancel_order(order_id)
+            
+            # 更新订单状态
+            if order_id in self.active_orders:
+                self.active_orders[order_id].status = OrderStatus.CancelSubmitted
+                self._notify_order_update(self.active_orders[order_id])
+                
+            return True
+        except Exception as e:
+            self.logger.error(f"取消订单失败: {order_id}, 错误: {e}")
+            return False
 
     # 处理信号的方法
     async def process_signal(self, signal: Signal) -> Optional[OrderResult]:
@@ -652,42 +806,55 @@ class OrderManager:
                 
     async def _submit_order(self, symbol: str, price: float, quantity: int, order_type: str, strategy_name: str) -> OrderResult:
         """
-        提交订单到经纪商
-
+        提交订单
+        
         Args:
             symbol: 股票代码
-            price: 价格
+            price: 原始价格
             quantity: 数量
-            order_type: 订单类型，'BUY'或'SELL'
+            order_type: 订单类型 ("buy" 或 "sell")
             strategy_name: 策略名称
-
+            
         Returns:
             OrderResult: 订单结果对象
         """
-        # 初始化交易上下文（如果尚未初始化）
-        if not self._trade_ctx_initialized:
-            if not await self._init_trade_context():
-                self.logger.error(f"无法提交订单 {symbol}: 交易上下文初始化失败")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=OrderSide.Buy if order_type == "BUY" else OrderSide.Sell,
-                    quantity=quantity,
-                    price=price,
-                    status=OrderStatus.Rejected,
-                    submitted_at=datetime.now(),
-                    msg="交易上下文初始化失败",
-                    strategy_name=strategy_name
-                )
+        # 限价单价格优化
+        adjusted_price = price
+        price_adjust_rate = self.config.get("execution.price_adjust_rate", {
+            "buy": 0.003,  # 买入价格上浮0.3%
+            "sell": 0.003  # 卖出价格下浮0.3%
+        })
         
-        # 转换订单类型
-        side = OrderSide.Buy if order_type == "BUY" else OrderSide.Sell
+        if order_type.lower() == "buy":
+            # 买入价格上浮，提高成交概率
+            buy_adjust_rate = price_adjust_rate.get("buy", 0.003)
+            adjusted_price = price * (1 + buy_adjust_rate)
+            self.logger.info(f"买入价格调整: {price:.3f} -> {adjusted_price:.3f} (+{buy_adjust_rate*100:.2f}%)")
+        elif order_type.lower() == "sell":
+            # 卖出价格下浮，提高成交概率
+            sell_adjust_rate = price_adjust_rate.get("sell", 0.003)
+            adjusted_price = price * (1 - sell_adjust_rate)
+            self.logger.info(f"卖出价格调整: {price:.3f} -> {adjusted_price:.3f} (-{sell_adjust_rate*100:.2f}%)")
         
-        # 记录订单提交
-        self.logger.info(f"提交{order_type}订单: {symbol} x {quantity} @ {price} [{strategy_name}]")
-        
-        # 增加每日订单计数
-        self.daily_orders_count += 1
+        # 选择交易方向
+        if order_type.lower() == "buy":
+            side = OrderSide.Buy
+        elif order_type.lower() == "sell":
+            side = OrderSide.Sell
+        else:
+            self.logger.error(f"不支持的订单类型: {order_type}")
+            return OrderResult(
+                order_id="",
+                symbol=symbol,
+                side=OrderSide.Buy,  # 默认值
+                quantity=quantity,
+                price=price,
+                status=OrderStatus.Rejected,
+                submitted_at=datetime.now(),
+                msg=f"不支持的订单类型: {order_type}"
+            )
+            
+        self.logger.info(f"提交{order_type}订单: {symbol} x {quantity} @ {adjusted_price} [{strategy_name}]")
         
         try:
             # 提交订单
@@ -696,7 +863,7 @@ class OrderManager:
                 symbol=symbol,
                 order_type=OrderType.LO,  # 限价单
                 side=side,
-                submitted_price=price,
+                submitted_price=adjusted_price,  # 使用调整后的价格
                 submitted_quantity=quantity,
                 time_in_force=TimeInForceType.Day,
                 remark=f"Strategy: {strategy_name}"
@@ -709,7 +876,7 @@ class OrderManager:
                     symbol=symbol,
                     side=side,
                     quantity=quantity,
-                    price=price,
+                    price=adjusted_price,  # 使用调整后的价格
                     status=OrderStatus.Rejected,
                     submitted_at=submitted_time,
                     msg="订单提交失败: API响应无效",
@@ -722,7 +889,7 @@ class OrderManager:
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
-                price=price,
+                price=adjusted_price,  # 使用调整后的价格
                 status=OrderStatus.New,
                 submitted_at=submitted_time,
                 strategy_name=strategy_name
@@ -730,20 +897,22 @@ class OrderManager:
             
             # 添加到活跃订单列表
             self.active_orders[response.order_id] = order_result
-            self.logger.info(f"订单已提交: ID={response.order_id}, {symbol}, {order_type}, {quantity}@{price}")
+            self.logger.info(f"订单已提交: ID={response.order_id}, {symbol}, {order_type}, {quantity}@{adjusted_price}")
             
             return order_result
-            
+        
         except Exception as e:
-            import traceback
+            # 记录详细异常信息
             self.logger.error(f"订单提交异常: {symbol} - {str(e)}")
-            self.logger.error(traceback.format_exc())
+            self.logger.error(f"Traceback (most recent call last):\n{traceback.format_exc()}")
+            
+            # 返回错误结果
             return OrderResult(
                 order_id="",
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
-                price=price,
+                price=adjusted_price,  # 使用调整后的价格
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
                 msg=f"订单提交异常: {str(e)}",
@@ -1126,11 +1295,25 @@ class OrderManager:
             return False
     
     async def close(self):
-        """关闭交易上下文"""
-        if self.trade_ctx:
-            self.logger.info("关闭交易上下文")
-            self.trade_ctx.close()
-            self.trade_ctx = None
+        """关闭交易上下文并清理资源"""
+        try:
+            # 取消订单跟踪任务
+            if hasattr(self, 'order_tracking_task') and self.order_tracking_task:
+                self.order_tracking_task.cancel()
+                try:
+                    await self.order_tracking_task
+                except asyncio.CancelledError:
+                    pass
+                    
+            # 关闭交易上下文
+            if self._trade_ctx_initialized and self.trade_ctx:
+                self.logger.info("关闭交易上下文")
+                self.trade_ctx.close()
+                self._trade_ctx_initialized = False
+                self.trade_ctx = None
+        except Exception as e:
+            self.logger.error(f"关闭交易上下文时出错: {e}")
+            self.logger.error(traceback.format_exc())
 
     def _save_order(self, order_result: OrderResult, signal: Signal):
         """保存订单结果"""
@@ -1366,16 +1549,71 @@ class OrderManager:
         )
 
     async def _init_trade_context(self):
-        """初始化交易上下文
-        
-        Returns:
-            bool: 如果初始化成功返回True，否则返回False
-        """
-        try:
-            await self.initialize()
-            self._trade_ctx_initialized = True
+        """初始化交易上下文，带重试机制"""
+        # 如果已经初始化，则直接返回
+        if self._trade_ctx_initialized:
             return True
+            
+        self.logger.info("正在初始化交易上下文...")
+        
+        # 重试逻辑
+        max_retries = self.config.get("execution.order_tracking.retry_count", 3)
+        retry_delay = 5  # 秒
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.logger.info(f"尝试创建交易上下文 (尝试 {attempt}/{max_retries})...")
+                
+                # 创建交易上下文
+                self.trade_ctx = TradeContext(self.longport_config)
+                
+                # 验证连接 - 尝试获取账户余额来验证连接是否成功
+                try:
+                    balance = self.trade_ctx.account_balance()
+                    self.logger.info(f"成功获取账户余额，API连接正常")
+                    
+                    # 保存获取到的账户余额
+                    self.account_balance = {}
+                    if hasattr(balance, 'cash'):
+                        # 按货币类型保存余额
+                        for cash_info in balance.cash:
+                            self.account_balance[cash_info.currency] = cash_info.available
+                    
+                    # 计算总可用资金（用于风控）
+                    self.total_available_cash = self.get_account_balance()
+                    
+                except Exception as e:
+                    self.logger.warning(f"获取账户余额失败，但上下文已创建: {e}")
+                
+                self._trade_ctx_initialized = True
+                self.logger.info("交易上下文初始化完成")
+                return True
+            except Exception as e:
+                self.logger.error(f"交易上下文初始化失败 (尝试 {attempt}/{max_retries}): {e}")
+                # 使用指数退避策略
+                if attempt < max_retries:
+                    wait_time = retry_delay * (2 ** (attempt - 1))
+                    self.logger.info(f"等待 {wait_time} 秒后重试...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    self.logger.error("已达到最大重试次数，无法初始化交易上下文")
+                    self._trade_ctx_initialized = False
+                    return False
+        
+        return False
+
+    def _notify_order_update(self, order: OrderResult):
+        """通知订单状态更新"""
+        try:
+            if hasattr(self, 'order_callbacks') and self.order_callbacks:
+                for callback in self.order_callbacks:
+                    try:
+                        callback(order)
+                    except Exception as e:
+                        self.logger.error(f"执行订单回调时出错: {e}")
+            else:
+                # 如果没有回调，仍然记录订单状态变化
+                self.logger.info(f"订单状态变化: {order.order_id}, {order.symbol}, {order.status}")
         except Exception as e:
-            self.logger.error(f"初始化交易上下文失败: {e}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return False
+            self.logger.error(f"通知订单更新时出错: {e}")
+            self.logger.error(f"Traceback:\n{traceback.format_exc()}")

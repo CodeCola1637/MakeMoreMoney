@@ -76,7 +76,7 @@ async def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="量化交易系统")
     parser.add_argument("--train", action="store_true", help="训练模型")
-    parser.add_argument("--symbols", nargs="+", default=["700.HK"], help="要交易的股票代码")
+    parser.add_argument("--symbols", nargs="+", default=["AAPL.US"], help="要交易的股票代码")
     parser.add_argument("--no-mock", action="store_true", help="禁止使用模拟数据，使用实时行情")
     args = parser.parse_args()
     
@@ -130,6 +130,8 @@ async def main():
     # 初始化订单管理器 - 使用真实API
     try:
         order_mgr = OrderManager(config)
+        # 注入实时数据管理器，使订单管理器能够获取最新价格
+        order_mgr.realtime_mgr = realtime_mgr
         logger.info("订单管理器初始化完成")
     except Exception as e:
         logger.error(f"订单管理器初始化失败: {e}")

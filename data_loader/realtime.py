@@ -13,10 +13,6 @@ from longport.openapi import (
     Config, 
     QuoteContext, 
     SubType, 
-    PushQuote, 
-    PushDepth, 
-    PushBrokers, 
-    PushTrades,
     Trade,
     Brokers,
     SecurityQuote,
@@ -26,8 +22,7 @@ from longport.openapi import (
 from utils import ConfigLoader, setup_logger, setup_longport_env
 
 # 定义回调类型
-PushEventType = Union[PushQuote, PushDepth, PushBrokers, PushTrades]
-EventCallback = Callable[[str, PushEventType], None]
+EventCallback = Callable[[str, Any], None]
 
 class RealtimeDataManager:
     """实时行情数据管理器，负责订阅和处理长桥API的实时行情数据"""
@@ -94,8 +89,12 @@ class RealtimeDataManager:
             try:
                 self.logger.info(f"尝试创建行情上下文 (尝试 {attempt}/{max_retries})...")
                 
-                # 创建行情上下文，新版本SDK不再支持设置推送回调
+                # 创建行情上下文
                 self.quote_ctx = QuoteContext(self.longport_config)
+                
+                # 设置推送回调函数
+                # 注意: 新版SDK使用subscribe_quote方法后会触发推送回调
+                self._setup_push_callbacks()
                 
                 # 验证连接
                 # 尝试获取市场状态来验证连接是否成功
@@ -112,6 +111,75 @@ class RealtimeDataManager:
                 else:
                     self.logger.error("已达到最大重试次数，无法初始化行情上下文")
                     raise
+                    
+    def _setup_push_callbacks(self):
+        """设置推送回调函数"""
+        try:
+            # 设置推送回调
+            self.quote_ctx.set_on_quote(self._on_quote_push)
+            self.quote_ctx.set_on_depth(self._on_depth_push)
+            self.quote_ctx.set_on_brokers(self._on_brokers_push)
+            self.quote_ctx.set_on_trade(self._on_trade_push)
+            self.logger.info("已设置实时行情推送回调")
+        except Exception as e:
+            self.logger.error(f"设置推送回调函数失败: {e}")
+    
+    def _on_quote_push(self, symbol: str, quote):
+        """行情推送回调"""
+        # 更新最新行情
+        self.latest_quotes[symbol] = quote
+        self.logger.debug(f"收到行情推送: {symbol}, 价格: {quote.last_done}")
+        
+        # 执行用户回调
+        for callback in self.user_callbacks.get("Quote", []):
+            try:
+                callback(symbol, quote)
+            except Exception as e:
+                self.logger.error(f"执行Quote回调失败: {e}")
+    
+    def _on_depth_push(self, symbol: str, depth):
+        """深度行情推送回调"""
+        # 更新最新深度行情
+        self.latest_depths[symbol] = depth
+        self.logger.debug(f"收到深度行情推送: {symbol}")
+        
+        # 执行用户回调
+        for callback in self.user_callbacks.get("Depth", []):
+            try:
+                callback(symbol, depth)
+            except Exception as e:
+                self.logger.error(f"执行Depth回调失败: {e}")
+    
+    def _on_brokers_push(self, symbol: str, brokers):
+        """经纪队列推送回调"""
+        # 更新最新经纪队列
+        self.latest_brokers[symbol] = brokers
+        self.logger.debug(f"收到经纪队列推送: {symbol}")
+        
+        # 执行用户回调
+        for callback in self.user_callbacks.get("Brokers", []):
+            try:
+                callback(symbol, brokers)
+            except Exception as e:
+                self.logger.error(f"执行Brokers回调失败: {e}")
+    
+    def _on_trade_push(self, symbol: str, trade):
+        """成交推送回调"""
+        # 更新最新成交记录
+        if symbol not in self.latest_trades:
+            self.latest_trades[symbol] = []
+        self.latest_trades[symbol].append(trade)
+        # 只保留最新的100条记录
+        if len(self.latest_trades[symbol]) > 100:
+            self.latest_trades[symbol] = self.latest_trades[symbol][-100:]
+        self.logger.debug(f"收到成交推送: {symbol}, 价格: {trade.price}, 数量: {trade.volume}")
+        
+        # 执行用户回调
+        for callback in self.user_callbacks.get("Trade", []):
+            try:
+                callback(symbol, trade)
+            except Exception as e:
+                self.logger.error(f"执行Trade回调失败: {e}")
         
     async def start(self):
         """启动行情管理器"""
@@ -131,9 +199,9 @@ class RealtimeDataManager:
         if symbol not in self.subscribed_symbols:
             self.logger.warning(f"股票{symbol}未订阅，回调可能不会被触发")
             
-        def wrapped_callback(sym: str, quote: PushQuote):
+        def wrapped_callback(sym: str, quote):
             if sym == symbol:
-                callback(quote.quote)
+                callback(quote)
                 
         self.register_callback("Quote", wrapped_callback)
         

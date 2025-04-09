@@ -44,8 +44,8 @@ if [ ! -d "databases" ]; then
     mkdir -p databases
 fi
 
-# 运行参数
-SYMBOLS="700.HK"
+# 设置默认参数
+SYMBOLS="AAPL.US"
 TRAIN=""
 NO_MOCK=""
 
