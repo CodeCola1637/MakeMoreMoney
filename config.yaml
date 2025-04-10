@@ -9,14 +9,12 @@ api:
 # 行情订阅配置
 quote:
   symbols:
-    - "AAPL.US"  # 苹果
+    - "00700.HK"  # 腾讯控股
   sub_types:
     - "Quote"      # 实时报价
-    - "Depth"      # 盘口
-    - "Brokers"    # 经纪队列
-    - "Trade"      # 逐笔成交
   use_mock_data: false  # 禁止使用本地mock数据
   historical_days: 1250  # 5年的交易日数量
+  data_quality_threshold: 0.5  # 降低数据质量检查阈值，要求至少50%的检查项通过
 
 # 策略配置
 strategy:

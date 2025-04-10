@@ -335,6 +335,18 @@ class OrderManager:
         # 订单回调函数
         self.order_callbacks = []
         
+        # 添加最小价格变动单位和最小交易单位配置
+        self.min_price_unit = {
+            "700.HK": 0.2,  # 腾讯控股
+            "9988.HK": 0.2,  # 阿里巴巴
+            "AAPL.US": 0.01  # 苹果
+        }
+        self.min_quantity_unit = {
+            "700.HK": 100,  # 腾讯控股
+            "9988.HK": 100,  # 阿里巴巴
+            "AAPL.US": 1  # 苹果
+        }
+        
     async def initialize(self):
         """初始化订单管理器"""
         # 初始化状态
@@ -810,112 +822,105 @@ class OrderManager:
         
         Args:
             symbol: 股票代码
-            price: 原始价格
+            price: 价格
             quantity: 数量
-            order_type: 订单类型 ("buy" 或 "sell")
+            order_type: 订单类型
             strategy_name: 策略名称
             
         Returns:
-            OrderResult: 订单结果对象
+            OrderResult: 订单结果
         """
-        # 限价单价格优化
-        adjusted_price = price
-        price_adjust_rate = self.config.get("execution.price_adjust_rate", {
-            "buy": 0.003,  # 买入价格上浮0.3%
-            "sell": 0.003  # 卖出价格下浮0.3%
-        })
-        
-        if order_type.lower() == "buy":
-            # 买入价格上浮，提高成交概率
-            buy_adjust_rate = price_adjust_rate.get("buy", 0.003)
-            adjusted_price = price * (1 + buy_adjust_rate)
-            self.logger.info(f"买入价格调整: {price:.3f} -> {adjusted_price:.3f} (+{buy_adjust_rate*100:.2f}%)")
-        elif order_type.lower() == "sell":
-            # 卖出价格下浮，提高成交概率
-            sell_adjust_rate = price_adjust_rate.get("sell", 0.003)
-            adjusted_price = price * (1 - sell_adjust_rate)
-            self.logger.info(f"卖出价格调整: {price:.3f} -> {adjusted_price:.3f} (-{sell_adjust_rate*100:.2f}%)")
-        
-        # 选择交易方向
-        if order_type.lower() == "buy":
-            side = OrderSide.Buy
-        elif order_type.lower() == "sell":
-            side = OrderSide.Sell
-        else:
-            self.logger.error(f"不支持的订单类型: {order_type}")
+        try:
+            # 记录详细的订单信息
+            self.logger.info(f"准备提交订单 - 股票: {symbol}, 价格: {price}, 数量: {quantity}, 类型: {order_type}, 策略: {strategy_name}")
+            
+            # 验证订单参数
+            is_valid, error_msg = self._validate_order_parameters(symbol, price, quantity)
+            if not is_valid:
+                self.logger.error(f"订单参数验证失败: {error_msg}")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg=error_msg,
+                    strategy_name=strategy_name
+                )
+            
+            # 执行风险控制检查
+            if not await self.risk_control_check(symbol, quantity, price, is_buy=(order_type.lower() == "buy")):
+                self.logger.warning(f"风险控制检查未通过: {symbol}")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg="风险控制检查未通过",
+                    strategy_name=strategy_name
+                )
+            
+            # 提交订单
+            order = await self.trade_ctx.submit_order(
+                symbol=symbol,
+                order_type=OrderType.LO,
+                side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                submitted_price=price,
+                submitted_quantity=quantity,
+                time_in_force=TimeInForceType.Day
+            )
+            
+            if not order:
+                self.logger.error(f"订单提交失败: {symbol} - API返回空响应")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg="API返回空响应",
+                    strategy_name=strategy_name
+                )
+            
+            # 创建订单结果对象
+            order_result = OrderResult(
+                order_id=order.order_id,
+                symbol=symbol,
+                side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                quantity=quantity,
+                price=price,
+                status=OrderStatus.New,
+                submitted_at=datetime.now(),
+                strategy_name=strategy_name
+            )
+            
+            # 保存订单
+            self._save_order(order_result, strategy_name)
+            
+            self.logger.info(f"订单提交成功: {order_result}")
+            return order_result
+            
+        except Exception as e:
+            error_msg = f"提交订单时发生错误: {str(e)}"
+            self.logger.error(error_msg)
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            
             return OrderResult(
                 order_id="",
                 symbol=symbol,
-                side=OrderSide.Buy,  # 默认值
+                side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
                 quantity=quantity,
                 price=price,
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
-                msg=f"不支持的订单类型: {order_type}"
-            )
-            
-        self.logger.info(f"提交{order_type}订单: {symbol} x {quantity} @ {adjusted_price} [{strategy_name}]")
-        
-        try:
-            # 提交订单
-            submitted_time = datetime.now()
-            response = self.trade_ctx.submit_order(
-                symbol=symbol,
-                order_type=OrderType.LO,  # 限价单
-                side=side,
-                submitted_price=adjusted_price,  # 使用调整后的价格
-                submitted_quantity=quantity,
-                time_in_force=TimeInForceType.Day,
-                remark=f"Strategy: {strategy_name}"
-            )
-            
-            if not response or not response.order_id:
-                self.logger.error(f"订单提交失败: {symbol} - API响应无效")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=side,
-                    quantity=quantity,
-                    price=adjusted_price,  # 使用调整后的价格
-                    status=OrderStatus.Rejected,
-                    submitted_at=submitted_time,
-                    msg="订单提交失败: API响应无效",
-                    strategy_name=strategy_name
-                )
-                
-            # 创建并返回订单结果
-            order_result = OrderResult(
-                order_id=response.order_id,
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                price=adjusted_price,  # 使用调整后的价格
-                status=OrderStatus.New,
-                submitted_at=submitted_time,
-                strategy_name=strategy_name
-            )
-            
-            # 添加到活跃订单列表
-            self.active_orders[response.order_id] = order_result
-            self.logger.info(f"订单已提交: ID={response.order_id}, {symbol}, {order_type}, {quantity}@{adjusted_price}")
-            
-            return order_result
-        
-        except Exception as e:
-            # 记录详细异常信息
-            self.logger.error(f"订单提交异常: {symbol} - {str(e)}")
-            self.logger.error(f"Traceback (most recent call last):\n{traceback.format_exc()}")
-            
-            # 返回错误结果
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                price=adjusted_price,  # 使用调整后的价格
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg=f"订单提交异常: {str(e)}",
+                msg=error_msg,
                 strategy_name=strategy_name
             )
     
@@ -1315,64 +1320,52 @@ class OrderManager:
             self.logger.error(f"关闭交易上下文时出错: {e}")
             self.logger.error(traceback.format_exc())
 
-    def _save_order(self, order_result: OrderResult, signal: Signal):
-        """保存订单结果"""
+    def _save_order(self, order_result: OrderResult, strategy_name: str):
+        """
+        保存订单信息
+        
+        Args:
+            order_result: 订单结果
+            strategy_name: 策略名称
+        """
         try:
-            # 记录信号和订单的关联
-            if not hasattr(self, 'signal_order_map'):
-                self.signal_order_map = {}
-            
-            # 生成一个唯一的信号标识符，因为Signal对象没有id属性
-            signal_id = f"{signal.symbol}_{signal.signal_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{id(signal)}"
-            
-            self.signal_order_map[signal_id] = order_result.order_id
-            
-            # 这里可以将订单信息保存到数据库
-            # 将订单信息写入CSV文件
-            order_data = {
-                'order_id': order_result.order_id,
-                'symbol': order_result.symbol,
-                'side': order_result.side.value if hasattr(order_result.side, 'value') else str(order_result.side),
-                'quantity': order_result.quantity,
-                'price': order_result.price,
-                'status': order_result.status.value if hasattr(order_result.status, 'value') else str(order_result.status),
-                'signal_id': signal_id,
-                'signal_type': signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type),
-                'submitted_at': order_result.submitted_at.isoformat() if hasattr(order_result, 'submitted_at') and order_result.submitted_at else '',
-            }
-            
-            # 检查是否存在这些属性，并安全添加
-            if hasattr(order_result, 'filled_at') and order_result.filled_at:
-                order_data['filled_at'] = order_result.filled_at.isoformat()
-            else:
-                order_data['filled_at'] = ''
-                
-            if hasattr(order_result, 'cancelled_at') and order_result.cancelled_at:
-                order_data['cancelled_at'] = order_result.cancelled_at.isoformat()
-            else:
-                order_data['cancelled_at'] = ''
-                
-            if hasattr(order_result, 'rejected_at') and order_result.rejected_at:
-                order_data['rejected_at'] = order_result.rejected_at.isoformat()
-            else:
-                order_data['rejected_at'] = ''
-            
             # 确保日志目录存在
             log_dir = self.config.get('logging', {}).get('dir', 'logs')
             os.makedirs(log_dir, exist_ok=True)
             
-            orders_csv = os.path.join(log_dir, 'orders.csv')
-            file_exists = os.path.isfile(orders_csv)
+            # 保存到CSV文件
+            orders_file = os.path.join(log_dir, 'orders.csv')
+            file_exists = os.path.exists(orders_file)
             
-            with open(orders_csv, 'a', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=order_data.keys())
+            with open(orders_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=[
+                    'order_id', 'symbol', 'side', 'quantity', 'price',
+                    'status', 'submitted_at', 'filled_at', 'cancelled_at',
+                    'rejected_at', 'msg', 'strategy_name'
+                ])
+                
                 if not file_exists:
                     writer.writeheader()
-                writer.writerow(order_data)
+                    
+                writer.writerow({
+                    'order_id': order_result.order_id,
+                    'symbol': order_result.symbol,
+                    'side': order_result.side.name if hasattr(order_result.side, 'name') else str(order_result.side),
+                    'quantity': order_result.quantity,
+                    'price': order_result.price,
+                    'status': order_result.status.name if hasattr(order_result.status, 'name') else str(order_result.status),
+                    'submitted_at': order_result.submitted_at.isoformat() if order_result.submitted_at else '',
+                    'filled_at': order_result.filled_at.isoformat() if hasattr(order_result, 'filled_at') and order_result.filled_at else '',
+                    'cancelled_at': order_result.cancelled_at.isoformat() if hasattr(order_result, 'cancelled_at') and order_result.cancelled_at else '',
+                    'rejected_at': order_result.rejected_at.isoformat() if hasattr(order_result, 'rejected_at') and order_result.rejected_at else '',
+                    'msg': order_result.msg if hasattr(order_result, 'msg') else '',
+                    'strategy_name': strategy_name
+                })
+                
+            self.logger.info(f"订单信息已保存到 {orders_file}")
             
-            self.logger.info(f"订单信息已保存到 {orders_csv}")
         except Exception as e:
-            self.logger.error(f"保存订单信息失败: {e}")
+            self.logger.error(f"保存订单信息时发生错误: {str(e)}")
             self.logger.error(f"Traceback: {traceback.format_exc()}")
 
     def _check_daily_order_limit(self) -> bool:
@@ -1430,12 +1423,16 @@ class OrderManager:
             bool: 如果通过风险控制检查则返回True，否则返回False
         """
         try:
+            self.logger.info(f"开始风险控制检查: {symbol}, 数量={quantity}, 价格={price}, 买入={is_buy}")
+            
             # 1. 检查每日订单上限
             if not self._check_daily_order_limit():
+                self.logger.warning(f"风险控制: 今日订单数已达上限 {self.daily_order_count}/{self.max_daily_orders}")
                 return False
                 
             # 2. 获取当前持仓
             positions = self.get_positions(symbol)
+            self.logger.info(f"当前持仓: {positions}")
             
             if is_buy:
                 # 3. 买入风险控制
@@ -1445,13 +1442,18 @@ class OrderManager:
                     if pos.symbol == symbol:
                         current_position += pos.quantity
                 
+                self.logger.info(f"当前持仓数量: {current_position}, 最大持仓限制: {self.max_position_size}")
                 if current_position + quantity > self.max_position_size:
                     self.logger.warning(f"风险控制: 买入{symbol}的数量{quantity}会导致持仓({current_position})超过最大限制({self.max_position_size})")
                     return False
                 
                 # 3.2 检查账户余额是否足够
                 cost = price * quantity * (1 + self.config.get('commission_rate', 0.0025))
-                return self.is_enough_balance(cost)
+                self.logger.info(f"计算交易成本: {cost}")
+                balance_check = self.is_enough_balance(cost)
+                if not balance_check:
+                    self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前可用资金: {self.get_account_balance()}")
+                return balance_check
             else:
                 # 4. 卖出风险控制
                 # 4.1 检查卖出数量是否超过当前持仓
@@ -1460,6 +1462,7 @@ class OrderManager:
                     if pos.symbol == symbol:
                         current_position += pos.quantity
                 
+                self.logger.info(f"当前持仓数量: {current_position}, 计划卖出数量: {quantity}")
                 if quantity > current_position:
                     self.logger.warning(f"风险控制: 卖出{symbol}的数量{quantity}超过当前持仓{current_position}")
                     return False
@@ -1470,6 +1473,44 @@ class OrderManager:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
+    def _validate_order_parameters(self, symbol: str, price: float, quantity: int) -> Tuple[bool, str]:
+        """
+        验证订单参数是否符合交易所要求
+        
+        Args:
+            symbol: 股票代码
+            price: 价格
+            quantity: 数量
+            
+        Returns:
+            Tuple[bool, str]: (是否通过验证, 错误信息)
+        """
+        try:
+            # 验证价格
+            if symbol not in self.min_price_unit:
+                return False, f"未配置{symbol}的最小价格变动单位"
+                
+            min_price_unit = self.min_price_unit[symbol]
+            if price <= 0:
+                return False, f"价格必须大于0"
+            if price % min_price_unit != 0:
+                return False, f"价格{price}不符合最小价格变动单位{min_price_unit}"
+                
+            # 验证数量
+            if symbol not in self.min_quantity_unit:
+                return False, f"未配置{symbol}的最小交易单位"
+                
+            min_quantity = self.min_quantity_unit[symbol]
+            if quantity <= 0:
+                return False, f"数量必须大于0"
+            if quantity % min_quantity != 0:
+                return False, f"数量{quantity}不符合最小交易单位{min_quantity}"
+                
+            return True, ""
+            
+        except Exception as e:
+            return False, f"验证订单参数时发生错误: {str(e)}"
+            
     async def submit_buy_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default") -> OrderResult:
         """
         提交买入订单
@@ -1485,19 +1526,23 @@ class OrderManager:
         """
         self.logger.info(f"提交买入订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
         
+        # 验证订单参数
+        is_valid, error_msg = self._validate_order_parameters(symbol, price, quantity)
+        if not is_valid:
+            self.logger.error(f"订单参数验证失败: {error_msg}")
+            return OrderResult(
+                success=False,
+                order_id=None,
+                error_message=error_msg
+            )
+        
         # 执行风险控制检查
         if not await self.risk_control_check(symbol, quantity, price, is_buy=True):
             self.logger.warning(f"买入订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
             return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Buy,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg="风险控制检查失败",
-                strategy_name=strategy_name
+                success=False,
+                order_id=None,
+                error_message="未通过风险控制检查"
             )
             
         # 提交订单
@@ -1524,19 +1569,23 @@ class OrderManager:
         """
         self.logger.info(f"提交卖出订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
         
+        # 验证订单参数
+        is_valid, error_msg = self._validate_order_parameters(symbol, price, quantity)
+        if not is_valid:
+            self.logger.error(f"订单参数验证失败: {error_msg}")
+            return OrderResult(
+                success=False,
+                order_id=None,
+                error_message=error_msg
+            )
+        
         # 执行风险控制检查
         if not await self.risk_control_check(symbol, quantity, price, is_buy=False):
             self.logger.warning(f"卖出订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
             return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Sell,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg="风险控制检查失败",
-                strategy_name=strategy_name
+                success=False,
+                order_id=None,
+                error_message="未通过风险控制检查"
             )
             
         # 提交订单
@@ -1617,3 +1666,95 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"通知订单更新时出错: {e}")
             self.logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    async def on_signal(self, signal: Signal):
+        """
+        处理交易信号
+        
+        Args:
+            signal: 交易信号对象
+        """
+        try:
+            self.logger.info(f"收到交易信号: {signal}")
+            
+            # 检查信号有效性
+            if not self._validate_signal(signal):
+                self.logger.warning(f"信号验证失败，跳过执行")
+                return
+                
+            # 执行风控检查
+            if not await self.risk_control_check(signal):
+                self.logger.warning(f"风控检查未通过，跳过执行")
+                return
+                
+            # 确定订单类型和价格
+            order_type = OrderType[self.config.get("execution.order_types.default", "LO")]
+            price = signal.price
+            
+            # 根据信号类型调整价格
+            if signal.signal_type == SignalType.BUY:
+                price_adjust_rate = self.config.get("execution.price_adjust_rate.buy", 0.003)
+                price *= (1 + price_adjust_rate)
+                side = OrderSide.Buy
+            else:  # SELL
+                price_adjust_rate = self.config.get("execution.price_adjust_rate.sell", 0.003)
+                price *= (1 - price_adjust_rate)
+                side = OrderSide.Sell
+                
+            # 提交订单
+            order_result = await self.submit_order(
+                symbol=signal.symbol,
+                side=side,
+                quantity=signal.quantity,
+                price=price,
+                order_type=order_type,
+                strategy_name=signal.strategy_name
+            )
+            
+            if order_result:
+                self.logger.info(f"订单提交成功: {order_result.order_id}")
+            else:
+                self.logger.error("订单提交失败")
+                
+        except Exception as e:
+            self.logger.error(f"处理交易信号时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            
+    def _validate_signal(self, signal: Signal) -> bool:
+        """
+        验证交易信号
+        
+        Args:
+            signal: 交易信号对象
+            
+        Returns:
+            bool: 信号是否有效
+        """
+        try:
+            # 检查必要字段
+            if not all([signal.symbol, signal.signal_type, signal.price, signal.quantity]):
+                self.logger.warning(f"信号缺少必要字段: {signal}")
+                return False
+                
+            # 检查价格和数量是否为正数
+            if signal.price <= 0 or signal.quantity <= 0:
+                self.logger.warning(f"价格或数量必须为正数: price={signal.price}, quantity={signal.quantity}")
+                return False
+                
+            # 检查信号类型
+            if signal.signal_type not in [SignalType.BUY, SignalType.SELL]:
+                self.logger.warning(f"不支持的信号类型: {signal.signal_type}")
+                return False
+                
+            # 检查信号时效性
+            signal_age = datetime.now() - signal.created_at
+            if signal_age > timedelta(minutes=5):  # 信号有效期5分钟
+                self.logger.warning(f"信号已过期: {signal_age.total_seconds()}秒")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"验证信号时出错: {e}")
+            return False

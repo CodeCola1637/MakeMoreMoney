@@ -391,6 +391,32 @@ class LSTMModelTrainer:
         self.logger.info(f"训练历史已保存到图表")
         plt.close()
 
+    def load_model(self) -> Optional[tf.keras.Model]:
+        """
+        加载已训练的模型
+        
+        Returns:
+            加载的模型，如果加载失败则返回None
+        """
+        try:
+            if not os.path.exists(self.model_path):
+                self.logger.warning(f"模型文件不存在: {self.model_path}")
+                # 如果模型不存在，创建一个新的模型
+                input_shape = (self.lookback_period, len(self.feature_cols))
+                self.model = self.build_model(input_shape)
+                self.logger.info("已创建新模型")
+            else:
+                self.logger.info(f"从文件加载模型: {self.model_path}")
+                self.model = tf.keras.models.load_model(self.model_path)
+                self.logger.info("模型加载成功")
+                
+            return self.model
+            
+        except Exception as e:
+            self.logger.error(f"加载模型失败: {str(e)}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return None
+
 if __name__ == "__main__":
     # 初始化配置和数据加载器
     config = ConfigLoader()

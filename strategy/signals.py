@@ -9,6 +9,10 @@ from typing import Dict, List, Tuple, Optional, Union, Any, Callable
 from enum import Enum
 import time
 import json
+import logging
+import os
+import traceback
+import tensorflow as tf
 
 from utils import ConfigLoader, setup_logger
 from data_loader.realtime import RealtimeDataManager
@@ -82,329 +86,178 @@ class Signal:
         )
 
 class SignalGenerator:
-    """交易信号生成器，负责根据模型预测生成交易信号"""
+    """信号生成器"""
     
-    def __init__(
-        self, 
-        config_loader: ConfigLoader, 
-        realtime_manager: RealtimeDataManager,
-        model_trainer: LSTMModelTrainer
-    ):
+    def __init__(self, config, realtime_mgr, model_trainer):
         """
-        初始化交易信号生成器
+        初始化信号生成器
         
         Args:
-            config_loader: 配置加载器
-            realtime_manager: 实时数据管理器
-            model_trainer: 模型训练器
+            config: 配置字典
+            realtime_mgr: 实时数据管理器
+            model_trainer: LSTM模型训练器
         """
-        self.config = config_loader
-        self.realtime_manager = realtime_manager
+        self.config = config
+        self.realtime_mgr = realtime_mgr
         self.model_trainer = model_trainer
-        self.logger = setup_logger(
-            "signal_generator", 
-            self.config.get("logging.level", "INFO"),
-            self.config.get("logging.file")
-        )
+        self.model = None
+        self.data_cache = {}
+        self.callbacks = []
+        self.logger = logging.getLogger(__name__)
         
-        # 信号回调
-        self.signal_callbacks: List[Callable[[Signal], None]] = []
+        # 初始化信号生成间隔
+        self.signal_interval = config.get("strategy.signal_interval", 60)  # 默认60秒
         
-        # 信号缓存
-        self.signals: Dict[str, Signal] = {}
+        # 初始化回看周期
+        self.lookback_period = config.get("strategy.lookback_period", 30)  # 默认30个数据点
         
-        # 最后预测时间
-        self.last_prediction_time: Dict[str, datetime] = {}
-        
-        # 信号阈值参数
-        self.buy_threshold = 0.01  # 价格上涨超过1%发出买入信号
-        self.sell_threshold = -0.01  # 价格下跌超过1%发出卖出信号
-        
-        # 注册行情回调
-        self.realtime_manager.register_callback("Quote", self._on_quote_update)
-        
-    def register_signal_callback(self, callback: Callable[[Signal], None]):
-        """
-        注册信号回调函数
-        
-        Args:
-            callback: 回调函数，接收Signal参数
-        """
-        self.signal_callbacks.append(callback)
-        self.logger.debug(f"已注册信号回调函数: {callback.__name__}")
-        
-    async def initialize(self):
-        """初始化，包括加载模型等操作"""
+    async def start(self):
+        """启动信号生成器"""
         try:
-            # 订阅默认股票行情
-            self.realtime_manager.batch_subscribe_default()
+            self.logger.info("正在加载模型...")
+            self.model = self.model_trainer.load_model()
+            if self.model is None:
+                raise ValueError("无法加载模型")
             
-            # 加载模型
-            self.model_trainer.train_model(force_retrain=False)
+            self.logger.info("模型加载成功")
             
+            # 注册实时数据回调，指定事件类型为 "Quote"
+            self.realtime_mgr.register_callback("Quote", self.update_data)
+            
+            self.logger.info("信号生成器启动完成")
+            return True
         except Exception as e:
-            self.logger.error(f"初始化信号生成器失败: {e}")
-            raise
-    
-    async def predict_and_generate_signal(self, symbol: str) -> Optional[Signal]:
-        """
-        为指定股票生成交易信号
+            self.logger.error(f"启动信号生成器时出错: {str(e)}")
+            return False
         
-        Args:
-            symbol: 股票代码
-            
-        Returns:
-            生成的交易信号，如果无法生成则返回None
-        """
-        # 防止短时间内重复预测
-        now = datetime.now()
-        if symbol in self.last_prediction_time:
-            elapsed = (now - self.last_prediction_time[symbol]).total_seconds()
-            if elapsed < 60:  # 至少间隔60秒
-                self.logger.debug(f"跳过 {symbol} 的信号生成，距上次生成时间不足60秒")
-                return None
-                
-        self.last_prediction_time[symbol] = now
+    def register_callback(self, callback: Callable):
+        """注册回调函数"""
+        self.callbacks.append(callback)
         
-        try:
-            # 获取最新价格
-            latest_price = None
-            quote = self.realtime_manager.get_latest_quote(symbol)
-            
-            if quote:
-                latest_price = quote.last_done
-                self.logger.debug(f"{symbol} 最新价格: {latest_price}")
-            else:
-                # 实时获取价格
-                quotes = await self.realtime_manager.get_quote([symbol])
-                if quotes and symbol in quotes:
-                    quote = quotes[symbol]
-                    latest_price = quote.last_done
-                    self.logger.debug(f"{symbol} 实时价格: {latest_price}")
-                else:
-                    self.logger.warning(f"无法获取 {symbol} 的价格信息")
-                    return None
-                    
-            # 进行预测
-            try:
-                # 确保处理异步方法
-                prediction_result = await self.model_trainer.predict_next(symbol)
-                
-                if isinstance(prediction_result, dict) and "error" in prediction_result:
-                    self.logger.error(f"预测 {symbol} 失败: {prediction_result['error']}")
-                    return None
-                    
-                # 假设返回预测结果包含百分比变化
-                predicted_change_pct = prediction_result.get('predicted_change_pct', 0)
-                self.logger.info(f"{symbol} 预测价格变化: {predicted_change_pct:.2f}%")
-                
-                # 根据预测结果生成信号
-                signal_type = SignalType.HOLD
-                confidence = abs(predicted_change_pct) / 5.0  # 归一化置信度
-                confidence = min(max(confidence, 0.0), 1.0)  # 限制在0-1之间
-                
-                # 根据预测涨跌幅判断买卖信号
-                buy_threshold = self.config.get("strategy.thresholds.buy", 0.5)
-                sell_threshold = self.config.get("strategy.thresholds.sell", -0.5)
-                
-                if predicted_change_pct >= buy_threshold:
-                    signal_type = SignalType.BUY
-                elif predicted_change_pct <= sell_threshold:
-                    signal_type = SignalType.SELL
-                
-                try:
-                    # 确保数值类型正确
-                    try:
-                        # 确保是浮点数
-                        position_pct = float(self.config.get("execution.risk_control.position_pct", 2.0))
-                        max_position_size = float(self.config.get("execution.max_position_size", 10000))
-                        confidence = float(confidence)
-                        latest_price = float(latest_price) if latest_price else 0.0
-                        
-                        # 计算建议交易数量
-                        suggested_value = max_position_size * (position_pct / 100) * confidence
-                        quantity = int(suggested_value / latest_price) if latest_price > 0 else 0
-                    except Exception as e:
-                        self.logger.error(f"计算交易数量时出错: {e}")
-                        quantity = 0
-                    
-                    if quantity <= 0 and signal_type != SignalType.HOLD:
-                        quantity = 1  # 至少交易1股
-                        
-                    # 创建信号对象
-                    if signal_type != SignalType.HOLD:
-                        signal = Signal(
-                            symbol=symbol,
-                            signal_type=signal_type,  # 使用 SignalType 枚举值
-                            price=latest_price,
-                            confidence=confidence,
-                            quantity=quantity,
-                            extra_data={
-                                "predicted_change_pct": predicted_change_pct,
-                                "model": "LSTM"
-                            },
-                            strategy_name="default"
-                        )
-                        return signal
-                    else:
-                        self.logger.info(f"{symbol} 预测变化不足以触发交易信号")
-                        return None
-                except Exception as e:
-                    self.logger.error(f"创建信号对象时出错: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    return None
-                    
-            except Exception as e:
-                self.logger.error(f"生成 {symbol} 的交易信号时出错: {e}")
-                import traceback
-                traceback.print_exc()
-                return None
-                
-        except Exception as e:
-            self.logger.error(f"生成 {symbol} 的交易信号失败: {e}")
-            return None
-    
-    async def generate_signals_for_all(self) -> Dict[str, Signal]:
-        """
-        为所有已订阅的股票生成交易信号
-        
-        Returns:
-            生成的交易信号字典，key为股票代码，value为Signal对象
-        """
-        symbols = list(self.realtime_manager.subscribed_symbols)
-        if not symbols:
-            self.logger.warning("没有订阅的股票，无法生成信号")
-            return {}
-            
-        new_signals = {}
-        
-        for symbol in symbols:
-            try:
-                signal = await self.predict_and_generate_signal(symbol)
-                if signal:
-                    self.logger.info(f"生成信号: {signal}")
-                    self.signals[symbol] = signal
-                    new_signals[symbol] = signal
-                    
-                    # 触发回调
-                    for callback in self.signal_callbacks:
-                        try:
-                            if asyncio.iscoroutinefunction(callback):
-                                await callback(signal)
-                            else:
-                                callback(signal)
-                        except Exception as e:
-                            self.logger.error(f"执行信号回调失败: {e}")
-            except Exception as e:
-                self.logger.error(f"生成信号失败: {symbol}, {e}")
-                
-        return new_signals
-    
-    def _on_quote_update(self, symbol: str, quote: Any):
-        """
-        行情更新回调函数
+    async def update_data(self, symbol: str, quote: Any):
+        """更新数据并生成信号
         
         Args:
             symbol: 股票代码
             quote: 行情数据
         """
-        # 这里可以实现基于实时行情的信号生成逻辑
-        # 对于复杂策略，可以在此调用预测函数
-        pass
-    
-    def get_latest_signal(self, symbol: str) -> Optional[Signal]:
-        """
-        获取指定股票的最新信号
-        
-        Args:
-            symbol: 股票代码
+        try:
+            # 转换行情数据为字典格式
+            data = {
+                "last_done": quote.last_done,
+                "open": quote.open,
+                "high": quote.high,
+                "low": quote.low,
+                "volume": quote.volume,
+                "timestamp": datetime.now()
+            }
             
-        Returns:
-            最新信号，如果没有则返回None
-        """
-        return self.signals.get(symbol)
-    
-    def get_all_signals(self) -> Dict[str, Signal]:
-        """
-        获取所有信号
-        
-        Returns:
-            信号字典
-        """
-        return self.signals
-    
-    def clear_signals(self):
-        """清除所有信号"""
-        self.signals.clear()
-        self.logger.info("已清除所有信号")
-        
-    async def scheduled_signal_generation(self, interval_seconds: int = 300):
-        """
-        定时生成交易信号的任务
-        
-        Args:
-            interval_seconds: 信号生成间隔，单位为秒
-        """
-        self.logger.info(f"启动定时信号生成任务，间隔 {interval_seconds} 秒")
-        
-        while True:
-            try:
-                self.logger.debug("执行定时信号生成")
+            # 更新数据缓存
+            if symbol not in self.data_cache:
+                self.data_cache[symbol] = []
                 
-                # 获取已订阅的股票代码
-                symbols = list(self.realtime_manager.subscribed_symbols)
-                if not symbols:
-                    self.logger.warning("没有订阅的股票，无法生成信号")
-                    await asyncio.sleep(interval_seconds)
-                    continue
+            self.data_cache[symbol].append(data)
+            
+            # 保持缓存大小
+            if len(self.data_cache[symbol]) > self.lookback_period:
+                self.data_cache[symbol] = self.data_cache[symbol][-self.lookback_period:]
                 
-                self.logger.info(f"正在为 {symbols} 生成交易信号")
+            # 如果数据足够，生成信号
+            if len(self.data_cache[symbol]) >= self.lookback_period:
+                # 准备模型输入数据
+                input_data = self._prepare_model_input(symbol)
                 
-                # 为每个股票生成信号
-                for symbol in symbols:
+                # 使用模型预测
+                prediction = self.model.predict(input_data, verbose=0)[0][0]
+                
+                # 生成信号
+                signal = self._generate_signal(symbol, prediction, data)
+                
+                # 通知回调函数
+                for callback in self.callbacks:
                     try:
-                        # 获取最新价格
-                        quote = self.realtime_manager.get_latest_quote(symbol)
-                        if not quote:
-                            self.logger.warning(f"无法获取 {symbol} 的最新行情，尝试请求实时数据")
-                            quotes = await self.realtime_manager.get_quote([symbol])
-                            if not quotes or symbol not in quotes:
-                                self.logger.error(f"无法获取 {symbol} 的最新行情，跳过信号生成")
-                                continue
-                            quote = quotes[symbol]
-                        
-                        # 使用最新价格生成信号
-                        latest_price = quote.last_done
-                        self.logger.info(f"{symbol} 最新价格: {latest_price}")
-                        
-                        # 使用LSTM模型预测
-                        self.logger.info(f"为 {symbol} 使用LSTM模型预测")
-                        
-                        # 预测并生成信号
-                        signal = await self.predict_and_generate_signal(symbol)
-                        
-                        if signal:
-                            self.logger.info(f"生成信号: {signal}")
-                            self.signals[symbol] = signal
-                            
-                            # 触发回调
-                            for callback in self.signal_callbacks:
-                                try:
-                                    if asyncio.iscoroutinefunction(callback):
-                                        await callback(signal)
-                                    else:
-                                        callback(signal)
-                                except Exception as e:
-                                    self.logger.error(f"执行信号回调失败: {e}")
+                        if asyncio.iscoroutinefunction(callback):
+                            await callback(signal)
                         else:
-                            self.logger.info(f"未生成 {symbol} 的交易信号")
+                            callback(signal)
                     except Exception as e:
-                        self.logger.error(f"为 {symbol} 生成信号时出错: {e}")
-                
-                self.logger.debug("定时信号生成完成")
-            except Exception as e:
-                self.logger.error(f"定时信号生成任务出错: {e}")
+                        self.logger.error(f"执行回调函数失败: {str(e)}")
+                        
+        except Exception as e:
+            self.logger.error(f"更新数据失败: {str(e)}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
             
-            # 等待下一次执行
-            await asyncio.sleep(interval_seconds)
+    def _prepare_model_input(self, symbol: str) -> np.ndarray:
+        """准备模型输入数据"""
+        try:
+            # 获取最近的数据
+            recent_data = self.data_cache[symbol][-self.lookback_period:]
+            
+            # 提取特征
+            features = []
+            for data in recent_data:
+                features.append([
+                    data["last_done"],
+                    data["open"],
+                    data["high"],
+                    data["low"],
+                    data["volume"]
+                ])
+                
+            # 转换为numpy数组并标准化
+            features = np.array(features)
+            features = (features - np.mean(features, axis=0)) / (np.std(features, axis=0) + 1e-8)
+            
+            # 添加批次维度
+            features = np.expand_dims(features, axis=0)
+            
+            return features
+            
+        except Exception as e:
+            self.logger.error(f"准备模型输入数据失败: {str(e)}")
+            raise
+            
+    def _generate_signal(self, symbol: str, prediction: float, latest_data: Dict[str, Any]) -> Signal:
+        """生成交易信号"""
+        try:
+            # 根据预测结果确定信号类型
+            if prediction > 0.5:
+                signal_type = SignalType.BUY
+            elif prediction < -0.5:
+                signal_type = SignalType.SELL
+            else:
+                signal_type = SignalType.HOLD
+                
+            # 计算置信度
+            confidence = abs(prediction)
+            
+            # 计算建议交易数量
+            quantity = self._calculate_quantity(symbol, latest_data)
+            
+            # 创建信号对象
+            signal = Signal(
+                symbol=symbol,
+                signal_type=signal_type,
+                price=latest_data["last_done"],
+                confidence=confidence,
+                quantity=quantity,
+                extra_data=latest_data
+            )
+            
+            self.logger.info(f"生成信号: {signal}")
+            return signal
+            
+        except Exception as e:
+            self.logger.error(f"生成信号失败: {str(e)}")
+            raise
+            
+    def _calculate_quantity(self, symbol: str, data: Dict[str, Any]) -> int:
+        """计算建议交易数量"""
+        try:
+            # 这里可以实现更复杂的仓位计算逻辑
+            # 当前简单实现：固定交易100股
+            return 100
+            
+        except Exception as e:
+            self.logger.error(f"计算交易数量失败: {str(e)}")
+            return 0
