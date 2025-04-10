@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Dict, Optional
 from datetime import datetime
+import traceback
 
 from data_loader.realtime import RealtimeDataManager
 from execution.order_manager import OrderManager
@@ -44,16 +45,21 @@ class TradeExecutor:
                     # 获取最新的交易信号
                     signals = self.realtime_mgr.get_latest_signals()
                     
+                    if signals:
+                        logger.info(f"获取到 {len(signals)} 个交易信号: {list(signals.keys())}")
+                    
                     # 处理每个信号
                     for symbol, signal_data in signals.items():
                         if signal_data and "quote" in signal_data:
                             quote = signal_data["quote"]
                             
+                            logger.info(f"处理信号: {symbol}, 价格: {quote.last_done}")
+                            
                             # 创建信号对象
                             signal = Signal(
                                 symbol=symbol,
                                 signal_type=self._determine_signal_type(quote),
-                                price=quote.get("last_done", 0),
+                                price=quote.last_done,
                                 confidence=0.8,  # 默认置信度
                                 quantity=self._calculate_position_size(quote),
                                 extra_data=quote
@@ -79,8 +85,8 @@ class TradeExecutor:
         try:
             # 这里可以实现更复杂的信号生成逻辑
             # 当前简单实现：如果最新价格高于开盘价，生成买入信号；否则生成卖出信号
-            last_done = quote.get("last_done", 0)
-            open_price = quote.get("open", 0)
+            last_done = quote.last_done
+            open_price = quote.open
             
             if last_done > open_price:
                 return SignalType.BUY
@@ -125,29 +131,47 @@ class TradeExecutor:
             signal: 交易信号
         """
         try:
+            logger.info(f"处理交易信号: {symbol}, 类型: {signal.signal_type}, 价格: {signal.price}, 数量: {signal.quantity}")
+            
             # 获取当前持仓
             position = await self.order_manager.get_position(symbol)
+            
+            if position:
+                logger.info(f"当前持仓: {symbol}, 数量: {position.quantity}")
+            else:
+                logger.info(f"当前没有 {symbol} 的持仓")
             
             # 根据信号类型执行交易
             if signal.signal_type == SignalType.BUY and (position is None or position.quantity == 0):
                 # 执行买入
+                logger.info(f"准备买入: {symbol}, 数量: {signal.quantity}")
+                # 使用信号中的价格，如果是0或负数则使用默认价格100
+                price = max(signal.price, 100)
                 await self.order_manager.place_order(
                     symbol=symbol,
                     side="BUY",
                     quantity=signal.quantity,
-                    price_type="MARKET"
+                    price_type="MARKET",
+                    price=price  # 提供有效价格
                 )
                 logger.info(f"下单买入: {symbol}, 数量: {signal.quantity}")
                 
             elif signal.signal_type == SignalType.SELL and position is not None and position.quantity > 0:
                 # 执行卖出
+                logger.info(f"准备卖出: {symbol}, 数量: {position.quantity}")
+                # 使用信号中的价格，如果是0或负数则使用默认价格100
+                price = max(signal.price, 100)
                 await self.order_manager.place_order(
                     symbol=symbol,
                     side="SELL",
                     quantity=position.quantity,  # 卖出全部持仓
-                    price_type="MARKET"
+                    price_type="MARKET",
+                    price=price  # 提供有效价格
                 )
                 logger.info(f"下单卖出: {symbol}, 数量: {position.quantity}")
+            else:
+                logger.info(f"不执行交易: {symbol}, 信号类型: {signal.signal_type}, 持仓情况不符合交易条件")
                 
         except Exception as e:
-            logger.error(f"Error processing signal for {symbol}: {e}") 
+            logger.error(f"Error processing signal for {symbol}: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}") 

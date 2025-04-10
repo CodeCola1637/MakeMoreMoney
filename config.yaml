@@ -9,7 +9,7 @@ api:
 # 行情订阅配置
 quote:
   symbols:
-    - "00700.HK"  # 腾讯控股
+    - "AAPL.US"  # 苹果公司
   sub_types:
     - "Quote"      # 实时报价
   use_mock_data: false  # 禁止使用本地mock数据

@@ -142,6 +142,8 @@ class SignalGenerator:
             quote: 行情数据
         """
         try:
+            self.logger.info(f"收到行情数据: {symbol}, 价格: {quote.last_done}")
+            
             # 转换行情数据为字典格式
             data = {
                 "last_done": quote.last_done,
@@ -164,11 +166,15 @@ class SignalGenerator:
                 
             # 如果数据足够，生成信号
             if len(self.data_cache[symbol]) >= self.lookback_period:
+                self.logger.info(f"数据缓存已满，生成信号: {symbol}")
+                
                 # 准备模型输入数据
                 input_data = self._prepare_model_input(symbol)
                 
                 # 使用模型预测
                 prediction = self.model.predict(input_data, verbose=0)[0][0]
+                
+                self.logger.info(f"模型预测结果: {prediction}")
                 
                 # 生成信号
                 signal = self._generate_signal(symbol, prediction, data)
@@ -182,6 +188,8 @@ class SignalGenerator:
                             callback(signal)
                     except Exception as e:
                         self.logger.error(f"执行回调函数失败: {str(e)}")
+            else:
+                self.logger.info(f"数据缓存不足，当前缓存大小: {len(self.data_cache[symbol])}/{self.lookback_period}")
                         
         except Exception as e:
             self.logger.error(f"更新数据失败: {str(e)}")
