@@ -1,15 +1,19 @@
 # 长桥API配置
 api:
-  app_key: ${LONG_PORT_APP_KEY}
-  app_secret: ${LONG_PORT_APP_SECRET}
-  access_token: ${LONG_PORT_ACCESS_TOKEN}
+  app_key: ${LONGPORT_APP_KEY}
+  app_secret: ${LONGPORT_APP_SECRET}
+  access_token: ${LONGPORT_ACCESS_TOKEN}
   quote_ws_url: ${API_WS_URL}
   base_url: ${API_BASE_URL}
 
 # 行情订阅配置
 quote:
   symbols:
-    - "AAPL.US"  # 苹果公司
+    - "700.HK"   # 腾讯控股
+    - "9988.HK"  # 阿里巴巴
+    - "1299.HK"  # 友邦保险
+    - "388.HK"   # 香港交易所
+    - "941.HK"   # 中国移动
   sub_types:
     - "Quote"      # 实时报价
   use_mock_data: false  # 禁止使用本地mock数据
@@ -20,6 +24,7 @@ quote:
 strategy:
   model_path: "./models/lstm_model.h5"
   lookback_period: 60  # 增加回溯周期到60天
+  signal_interval: 30  # 降低信号生成间隔到30秒
   training:
     epochs: 200  # 增加训练轮数
     batch_size: 64  # 增加批次大小
@@ -56,8 +61,20 @@ execution:
   risk_control:
     position_pct: 100.0  # 单笔交易可以使用全部资金
     daily_loss_pct: 5.0  # 单日亏损达到5%停止交易
+  # 交易货币配置
+  preferred_currency: "HKD"  # 优先使用港币进行交易
+
+# 投资组合管理配置
+portfolio:
+  allocation_strategy: "signal_strength_weight"  # 配置策略: equal_weight, signal_strength_weight
+  max_position_weight: 0.4     # 单个仓位最大权重40%
+  min_position_weight: 0.05    # 单个仓位最小权重5%
+  rebalance_threshold: 0.15    # 再平衡阈值15%
+  cash_reserve_ratio: 0.1      # 现金储备比例10%
+  rebalance_frequency: 1800    # 再平衡频率30分钟(1800秒)
+  signal_weight_factor: 1.5    # 信号权重因子
 
 # 日志配置
 logging:
-  level: "INFO"
+  level: "DEBUG"  # 提高日志级别为DEBUG
   file: "./logs/trading.log"

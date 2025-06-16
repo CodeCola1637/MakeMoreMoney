@@ -88,7 +88,7 @@ class Signal:
 class SignalGenerator:
     """信号生成器"""
     
-    def __init__(self, config, realtime_mgr, model_trainer):
+    def __init__(self, config, realtime_mgr, model_trainer, portfolio_manager=None):
         """
         初始化信号生成器
         
@@ -96,10 +96,12 @@ class SignalGenerator:
             config: 配置字典
             realtime_mgr: 实时数据管理器
             model_trainer: LSTM模型训练器
+            portfolio_manager: 投资组合管理器（可选）
         """
         self.config = config
         self.realtime_mgr = realtime_mgr
         self.model_trainer = model_trainer
+        self.portfolio_manager = portfolio_manager
         self.model = None
         self.data_cache = {}
         self.callbacks = []
@@ -111,7 +113,7 @@ class SignalGenerator:
         # 初始化回看周期
         self.lookback_period = config.get("strategy.lookback_period", 30)  # 默认30个数据点
         
-    async def start(self):
+    async def start(self, symbols=None):
         """启动信号生成器"""
         try:
             self.logger.info("正在加载模型...")
@@ -121,6 +123,10 @@ class SignalGenerator:
             
             self.logger.info("模型加载成功")
             
+            # 如果提供了股票列表，预填充历史数据
+            if symbols:
+                await self._prefill_historical_data(symbols)
+            
             # 注册实时数据回调，指定事件类型为 "Quote"
             self.realtime_mgr.register_callback("Quote", self.update_data)
             
@@ -129,6 +135,52 @@ class SignalGenerator:
         except Exception as e:
             self.logger.error(f"启动信号生成器时出错: {str(e)}")
             return False
+    
+    async def _prefill_historical_data(self, symbols):
+        """使用历史数据预填充缓存"""
+        try:
+            self.logger.info(f"开始预填充历史数据，股票: {symbols}")
+            
+            for symbol in symbols:
+                try:
+                    self.logger.info(f"获取 {symbol} 的历史数据...")
+                    
+                    # 获取历史K线数据
+                    hist_data = await self.model_trainer.data_loader.get_candlesticks(
+                        symbol, 
+                        count=self.lookback_period + 10  # 多获取一些数据以确保有足够的样本
+                    )
+                    
+                    if hist_data.empty:
+                        self.logger.warning(f"无法获取 {symbol} 的历史数据")
+                        continue
+                    
+                    # 转换历史数据到缓存格式
+                    self.data_cache[symbol] = []
+                    
+                    # 取最近的数据点
+                    recent_data = hist_data.tail(self.lookback_period)
+                    
+                    for _, row in recent_data.iterrows():
+                        data_point = {
+                            "last_done": float(row['close']),
+                            "open": float(row['open']),
+                            "high": float(row['high']),
+                            "low": float(row['low']),
+                            "volume": float(row['volume']),
+                            "timestamp": row['datetime'] if 'datetime' in row else datetime.now()
+                        }
+                        self.data_cache[symbol].append(data_point)
+                    
+                    self.logger.info(f"成功预填充 {symbol} 历史数据，共 {len(self.data_cache[symbol])} 条记录")
+                    
+                except Exception as e:
+                    self.logger.error(f"预填充 {symbol} 历史数据失败: {e}")
+                    
+        except Exception as e:
+            self.logger.error(f"预填充历史数据失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
         
     def register_callback(self, callback: Callable):
         """注册回调函数"""
@@ -213,8 +265,17 @@ class SignalGenerator:
                 ])
                 
             # 转换为numpy数组并标准化
-            features = np.array(features)
-            features = (features - np.mean(features, axis=0)) / (np.std(features, axis=0) + 1e-8)
+            features = np.array(features, dtype=np.float64)
+            
+            # 计算均值和标准差，确保数据类型兼容性
+            mean_vals = np.mean(features, axis=0)
+            std_vals = np.std(features, axis=0)
+            
+            # 避免除零错误，同时确保数据类型兼容性
+            std_vals = np.where(std_vals == 0, 1e-8, std_vals)
+            
+            # 标准化特征
+            features = (features - mean_vals) / std_vals
             
             # 添加批次维度
             features = np.expand_dims(features, axis=0)
@@ -228,13 +289,19 @@ class SignalGenerator:
     def _generate_signal(self, symbol: str, prediction: float, latest_data: Dict[str, Any]) -> Signal:
         """生成交易信号"""
         try:
-            # 根据预测结果确定信号类型
-            if prediction > 0.5:
+            # 详细记录预测值
+            self.logger.info(f"模型预测结果详情: {symbol}, 预测值: {prediction:.6f}")
+            
+            # 根据预测结果确定信号类型，降低阈值至 ±0.01
+            if prediction > 0.01:
                 signal_type = SignalType.BUY
-            elif prediction < -0.5:
+                self.logger.info(f"生成买入信号: {symbol}, 预测值 {prediction:.6f} > 阈值 0.01")
+            elif prediction < -0.01:
                 signal_type = SignalType.SELL
+                self.logger.info(f"生成卖出信号: {symbol}, 预测值 {prediction:.6f} < 阈值 -0.01")
             else:
                 signal_type = SignalType.HOLD
+                self.logger.info(f"生成持有信号: {symbol}, 预测值 {prediction:.6f} 在 ±0.01 范围内")
                 
             # 计算置信度
             confidence = abs(prediction)
@@ -262,10 +329,122 @@ class SignalGenerator:
     def _calculate_quantity(self, symbol: str, data: Dict[str, Any]) -> int:
         """计算建议交易数量"""
         try:
-            # 这里可以实现更复杂的仓位计算逻辑
-            # 当前简单实现：固定交易100股
-            return 100
+            # 如果有投资组合管理器，使用其建议
+            if self.portfolio_manager:
+                try:
+                    # 获取预测置信度
+                    confidence = abs(data.get("confidence", 0.1))
+                    
+                    # 从投资组合管理器获取建议
+                    action, portfolio_quantity = self.portfolio_manager.get_position_suggestion(symbol, confidence)
+                    
+                    if portfolio_quantity > 0:
+                        self.logger.info(f"投资组合管理器建议: {symbol}, 动作={action}, 数量={portfolio_quantity}, 置信度={confidence}")
+                        return portfolio_quantity
+                    else:
+                        self.logger.debug(f"投资组合管理器建议: {symbol}, 持有不变")
+                        
+                except Exception as e:
+                    self.logger.warning(f"获取投资组合建议失败，使用传统计算方法: {e}")
+            
+            # 传统计算方法（备用）
+            max_position_value = self.config.get("execution.max_position_size", 10000)
+            current_price = float(data["last_done"])
+            confidence = min(abs(data.get("confidence", 0.1)), 1.0)
+            position_ratio = max(0.1, confidence)  # 至少使用10%的可用资金
+            
+            target_value = max_position_value * position_ratio
+            raw_quantity = target_value / current_price
+            quantity = max(1, int(raw_quantity))
+            
+            self.logger.info(f"传统方法计算数量: 符号={symbol}, 价格={current_price}, 置信度={confidence}, " +
+                            f"目标金额={target_value}, 原始数量={raw_quantity}, 最终数量={quantity}")
+            
+            return quantity
             
         except Exception as e:
             self.logger.error(f"计算交易数量失败: {str(e)}")
-            return 0
+            return 1
+            
+    async def scheduled_signal_generation(self, interval_seconds: int = 60):
+        """定时生成交易信号
+        
+        Args:
+            interval_seconds: 信号生成间隔，默认60秒
+        """
+        try:
+            # 加载模型
+            if self.model is None:
+                await self.start()
+                
+            self.logger.info(f"启动定时信号生成，间隔 {interval_seconds} 秒")
+            
+            while True:
+                try:
+                    # 记录开始生成信号的时间
+                    start_time = datetime.now()
+                    self.logger.info(f"开始定时信号生成，时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    # 获取最新的行情数据
+                    symbols = list(self.data_cache.keys())
+                    if not symbols:
+                        self.logger.warning("没有可用的数据缓存，等待数据")
+                        await asyncio.sleep(interval_seconds)
+                        continue
+                    
+                    self.logger.info(f"当前缓存包含以下股票数据: {symbols}")
+                        
+                    for symbol in symbols:
+                        # 如果数据不足，跳过
+                        if symbol not in self.data_cache or len(self.data_cache[symbol]) < self.lookback_period:
+                            self.logger.warning(f"{symbol} 数据不足，跳过信号生成。当前数据量: {len(self.data_cache.get(symbol, []))}/{self.lookback_period}")
+                            continue
+                            
+                        # 获取最新价格
+                        latest_data = self.data_cache[symbol][-1]
+                        self.logger.info(f"最新行情数据: {symbol}, 价格: {latest_data['last_done']}, 时间: {latest_data['timestamp']}")
+                        
+                        # 准备模型输入
+                        self.logger.info(f"准备 {symbol} 的模型输入数据...")
+                        input_data = self._prepare_model_input(symbol)
+                        
+                        # 使用模型预测
+                        self.logger.info(f"使用LSTM模型预测 {symbol} 的价格变动...")
+                        raw_prediction = self.model.predict(input_data, verbose=0)
+                        prediction = raw_prediction[0][0]
+                        
+                        self.logger.info(f"原始预测结果: {symbol}, 预测数组: {raw_prediction}, 提取值: {prediction}")
+                        
+                        # 生成信号
+                        signal = self._generate_signal(symbol, prediction, latest_data)
+                        
+                        # 记录信号详情
+                        if signal.signal_type != SignalType.HOLD:
+                            self.logger.info(f"生成非持仓信号! 详情: {signal}")
+                        
+                        # 触发回调
+                        for callback in self.callbacks:
+                            self.logger.debug(f"调用回调函数处理信号: {signal}")
+                            if asyncio.iscoroutinefunction(callback):
+                                await callback(signal)
+                            else:
+                                callback(signal)
+                    
+                    # 记录本次信号生成耗时
+                    end_time = datetime.now()
+                    elapsed = (end_time - start_time).total_seconds()
+                    self.logger.info(f"完成本轮信号生成，耗时: {elapsed:.2f}秒")
+                                
+                except Exception as e:
+                    self.logger.error(f"定时生成信号失败: {str(e)}")
+                    import traceback
+                    self.logger.error(traceback.format_exc())
+                
+                # 等待下一次信号生成
+                self.logger.info(f"等待 {interval_seconds} 秒进行下一轮信号生成...")
+                await asyncio.sleep(interval_seconds)
+                
+        except Exception as e:
+            self.logger.error(f"定时任务异常: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())

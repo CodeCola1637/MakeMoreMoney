@@ -660,14 +660,15 @@ class OrderManager:
                 )
         
         # 计算所需资金（加上一些手续费的缓冲）
-        required_cash = price * quantity * 1.01  # 假设1%的手续费缓冲
+        price_float = float(price) if hasattr(price, '__float__') else price
+        required_cash = price_float * quantity * 1.01  # 假设1%的手续费缓冲
         
         # 检查资金是否足够
         if required_cash > available_cash:
             self.logger.warning(f"可用资金不足，调整买入数量: {symbol}, 原始数量: {quantity}, 可用资金: {available_cash}, 所需资金: {required_cash}")
             
             # 计算可买数量
-            affordable_quantity = int(available_cash / (price * 1.01))
+            affordable_quantity = int(available_cash / (price_float * 1.01))
             
             # 如果是美股且资金严重不足，设置一个最小交易数量
             if is_us_stock and affordable_quantity <= 0:
@@ -888,8 +889,8 @@ class OrderManager:
                     strategy_name=strategy_name
                 )
             
-            # 提交订单
-            order = await self.trade_ctx.submit_order(
+            # 提交订单（移除await，因为submit_order是同步方法）
+            order = self.trade_ctx.submit_order(
                 symbol=symbol,
                 order_type=OrderType.LO,
                 side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
@@ -1438,27 +1439,52 @@ class OrderManager:
         return True
 
     def is_enough_balance(self, cost: float) -> bool:
-        """
-        检查账户余额是否足够支付给定的成本
+        """检查账户余额是否足够支付交易成本
         
         Args:
-            cost: 预计成本
+            cost: 交易成本
             
         Returns:
-            如果余额足够则返回True，否则返回False
+            是否有足够余额
         """
-        available_balance = self.get_account_balance()
-        
-        if available_balance <= 0:
-            self.logger.error(f"账户可用资金为零或获取失败，无法进行交易")
-            return False
+        try:
+            # 获取账户余额
+            balance_response = self.trade_ctx.account_balance()
             
-        if available_balance < cost:
-            self.logger.warning(f"账户可用资金不足: 需要 {cost}，但只有 {available_balance}")
-            return False
+            # 优先使用港币账户，避免负余额美元账户
+            if isinstance(balance_response, list):
+                # 查找港币账户
+                hkd_available = 0.0
+                
+                for item in balance_response:
+                    if hasattr(item, 'cash_infos') and item.cash_infos:
+                        for cash_info in item.cash_infos:
+                            if hasattr(cash_info, 'currency') and cash_info.currency == "HKD" and hasattr(cash_info, 'available_cash'):
+                                hkd_available = float(cash_info.available_cash)
+                                self.logger.info(f"使用港币账户进行交易，可用余额: {hkd_available} HKD")
+                                break
+                
+                # 如果有港币余额且足够
+                if hkd_available > 0 and hkd_available >= cost:
+                    return True
+                else:
+                    self.logger.warning(f"港币账户余额不足: {hkd_available} HKD < {cost} HKD")
+                    return False
             
-        self.logger.info(f"账户资金充足: 需要 {cost}，可用 {available_balance}")
-        return True
+            # 获取总可用资金
+            total_available = self.get_account_balance()
+            
+            # 检查是否足够
+            if total_available >= cost:
+                self.logger.info(f"账户余额充足: {total_available} >= {cost}")
+                return True
+            else:
+                self.logger.warning(f"账户余额不足: {total_available} < {cost}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"检查账户余额时出错: {str(e)}")
+            return False
 
     async def risk_control_check(self, symbol: str, quantity: int, price: float, is_buy: bool) -> bool:
         """

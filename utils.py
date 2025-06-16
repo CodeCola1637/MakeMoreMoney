@@ -163,6 +163,9 @@ def setup_longport_env():
         "LONG_PORT_APP_KEY": "LONGPORT_APP_KEY",
         "LONG_PORT_APP_SECRET": "LONGPORT_APP_SECRET",
         "LONG_PORT_ACCESS_TOKEN": "LONGPORT_ACCESS_TOKEN",
+        "LB_APP_KEY": "LONGPORT_APP_KEY",
+        "LB_APP_SECRET": "LONGPORT_APP_SECRET",
+        "LB_ACCESS_TOKEN": "LONGPORT_ACCESS_TOKEN"
     }
     
     # 设置超时
@@ -173,8 +176,6 @@ def setup_longport_env():
         if os.getenv(src):
             os.environ[dst] = os.getenv(src)
             logger.debug(f"设置环境变量 {dst} 来自 {src}")
-        else:
-            logger.warning(f"未找到环境变量 {src}")
     
     # 验证设置
     all_set = all(os.getenv(env) for env in ["LONGPORT_APP_KEY", "LONGPORT_APP_SECRET", "LONGPORT_ACCESS_TOKEN"])

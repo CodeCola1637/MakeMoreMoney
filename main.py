@@ -17,6 +17,7 @@ from data_loader.realtime import RealtimeDataManager
 from data_loader.historical import HistoricalDataLoader
 from strategy.train import LSTMModelTrainer
 from strategy.signals import SignalGenerator, Signal
+from strategy.portfolio_manager import PortfolioManager
 from execution.order_manager import OrderManager, OrderResult
 
 # 全局变量
@@ -123,10 +124,6 @@ async def main():
     model_trainer = LSTMModelTrainer(config, hist_loader)
     logger.info("LSTM模型训练器初始化完成")
     
-    # 初始化信号生成器
-    signal_gen = SignalGenerator(config, realtime_mgr, model_trainer)
-    logger.info("信号生成器初始化完成")
-    
     # 初始化订单管理器 - 使用真实API
     try:
         order_mgr = OrderManager(config)
@@ -136,6 +133,14 @@ async def main():
     except Exception as e:
         logger.error(f"订单管理器初始化失败: {e}")
         return
+    
+    # 初始化投资组合管理器
+    portfolio_mgr = PortfolioManager(config, order_mgr, realtime_mgr)
+    logger.info("投资组合管理器初始化完成")
+    
+    # 初始化信号生成器（集成投资组合管理器）
+    signal_gen = SignalGenerator(config, realtime_mgr, model_trainer, portfolio_mgr)
+    logger.info("信号生成器初始化完成")
     
     # 创建回调处理函数
     on_signal = create_signal_handler(order_mgr)
@@ -159,8 +164,13 @@ async def main():
                 logger.error(f"训练{symbol}的模型时出错: {e}")
     
     # 注册回调和启动组件
-    signal_gen.register_signal_callback(on_signal)
+    signal_gen.register_callback(on_signal)
     order_mgr.register_order_callback(on_order_update)
+    
+    # 启动信号生成器（这里会预填充历史数据）
+    logger.info("启动信号生成器并预填充历史数据...")
+    await signal_gen.start(symbols=args.symbols)
+    logger.info("信号生成器启动完成")
     
     # 启动实时数据管理器
     try:
@@ -173,13 +183,18 @@ async def main():
         await order_mgr.initialize()
         logger.info("订单管理器初始化成功")
         
+        # 初始化投资组合管理器并设置目标股票（在订单管理器初始化完成后）
+        logger.info("正在初始化投资组合管理器...")
+        await portfolio_mgr.initialize(args.symbols)
+        logger.info("投资组合管理器初始化成功")
+        
         # 获取账户信息
         try:
-            balance = await order_mgr.get_account_balance()
+            balance = order_mgr.get_account_balance()
             if balance:
                 logger.info(f"账户余额: {balance}")
             
-            positions = await order_mgr.get_positions()
+            positions = order_mgr.get_positions()
             if positions:
                 logger.info(f"当前持仓: {positions}")
         except Exception as e:
@@ -189,27 +204,58 @@ async def main():
         logger.info("正在订阅股票实时数据...")
         for symbol in args.symbols:
             try:
+                logger.info(f"开始订阅 {symbol} 行情数据...")
                 # 使用SubType.Quote枚举
                 await realtime_mgr.subscribe([symbol], [SubType.Quote])
+                logger.info(f"成功订阅 {symbol} 行情数据")
                 
                 # 获取并记录初始价格
                 try:
+                    logger.info(f"获取 {symbol} 初始价格...")
                     quotes = await realtime_mgr.get_quote([symbol])
                     if quotes and symbol in quotes:
                         initial_price = quotes[symbol].last_done
                         logger.info(f"初始价格 {symbol}: {initial_price}")
+                    else:
+                        logger.warning(f"无法获取 {symbol} 的报价数据")
                 except Exception as e:
                     logger.warning(f"获取{symbol}初始价格失败: {e}")
                     
-                logger.info(f"已订阅 {symbol} 行情数据")
+                logger.info(f"已完成 {symbol} 行情数据订阅")
             except Exception as e:
                 logger.error(f"订阅 {symbol} 行情数据失败: {e}")
         
-        # 启动信号生成器的定时任务
-        logger.info("启动信号生成器的定时任务...")
-        signal_task = asyncio.create_task(signal_gen.scheduled_signal_generation(interval_seconds=60))
+        logger.info("所有股票行情数据订阅完成！")
         
-        logger.info("系统已启动并运行中...")
+        # 启动信号生成器的定时任务
+        logger.info("准备启动信号生成器的定时任务...")
+        signal_interval = config.get("strategy.signal_interval", 30)  # 修改默认值为30秒
+        logger.info(f"信号生成间隔设置为 {signal_interval} 秒")
+        
+        logger.info("创建信号生成异步任务...")
+        signal_task = asyncio.create_task(signal_gen.scheduled_signal_generation(interval_seconds=signal_interval))
+        logger.info("信号生成任务已创建并启动!")
+        
+        # 启动投资组合管理器的定期更新任务
+        async def portfolio_update_task():
+            """投资组合定期更新任务"""
+            while should_continue:
+                try:
+                    await asyncio.sleep(300)  # 每5分钟更新一次投资组合状态
+                    await portfolio_mgr.update_portfolio_status()
+                    
+                    # 检查是否需要再平衡
+                    if portfolio_mgr.portfolio_status and portfolio_mgr.portfolio_status.rebalance_needed:
+                        logger.info("检测到需要再平衡，开始执行...")
+                        await portfolio_mgr.execute_rebalance()
+                        
+                except Exception as e:
+                    logger.error(f"投资组合更新任务错误: {e}")
+                    
+        portfolio_task = asyncio.create_task(portfolio_update_task())
+        logger.info("投资组合管理任务已启动!")
+        
+        logger.info("系统已启动并运行中，开始主循环...")
         
         # 主循环
         while should_continue:
@@ -239,6 +285,14 @@ async def main():
             signal_task.cancel()
             try:
                 await signal_task
+            except asyncio.CancelledError:
+                pass
+                
+        # 取消投资组合管理任务
+        if 'portfolio_task' in locals() and not portfolio_task.done():
+            portfolio_task.cancel()
+            try:
+                await portfolio_task
             except asyncio.CancelledError:
                 pass
             
