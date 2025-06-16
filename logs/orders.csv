@@ -299,3 +299,29 @@ order_id,symbol,side,quantity,price,status,signal_id,signal_type,submitted_at,fi
 1119223679841263616,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:15:19.618515,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.05, quantity=7)"
 1119223693290594304,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:15:22.722518,,,,,default
 1119223693290594304,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:15:22.722518,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.05, quantity=7)"
+1119223738206609408,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:15:33.431603,,,,,default
+1119223738206609408,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:15:33.431603,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.05, quantity=7)"
+1119223740489097216,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:15:34.056905,,,,,default
+1119223740489097216,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:15:34.056905,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.21, quantity=3)"
+1119223761359953920,AAPL.US,OrderSide.Buy,1,197.370,OrderStatus.New,2025-06-16T19:15:38.979876,,,,,default
+1119223761359953920,AAPL.US,OrderSide.Buy,1,197.370,OrderStatus.New,2025-06-16T19:15:38.979876,,,,,"Signal(AAPL.US, BUY, price=197.37, confidence=0.05, quantity=7)"
+1119223869386055680,AAPL.US,OrderSide.Buy,1,197.370,OrderStatus.New,2025-06-16T19:16:04.722055,,,,,default
+1119223869386055680,AAPL.US,OrderSide.Buy,1,197.370,OrderStatus.New,2025-06-16T19:16:04.722055,,,,,"Signal(AAPL.US, BUY, price=197.37, confidence=0.05, quantity=7)"
+1119223871656816640,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:16:05.261016,,,,,default
+1119223871656816640,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:16:05.261016,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.21, quantity=3)"
+1119223889973342208,MSFT.US,OrderSide.Buy,1,475.770,OrderStatus.New,2025-06-16T19:16:09.615686,,,,,default
+1119223889973342208,MSFT.US,OrderSide.Buy,1,475.770,OrderStatus.New,2025-06-16T19:16:09.615686,,,,,"Signal(MSFT.US, BUY, price=475.77, confidence=0.22, quantity=3)"
+1119223894763986944,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:16:10.773891,,,,,default
+1119223894763986944,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:16:10.773891,,,,,"Signal(AAPL.US, BUY, price=197.38, confidence=0.05, quantity=7)"
+1119223916347125760,AAPL.US,OrderSide.Buy,1,197.370,OrderStatus.New,2025-06-16T19:16:15.897626,,,,,default
+1119223916347125760,AAPL.US,OrderSide.Buy,1,197.370,OrderStatus.New,2025-06-16T19:16:15.897626,,,,,"Signal(AAPL.US, BUY, price=197.37, confidence=0.04, quantity=7)"
+1119223926556811264,AAPL.US,OrderSide.Buy,1,197.340,OrderStatus.New,2025-06-16T19:16:18.321273,,,,,default
+1119223926556811264,AAPL.US,OrderSide.Buy,1,197.340,OrderStatus.New,2025-06-16T19:16:18.321273,,,,,"Signal(AAPL.US, BUY, price=197.34, confidence=0.04, quantity=7)"
+1119223936199516160,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:16:20.618586,,,,,default
+1119223936199516160,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:16:20.618586,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.04, quantity=7)"
+1119223977965645824,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:16:30.582614,,,,,default
+1119223977965645824,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:16:30.582614,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.04, quantity=7)"
+1119223999583088640,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:16:35.731442,,,,,default
+1119223999583088640,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:16:35.731442,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.04, quantity=7)"
+1119224001754095616,MSFT.US,OrderSide.Buy,1,475.770,OrderStatus.New,2025-06-16T19:16:36.352062,,,,,default
+1119224001754095616,MSFT.US,OrderSide.Buy,1,475.770,OrderStatus.New,2025-06-16T19:16:36.352062,,,,,"Signal(MSFT.US, BUY, price=475.77, confidence=0.22, quantity=3)"
