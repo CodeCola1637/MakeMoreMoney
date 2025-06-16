@@ -24,7 +24,11 @@ quote:
 strategy:
   model_path: "./models/lstm_model.h5"
   lookback_period: 60  # 增加回溯周期到60天
-  signal_interval: 30  # 降低信号生成间隔到30秒
+  signal_interval: 600  # 信号生成间隔改为10分钟(600秒)
+  signal_processing:
+    buy_threshold: 0.08   # 买入信号阈值8%（提高阈值减少频繁交易）
+    sell_threshold: -0.08 # 卖出信号阈值-8%
+    enable_hold: true     # 启用HOLD信号处理
   training:
     epochs: 200  # 增加训练轮数
     batch_size: 64  # 增加批次大小
@@ -69,9 +73,9 @@ portfolio:
   allocation_strategy: "signal_strength_weight"  # 配置策略: equal_weight, signal_strength_weight
   max_position_weight: 0.4     # 单个仓位最大权重40%
   min_position_weight: 0.05    # 单个仓位最小权重5%
-  rebalance_threshold: 0.15    # 再平衡阈值15%
+  rebalance_threshold: 0.20    # 再平衡阈值20%（提高阈值减少再平衡频率）
   cash_reserve_ratio: 0.1      # 现金储备比例10%
-  rebalance_frequency: 1800    # 再平衡频率30分钟(1800秒)
+  rebalance_frequency: 3600    # 再平衡频率60分钟(3600秒)
   signal_weight_factor: 1.5    # 信号权重因子
 
 # 日志配置

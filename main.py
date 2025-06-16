@@ -10,6 +10,7 @@ import signal
 import argparse
 from dotenv import load_dotenv
 from longport.openapi import SubType
+from datetime import datetime
 
 from utils import ConfigLoader, setup_logger, setup_longport_env
 from databases.db import init_db
@@ -257,10 +258,56 @@ async def main():
         
         logger.info("系统已启动并运行中，开始主循环...")
         
+        # 添加心跳计数器
+        heartbeat_counter = 0
+        
         # 主循环
         while should_continue:
-            await asyncio.sleep(1)
-            
+            try:
+                await asyncio.sleep(60)  # 每60秒一次心跳
+                heartbeat_counter += 1
+                
+                # 每5分钟输出一次详细状态
+                if heartbeat_counter % 5 == 0:
+                    logger.info(f"系统运行正常 - 心跳 #{heartbeat_counter}, 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    # 检查定时任务状态
+                    if 'signal_task' in locals():
+                        task_status = "运行中" if not signal_task.done() else "已完成/异常"
+                        logger.info(f"信号生成任务状态: {task_status}")
+                        
+                        # 如果任务异常，尝试重新启动
+                        if signal_task.done() and signal_task.exception():
+                            logger.error(f"信号生成任务异常: {signal_task.exception()}")
+                            logger.info("重新启动信号生成任务...")
+                            signal_task = asyncio.create_task(signal_gen.scheduled_signal_generation(interval_seconds=signal_interval))
+                    
+                    if 'portfolio_task' in locals():
+                        task_status = "运行中" if not portfolio_task.done() else "已完成/异常"
+                        logger.info(f"投资组合管理任务状态: {task_status}")
+                        
+                        # 如果任务异常，尝试重新启动
+                        if portfolio_task.done() and portfolio_task.exception():
+                            logger.error(f"投资组合管理任务异常: {portfolio_task.exception()}")
+                            logger.info("重新启动投资组合管理任务...")
+                            portfolio_task = asyncio.create_task(portfolio_update_task())
+                    
+                    # 检查数据缓存状态
+                    cache_info = {}
+                    for symbol in args.symbols:
+                        if symbol in signal_gen.data_cache:
+                            cache_info[symbol] = len(signal_gen.data_cache[symbol])
+                        else:
+                            cache_info[symbol] = 0
+                    logger.info(f"数据缓存状态: {cache_info}")
+                else:
+                    # 简单心跳
+                    logger.debug(f"系统心跳 #{heartbeat_counter}")
+                    
+            except Exception as e:
+                logger.error(f"主循环异常: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
     except Exception as e:
         logger.error(f"运行时错误: {e}")
         import traceback

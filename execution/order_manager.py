@@ -588,8 +588,11 @@ class OrderManager:
             # 创建订单
             if signal.signal_type == SignalType.BUY:
                 result = await self._create_buy_order(signal)
-            else:  # SELL
+            elif signal.signal_type == SignalType.SELL:
                 result = await self._create_sell_order(signal)
+            else:  # HOLD 信号，不执行任何交易
+                self.logger.info(f"收到HOLD信号，不执行交易: {symbol}")
+                return None
             
             if result:
                 self.logger.info(f"订单已提交: {result}")
@@ -1277,15 +1280,26 @@ class OrderManager:
             # 注意：stock_positions()方法可能不是异步方法，不需要await
             positions_response = self.trade_ctx.stock_positions()
             
-            # StockPositionsResponse需要通过list属性获取持仓列表
-            positions = positions_response.list if hasattr(positions_response, 'list') else []
+            # 正确解析持仓数据结构：使用channels属性
+            positions = []
+            if hasattr(positions_response, 'channels') and positions_response.channels:
+                for channel in positions_response.channels:
+                    if hasattr(channel, 'positions') and channel.positions:
+                        positions.extend(channel.positions)
+            
             position_count = len(positions) if positions else 0
             self.logger.info(f"成功获取持仓, 共{position_count}个")
             
+            # 记录详细持仓信息
+            if positions:
+                for pos in positions:
+                    self.logger.debug(f"持仓: {pos.symbol}, 数量: {pos.quantity}, 可用: {pos.available_quantity}")
+            
             # 如果指定了股票代码，则过滤持仓
             if symbol and positions:
-                positions = [p for p in positions if p.symbol.lower() == symbol.lower()]
-                self.logger.debug(f"过滤持仓 {symbol}, 结果: {len(positions)}个")
+                filtered_positions = [p for p in positions if p.symbol.upper() == symbol.upper()]
+                self.logger.debug(f"过滤持仓 {symbol}, 结果: {len(filtered_positions)}个")
+                return filtered_positions
                 
             return positions
         except Exception as e:
@@ -1469,8 +1483,7 @@ class OrderManager:
                     return True
                 else:
                     self.logger.warning(f"港币账户余额不足: {hkd_available} HKD < {cost} HKD")
-                    return False
-            
+                    
             # 获取总可用资金
             total_available = self.get_account_balance()
             

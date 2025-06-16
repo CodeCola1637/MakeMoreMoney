@@ -325,3 +325,332 @@ order_id,symbol,side,quantity,price,status,signal_id,signal_type,submitted_at,fi
 1119223999583088640,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:16:35.731442,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.04, quantity=7)"
 1119224001754095616,MSFT.US,OrderSide.Buy,1,475.770,OrderStatus.New,2025-06-16T19:16:36.352062,,,,,default
 1119224001754095616,MSFT.US,OrderSide.Buy,1,475.770,OrderStatus.New,2025-06-16T19:16:36.352062,,,,,"Signal(MSFT.US, BUY, price=475.77, confidence=0.22, quantity=3)"
+1119224391513989120,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:18:09.200334,,,,,default
+1119224391513989120,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:18:09.200334,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.03, quantity=7)"
+1119224393707610112,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:18:09.708408,,,,,default
+1119224393707610112,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:18:09.708408,,,,,"Signal(MSFT.US, BUY, price=475.68, confidence=0.23, quantity=3)"
+1119224521851985920,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:18:40.256030,,,,,default
+1119224521851985920,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:18:40.256030,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.03, quantity=7)"
+1119224523887865856,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:18:40.761815,,,,,default
+1119224523887865856,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:18:40.761815,,,,,"Signal(MSFT.US, BUY, price=475.68, confidence=0.23, quantity=3)"
+1119224567943192576,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:18:51.247857,,,,,default
+1119224567943192576,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:18:51.247857,,,,,"Signal(MSFT.US, BUY, price=475.66, confidence=0.23, quantity=3)"
+1119224586941587456,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:18:55.785763,,,,,default
+1119224586941587456,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:18:55.785763,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.03, quantity=7)"
+1119224652282257408,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:19:11.386795,,,,,default
+1119224652282257408,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:19:11.386795,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.03, quantity=7)"
+1119224654337466368,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:19:11.910876,,,,,default
+1119224654337466368,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:19:11.910876,,,,,"Signal(MSFT.US, BUY, price=475.66, confidence=0.23, quantity=3)"
+1119224664816443392,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:19:14.339799,,,,,default
+1119224664816443392,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:19:14.339799,,,,,"Signal(AAPL.US, BUY, price=197.38, confidence=0.03, quantity=7)"
+1119224692499636224,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:19:20.937081,,,,,default
+1119224692499636224,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:19:20.937081,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119224783541198848,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:19:42.642577,,,,,default
+1119224783541198848,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:19:42.642577,,,,,"Signal(AAPL.US, BUY, price=197.38, confidence=0.03, quantity=7)"
+1119224785713848320,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:19:43.160648,,,,,default
+1119224785713848320,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:19:43.160648,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119224913939718144,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:20:13.750504,,,,,default
+1119224913939718144,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:20:13.750504,,,,,"Signal(AAPL.US, BUY, price=197.38, confidence=0.03, quantity=7)"
+1119224915963015168,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:20:14.247091,,,,,default
+1119224915963015168,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:20:14.247091,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119224963207618560,AAPL.US,OrderSide.Buy,1,197.340,OrderStatus.New,2025-06-16T19:20:25.483419,,,,,default
+1119224963207618560,AAPL.US,OrderSide.Buy,1,197.340,OrderStatus.New,2025-06-16T19:20:25.483419,,,,,"Signal(AAPL.US, BUY, price=197.34, confidence=0.03, quantity=7)"
+1119225044505812992,AAPL.US,OrderSide.Buy,1,197.340,OrderStatus.New,2025-06-16T19:20:44.864646,,,,,default
+1119225044505812992,AAPL.US,OrderSide.Buy,1,197.340,OrderStatus.New,2025-06-16T19:20:44.864646,,,,,"Signal(AAPL.US, BUY, price=197.34, confidence=0.03, quantity=7)"
+1119225046691082240,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:20:45.385370,,,,,default
+1119225046691082240,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:20:45.385370,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119225076519329792,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:20:52.529141,,,,,default
+1119225076519329792,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:20:52.529141,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.02, quantity=7)"
+,AAPL.US,OrderSide.Sell,7,196.45,OrderStatus.Rejected,2025-06-16T19:21:08.042153,,,,"持仓不足，需要: 7, 实际: 0","Signal(AAPL.US, HOLD, price=196.45, confidence=0.01, quantity=7)"
+1119225157949939712,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:11.936026,,,,,default
+1119225157949939712,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:11.936026,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.06, quantity=7)"
+1119225158561521664,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:12.060631,,,,,default
+1119225158561521664,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:12.060631,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.02, quantity=7)"
+1119225174705434624,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:15.919603,,,,,default
+1119225174705434624,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:15.919603,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.02, quantity=7)"
+1119225176889024512,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:21:16.444517,,,,,default
+1119225176889024512,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:21:16.444517,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119225189293187072,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:19.383095,,,,,default
+1119225189293187072,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:19.383095,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.11, quantity=7)"
+1119225189733625856,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:19.484068,,,,,default
+1119225189733625856,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:21:19.484068,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.02, quantity=7)"
+1119225222588358656,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:21:27.323500,,,,,default
+1119225222588358656,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:21:27.323500,,,,,"Signal(MSFT.US, BUY, price=475.66, confidence=0.23, quantity=3)"
+1119225234464235520,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:30.153698,,,,,default
+1119225234464235520,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:30.153698,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.15, quantity=7)"
+1119225234872688640,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:30.248137,,,,,default
+1119225234872688640,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:30.248137,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.02, quantity=7)"
+1119225267919609856,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:21:38.132080,,,,,default
+1119225267919609856,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:21:38.132080,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.22, quantity=3)"
+1119225269457313792,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:38.529486,,,,,default
+1119225269457313792,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:38.529486,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.15, quantity=7)"
+1119225272273334272,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:39.178369,,,,,default
+1119225272273334272,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:39.178369,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.18, quantity=7)"
+1119225272634007552,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:39.250831,,,,,default
+1119225272634007552,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:39.250831,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.02, quantity=7)"
+1119225304865628160,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:46.945421,,,,,default
+1119225304865628160,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:46.945421,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.02, quantity=7)"
+1119225306968616960,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:21:47.442352,,,,,default
+1119225306968616960,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:21:47.442352,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.22, quantity=3)"
+1119225325486432256,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:51.859612,,,,,default
+1119225325486432256,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:51.859612,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.02, quantity=7)"
+1119225325455466496,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:51.867434,,,,,default
+1119225325455466496,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:21:51.867434,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.20, quantity=7)"
+1119225368348811264,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:22:02.131264,,,,,default
+1119225368348811264,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:22:02.131264,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.22, quantity=3)"
+1119225380826865664,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:22:05.049309,,,,,default
+1119225380826865664,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:22:05.049309,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.02, quantity=7)"
+1119225435092770816,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:22:18.007851,,,,,default
+1119225435092770816,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:22:18.007851,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.02, quantity=7)"
+1119225437319196672,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:22:18.531354,,,,,default
+1119225437319196672,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:22:18.531354,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.22, quantity=3)"
+1119225565596147712,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:22:49.122930,,,,,default
+1119225565596147712,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:22:49.122930,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.02, quantity=7)"
+1119225567783772160,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:22:49.620659,,,,,default
+1119225567783772160,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:22:49.620659,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.22, quantity=3)"
+1119225612485914624,MSFT.US,OrderSide.Buy,1,475.670,OrderStatus.New,2025-06-16T19:23:00.341496,,,,,default
+1119225612485914624,MSFT.US,OrderSide.Buy,1,475.670,OrderStatus.New,2025-06-16T19:23:00.341496,,,,,"Signal(MSFT.US, BUY, price=475.67, confidence=0.21, quantity=3)"
+1119225626441113600,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:23:03.612012,,,,,default
+1119225626441113600,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:23:03.612012,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.01, quantity=7)"
+1119225695889649664,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:23:20.176859,,,,,default
+1119225695889649664,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:23:20.176859,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.01, quantity=7)"
+1119225697772892160,MSFT.US,OrderSide.Buy,1,475.670,OrderStatus.New,2025-06-16T19:23:20.615352,,,,,default
+1119225697772892160,MSFT.US,OrderSide.Buy,1,475.670,OrderStatus.New,2025-06-16T19:23:20.615352,,,,,"Signal(MSFT.US, BUY, price=475.67, confidence=0.21, quantity=3)"
+1119225723165171712,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:23:26.669792,,,,,default
+1119225723165171712,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:23:26.669792,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.01, quantity=7)"
+1119225735540957184,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:29.623318,,,,,default
+1119225735540957184,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:29.623318,,,,,"Signal(MSFT.US, BUY, price=475.75, confidence=0.20, quantity=3)"
+1119225747071098880,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:32.371276,,,,,default
+1119225747071098880,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:32.371276,,,,,"Signal(MSFT.US, BUY, price=475.75, confidence=0.20, quantity=3)"
+1119225785932967936,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:41.630590,,,,,default
+1119225785932967936,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:41.630590,,,,,"Signal(MSFT.US, BUY, price=475.75, confidence=0.19, quantity=3)"
+1119225792390553600,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:23:43.178835,,,,,default
+1119225792390553600,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:23:43.178835,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.01, quantity=7)"
+1119225825506975744,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:23:51.069052,,,,,default
+1119225825506975744,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:23:51.069052,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.01, quantity=7)"
+1119225827457327104,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:51.536381,,,,,default
+1119225827457327104,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:23:51.536381,,,,,"Signal(MSFT.US, BUY, price=475.75, confidence=0.19, quantity=3)"
+1119225886562672640,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:24:05.691443,,,,,default
+1119225886562672640,AAPL.US,OrderSide.Buy,1,197.380,OrderStatus.New,2025-06-16T19:24:05.691443,,,,,"Signal(AAPL.US, BUY, price=197.38, confidence=0.01, quantity=7)"
+1119225911800586240,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:24:11.660667,,,,,default
+1119225911800586240,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:24:11.660667,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.01, quantity=7)"
+1119225955496058880,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:24:22.138596,,,,,default
+1119225955496058880,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:24:22.138596,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.01, quantity=7)"
+1119225957794537472,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:24:22.612051,,,,,default
+1119225957794537472,MSFT.US,OrderSide.Buy,1,475.750,OrderStatus.New,2025-06-16T19:24:22.612051,,,,,"Signal(MSFT.US, BUY, price=475.75, confidence=0.19, quantity=3)"
+1119225982210367488,MSFT.US,OrderSide.Buy,1,475.670,OrderStatus.New,2025-06-16T19:24:28.428145,,,,,default
+1119225982210367488,MSFT.US,OrderSide.Buy,1,475.670,OrderStatus.New,2025-06-16T19:24:28.428145,,,,,"Signal(MSFT.US, BUY, price=475.67, confidence=0.19, quantity=3)"
+1119226072613646336,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:24:49.996129,,,,,default
+1119226072613646336,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:24:49.996129,,,,,"Signal(AAPL.US, BUY, price=197.30, confidence=0.06, quantity=7)"
+1119226106813964288,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:24:58.144038,,,,,default
+1119226106813964288,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:24:58.144038,,,,,"Signal(AAPL.US, BUY, price=197.30, confidence=0.11, quantity=7)"
+,MSFT.US,OrderSide.Sell,3,474.96,OrderStatus.Rejected,2025-06-16T19:26:12.732909,,,,"持仓不足，需要: 3, 实际: 0","Signal(MSFT.US, SELL, price=474.96, confidence=0.11, quantity=3)"
+,MSFT.US,OrderSide.Sell,3,474.96,OrderStatus.Rejected,2025-06-16T19:26:44.184084,,,,"持仓不足，需要: 3, 实际: 0","Signal(MSFT.US, SELL, price=474.96, confidence=0.11, quantity=3)"
+1119226562491576320,MSFT.US,OrderSide.Buy,1,475.700,OrderStatus.New,2025-06-16T19:26:46.793626,,,,,default
+1119226562491576320,MSFT.US,OrderSide.Buy,1,475.700,OrderStatus.New,2025-06-16T19:26:46.793626,,,,,"Signal(MSFT.US, BUY, price=475.70, confidence=0.08, quantity=3)"
+,MSFT.US,OrderSide.Sell,3,474.96,OrderStatus.Rejected,2025-06-16T19:27:29.129967,,,,"持仓不足，需要: 3, 实际: 0","Signal(MSFT.US, SELL, price=474.96, confidence=0.11, quantity=3)"
+1119226751054901248,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:27:31.735547,,,,,default
+1119226751054901248,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:27:31.735547,,,,,"Signal(MSFT.US, BUY, price=475.66, confidence=0.08, quantity=3)"
+1119226751103590400,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:27:31.771165,,,,,default
+1119226751103590400,MSFT.US,OrderSide.Buy,1,475.660,OrderStatus.New,2025-06-16T19:27:31.771165,,,,,"Signal(MSFT.US, BUY, price=475.66, confidence=0.13, quantity=3)"
+1119226754459033600,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:27:32.561911,,,,,default
+1119226754459033600,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:27:32.561911,,,,,"Signal(AAPL.US, BUY, price=197.33, confidence=0.06, quantity=7)"
+1119226754677137408,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:27:32.605567,,,,,default
+1119226754677137408,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:27:32.605567,,,,,"Signal(AAPL.US, BUY, price=197.33, confidence=0.06, quantity=7)"
+1119226754769412096,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:27:32.619573,,,,,default
+1119226754769412096,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:27:32.619573,,,,,"Signal(AAPL.US, BUY, price=197.33, confidence=0.06, quantity=7)"
+1119226760798269440,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:27:34.066140,,,,,default
+1119226760798269440,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:27:34.066140,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.13, quantity=3)"
+1119226760995364864,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:27:34.115977,,,,,default
+1119226760995364864,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:27:34.115977,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.17, quantity=3)"
+1119226761073451008,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:27:34.123796,,,,,default
+1119226761073451008,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:27:34.123796,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.08, quantity=3)"
+1119226768430260224,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:27:35.896820,,,,,default
+1119226768430260224,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:27:35.896820,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.17, quantity=3)"
+1119226768790970368,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:27:35.968265,,,,,default
+1119226768790970368,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:27:35.968265,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.19, quantity=3)"
+1119226768790970369,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:27:35.979336,,,,,default
+1119226768790970369,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:27:35.979336,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.13, quantity=3)"
+1119226792742838272,AAPL.US,OrderSide.Buy,1,197.320,OrderStatus.New,2025-06-16T19:27:41.691717,,,,,default
+1119226792742051840,AAPL.US,OrderSide.Buy,1,197.320,OrderStatus.New,2025-06-16T19:27:41.691791,,,,,default
+1119226792742051840,AAPL.US,OrderSide.Buy,1,197.320,OrderStatus.New,2025-06-16T19:27:41.691791,,,,,"Signal(AAPL.US, BUY, price=197.32, confidence=0.11, quantity=7)"
+1119226792742838272,AAPL.US,OrderSide.Buy,1,197.320,OrderStatus.New,2025-06-16T19:27:41.691717,,,,,"Signal(AAPL.US, BUY, price=197.32, confidence=0.11, quantity=7)"
+1119226792805003264,AAPL.US,OrderSide.Buy,1,197.320,OrderStatus.New,2025-06-16T19:27:41.705789,,,,,default
+1119226792805003264,AAPL.US,OrderSide.Buy,1,197.320,OrderStatus.New,2025-06-16T19:27:41.705789,,,,,"Signal(AAPL.US, BUY, price=197.32, confidence=0.11, quantity=7)"
+1119226920866242560,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:28:12.221178,,,,,default
+1119226920866242560,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:28:12.221178,,,,,"Signal(AAPL.US, BUY, price=197.33, confidence=0.15, quantity=7)"
+1119226920962711552,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:28:12.265268,,,,,default
+1119226920962711552,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:28:12.265268,,,,,"Signal(AAPL.US, BUY, price=197.33, confidence=0.15, quantity=7)"
+1119226921060982784,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:28:12.271989,,,,,default
+1119226921060982784,AAPL.US,OrderSide.Buy,1,197.330,OrderStatus.New,2025-06-16T19:28:12.271989,,,,,"Signal(AAPL.US, BUY, price=197.33, confidence=0.15, quantity=7)"
+1119226929611366400,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:28:14.314464,,,,,default
+1119226929611366400,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:28:14.314464,,,,,"Signal(AAPL.US, BUY, price=197.30, confidence=0.18, quantity=7)"
+1119226929703641088,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:28:14.330197,,,,,default
+1119226929703641088,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:28:14.330197,,,,,"Signal(AAPL.US, BUY, price=197.30, confidence=0.18, quantity=7)"
+1119226929820295168,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:28:14.356128,,,,,default
+1119226929820295168,AAPL.US,OrderSide.Buy,1,197.300,OrderStatus.New,2025-06-16T19:28:14.356128,,,,,"Signal(AAPL.US, BUY, price=197.30, confidence=0.18, quantity=7)"
+1119226947772702720,AAPL.US,OrderSide.Buy,1,197.350,OrderStatus.New,2025-06-16T19:28:18.635385,,,,,default
+1119226947772702720,AAPL.US,OrderSide.Buy,1,197.350,OrderStatus.New,2025-06-16T19:28:18.635385,,,,,"Signal(AAPL.US, BUY, price=197.35, confidence=0.20, quantity=7)"
+1119226947990806528,AAPL.US,OrderSide.Buy,1,197.350,OrderStatus.New,2025-06-16T19:28:18.693569,,,,,default
+1119226947990806528,AAPL.US,OrderSide.Buy,1,197.350,OrderStatus.New,2025-06-16T19:28:18.693569,,,,,"Signal(AAPL.US, BUY, price=197.35, confidence=0.20, quantity=7)"
+1119226948430458880,AAPL.US,OrderSide.Buy,1,197.350,OrderStatus.New,2025-06-16T19:28:18.831054,,,,,default
+1119226948430458880,AAPL.US,OrderSide.Buy,1,197.350,OrderStatus.New,2025-06-16T19:28:18.831054,,,,,"Signal(AAPL.US, BUY, price=197.35, confidence=0.20, quantity=7)"
+1119227284608118784,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:29:38.946006,,,,,default
+1119227284608118784,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:29:38.946006,,,,,"Signal(MSFT.US, BUY, price=475.68, confidence=0.17, quantity=3)"
+1119227284598087680,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:29:38.969134,,,,,default
+1119227284598087680,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:29:38.969134,,,,,"Signal(MSFT.US, BUY, price=475.68, confidence=0.19, quantity=3)"
+1119227284799414272,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:29:38.989816,,,,,default
+1119227284799414272,MSFT.US,OrderSide.Buy,1,475.680,OrderStatus.New,2025-06-16T19:29:38.989816,,,,,"Signal(MSFT.US, BUY, price=475.68, confidence=0.21, quantity=3)"
+1119227286432604160,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:29:39.388312,,,,,default
+1119227286432604160,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:29:39.388312,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.19, quantity=3)"
+1119227286550081536,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:29:39.427078,,,,,default
+1119227286550081536,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:29:39.427078,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.21, quantity=3)"
+1119227286665879552,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:29:39.439132,,,,,default
+1119227286665879552,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:29:39.439132,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.22, quantity=3)"
+1119227350069370880,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:29:54.558799,,,,,default
+1119227350069370880,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:29:54.558799,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.20, quantity=7)"
+1119227350098731009,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:29:54.563908,,,,,default
+1119227350098731009,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:29:54.563908,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.20, quantity=7)"
+1119227350098731008,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:29:54.571167,,,,,default
+1119227350098731008,AAPL.US,OrderSide.Buy,1,197.410,OrderStatus.New,2025-06-16T19:29:54.571167,,,,,"Signal(AAPL.US, BUY, price=197.41, confidence=0.20, quantity=7)"
+1119227366069891072,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:29:58.374012,,,,,default
+1119227366069891072,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:29:58.374012,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.22, quantity=3)"
+1119227366359298048,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:29:58.438310,,,,,default
+1119227366359298048,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:29:58.438310,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.23, quantity=3)"
+1119227366514450432,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:29:58.467779,,,,,default
+1119227366514450432,MSFT.US,OrderSide.Buy,1,475.640,OrderStatus.New,2025-06-16T19:29:58.467779,,,,,"Signal(MSFT.US, BUY, price=475.64, confidence=0.21, quantity=3)"
+1119227368095703040,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:29:58.854846,,,,,default
+1119227368095703040,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:29:58.854846,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.21, quantity=7)"
+1119227368246734848,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:29:58.887286,,,,,default
+1119227368246734848,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:29:58.887286,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.21, quantity=7)"
+1119227368255123456,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:29:58.902389,,,,,default
+1119227368255123456,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:29:58.902389,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.21, quantity=7)"
+1119227420162187264,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:30:11.276596,,,,,default
+1119227420162187264,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:30:11.276596,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.20, quantity=7)"
+1119227420365119488,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:30:11.342516,,,,,default
+1119227420365119488,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:30:11.342516,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.20, quantity=7)"
+1119227420493537280,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:30:11.357622,,,,,default
+1119227420493537280,AAPL.US,OrderSide.Buy,1,197.390,OrderStatus.New,2025-06-16T19:30:11.357622,,,,,"Signal(AAPL.US, BUY, price=197.39, confidence=0.20, quantity=7)"
+1119227474404532224,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:30:24.200962,,,,,default
+1119227474404532224,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:30:24.200962,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.20, quantity=7)"
+1119227474408763392,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:30:24.209658,,,,,default
+1119227474408763392,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:30:24.209658,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.20, quantity=7)"
+1119227474489204736,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:30:24.216342,,,,,default
+1119227474489204736,AAPL.US,OrderSide.Buy,1,197.430,OrderStatus.New,2025-06-16T19:30:24.216342,,,,,"Signal(AAPL.US, BUY, price=197.43, confidence=0.20, quantity=7)"
+1119227513340293120,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:30:33.478026,,,,,default
+1119227513340293120,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:30:33.478026,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119227513478705152,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:30:33.515069,,,,,default
+1119227513478705152,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:30:33.515069,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.22, quantity=3)"
+1119227513537388544,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:30:33.526597,,,,,default
+1119227513537388544,MSFT.US,OrderSide.Buy,1,475.710,OrderStatus.New,2025-06-16T19:30:33.526597,,,,,"Signal(MSFT.US, BUY, price=475.71, confidence=0.23, quantity=3)"
+1119227534916542464,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:38.623340,,,,,default
+1119227534916542464,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:38.623340,,,,,"Signal(AAPL.US, BUY, price=197.42, confidence=0.19, quantity=7)"
+1119227535013011456,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:38.646329,,,,,default
+1119227535013011456,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:38.646329,,,,,"Signal(AAPL.US, BUY, price=197.42, confidence=0.19, quantity=7)"
+1119227536065781760,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:38.922121,,,,,default
+1119227536065781760,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:38.922121,,,,,"Signal(AAPL.US, BUY, price=197.42, confidence=0.19, quantity=7)"
+1119227543535837184,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:40.697790,,,,,default
+1119227543535837184,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:40.697790,,,,,"Signal(AAPL.US, BUY, price=197.42, confidence=0.19, quantity=7)"
+1119227543665860608,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:40.702262,,,,,default
+1119227543665860608,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:40.702262,,,,,"Signal(AAPL.US, BUY, price=197.42, confidence=0.19, quantity=7)"
+1119227543677657088,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:40.709853,,,,,default
+1119227543677657088,AAPL.US,OrderSide.Buy,1,197.420,OrderStatus.New,2025-06-16T19:30:40.709853,,,,,"Signal(AAPL.US, BUY, price=197.42, confidence=0.19, quantity=7)"
+1119227576246427648,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:30:48.477292,,,,,default
+1119227576246427648,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:30:48.477292,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.18, quantity=7)"
+1119227576330350592,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:30:48.500036,,,,,default
+1119227576330350592,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:30:48.500036,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.18, quantity=7)"
+1119227576362262528,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:30:48.525287,,,,,default
+1119227576362262528,AAPL.US,OrderSide.Buy,1,197.400,OrderStatus.New,2025-06-16T19:30:48.525287,,,,,"Signal(AAPL.US, BUY, price=197.40, confidence=0.18, quantity=7)"
+1119227619737202688,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:30:58.846265,,,,,default
+1119227619737202688,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:30:58.846265,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.16, quantity=7)"
+1119227619737952256,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:30:58.856901,,,,,default
+1119227619737952256,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:30:58.856901,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.16, quantity=7)"
+1119227620297596928,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:30:58.984636,,,,,default
+1119227620297596928,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:30:58.984636,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.16, quantity=7)"
+1119227636699717632,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:02.891047,,,,,default
+1119227636699717632,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:02.891047,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.23, quantity=3)"
+1119227636736679936,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:02.899198,,,,,default
+1119227636736679936,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:02.899198,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.23, quantity=3)"
+1119227636729077760,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:02.908932,,,,,default
+1119227636729077760,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:02.908932,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.23, quantity=3)"
+1119227679948988416,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:13.204123,,,,,default
+1119227679948988416,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:13.204123,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.16, quantity=7)"
+1119227682085531648,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:13.710648,,,,,default
+1119227682085531648,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:13.710648,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.23, quantity=3)"
+1119227738671636480,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:27.199576,,,,,default
+1119227738671636480,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:27.199576,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.15, quantity=7)"
+1119227738831020032,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:27.236786,,,,,default
+1119227738831020032,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:27.236786,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.15, quantity=7)"
+1119227812222201856,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:44.753397,,,,,default
+1119227812222201856,AAPL.US,OrderSide.Buy,1,197.440,OrderStatus.New,2025-06-16T19:31:44.753397,,,,,"Signal(AAPL.US, BUY, price=197.44, confidence=0.15, quantity=7)"
+1119227814222884864,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:45.218798,,,,,default
+1119227814222884864,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:31:45.218798,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.23, quantity=3)"
+1119227845483782144,AAPL.US,OrderSide.Buy,1,197.450,OrderStatus.New,2025-06-16T19:31:52.678701,,,,,default
+1119227845483782144,AAPL.US,OrderSide.Buy,1,197.450,OrderStatus.New,2025-06-16T19:31:52.678701,,,,,"Signal(AAPL.US, BUY, price=197.45, confidence=0.13, quantity=7)"
+1119227868107108352,AAPL.US,OrderSide.Buy,1,197.450,OrderStatus.New,2025-06-16T19:31:58.057867,,,,,default
+1119227868107108352,AAPL.US,OrderSide.Buy,1,197.450,OrderStatus.New,2025-06-16T19:31:58.057867,,,,,"Signal(AAPL.US, BUY, price=197.45, confidence=0.11, quantity=7)"
+1119227887309381632,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:32:02.672576,,,,,default
+1119227887309381632,MSFT.US,OrderSide.Buy,1,475.720,OrderStatus.New,2025-06-16T19:32:02.672576,,,,,"Signal(MSFT.US, BUY, price=475.72, confidence=0.23, quantity=3)"
+1119227911211970560,AAPL.US,OrderSide.Buy,1,197.560,OrderStatus.New,2025-06-16T19:32:08.338345,,,,,default
+1119227911211970560,AAPL.US,OrderSide.Buy,1,197.560,OrderStatus.New,2025-06-16T19:32:08.338345,,,,,"Signal(AAPL.US, BUY, price=197.56, confidence=0.11, quantity=7)"
+1119227942628057088,MSFT.US,OrderSide.Buy,1,475.730,OrderStatus.New,2025-06-16T19:32:15.832940,,,,,default
+1119227942628057088,MSFT.US,OrderSide.Buy,1,475.730,OrderStatus.New,2025-06-16T19:32:15.832940,,,,,"Signal(MSFT.US, BUY, price=475.73, confidence=0.23, quantity=3)"
+1119228039940104192,AAPL.US,OrderSide.Buy,1,197.550,OrderStatus.New,2025-06-16T19:32:39.036436,,,,,default
+1119228039940104192,AAPL.US,OrderSide.Buy,1,197.550,OrderStatus.New,2025-06-16T19:32:39.036436,,,,,"Signal(AAPL.US, BUY, price=197.55, confidence=0.10, quantity=7)"
+1119228188210552832,AAPL.US,OrderSide.Buy,1,197.570,OrderStatus.New,2025-06-16T19:33:14.380972,,,,,default
+1119228188210552832,AAPL.US,OrderSide.Buy,1,197.570,OrderStatus.New,2025-06-16T19:33:14.380972,,,,,"Signal(AAPL.US, BUY, price=197.57, confidence=0.10, quantity=7)"
+1119228200455368704,MSFT.US,OrderSide.Buy,1,475.800,OrderStatus.New,2025-06-16T19:33:17.298114,,,,,default
+1119228200455368704,MSFT.US,OrderSide.Buy,1,475.800,OrderStatus.New,2025-06-16T19:33:17.298114,,,,,"Signal(MSFT.US, BUY, price=475.80, confidence=0.22, quantity=3)"
+1119228263307763712,AAPL.US,OrderSide.Buy,1,197.530,OrderStatus.New,2025-06-16T19:33:32.291770,,,,,default
+1119228263307763712,AAPL.US,OrderSide.Buy,1,197.530,OrderStatus.New,2025-06-16T19:33:32.291770,,,,,"Signal(AAPL.US, BUY, price=197.53, confidence=0.09, quantity=7)"
+1119228283500945408,MSFT.US,OrderSide.Buy,1,475.820,OrderStatus.New,2025-06-16T19:33:37.126757,,,,,default
+1119228283500945408,MSFT.US,OrderSide.Buy,1,475.820,OrderStatus.New,2025-06-16T19:33:37.126757,,,,,"Signal(MSFT.US, BUY, price=475.82, confidence=0.22, quantity=3)"
+1119228318827016192,MSFT.US,OrderSide.Buy,1,475.800,OrderStatus.New,2025-06-16T19:33:45.524559,,,,,default
+1119228318827016192,MSFT.US,OrderSide.Buy,1,475.800,OrderStatus.New,2025-06-16T19:33:45.524559,,,,,"Signal(MSFT.US, BUY, price=475.80, confidence=0.21, quantity=3)"
+1119228327576334336,AAPL.US,OrderSide.Buy,1,197.470,OrderStatus.New,2025-06-16T19:33:47.607779,,,,,default
+1119228327576334336,AAPL.US,OrderSide.Buy,1,197.470,OrderStatus.New,2025-06-16T19:33:47.607779,,,,,"Signal(AAPL.US, BUY, price=197.47, confidence=0.08, quantity=7)"
+1119228403300261888,MSFT.US,OrderSide.Buy,1,475.730,OrderStatus.New,2025-06-16T19:34:05.687033,,,,,default
+1119228403300261888,MSFT.US,OrderSide.Buy,1,475.730,OrderStatus.New,2025-06-16T19:34:05.687033,,,,,"Signal(MSFT.US, BUY, price=475.73, confidence=0.20, quantity=3)"
+1119228462213492736,AAPL.US,OrderSide.Buy,1,197.470,OrderStatus.New,2025-06-16T19:34:19.737707,,,,,default
+1119228462213492736,AAPL.US,OrderSide.Buy,1,197.470,OrderStatus.New,2025-06-16T19:34:19.737707,,,,,"Signal(AAPL.US, BUY, price=197.47, confidence=0.08, quantity=7)"
+1119228472483700736,AAPL.US,OrderSide.Buy,1,197.470,OrderStatus.New,2025-06-16T19:34:22.166321,,,,,default
+1119228472483700736,AAPL.US,OrderSide.Buy,1,197.470,OrderStatus.New,2025-06-16T19:34:22.166321,,,,,"Signal(AAPL.US, BUY, price=197.47, confidence=0.07, quantity=7)"
+1119228516231897088,AAPL.US,OrderSide.Buy,1,197.450,OrderStatus.New,2025-06-16T19:34:32.595195,,,,,default
+1119228516231897088,AAPL.US,OrderSide.Buy,1,197.450,OrderStatus.New,2025-06-16T19:34:32.595195,,,,,"Signal(AAPL.US, BUY, price=197.45, confidence=0.07, quantity=7)"
+1119228628626698240,AAPL.US,OrderSide.Buy,1,197.490,OrderStatus.New,2025-06-16T19:34:59.381173,,,,,default
+1119228628626698240,AAPL.US,OrderSide.Buy,1,197.490,OrderStatus.New,2025-06-16T19:34:59.381173,,,,,"Signal(AAPL.US, BUY, price=197.49, confidence=0.07, quantity=7)"
+1119228630887428096,AAPL.US,OrderSide.Buy,1,197.500,OrderStatus.New,2025-06-16T19:34:59.941726,,,,,default
+1119228630887428096,AAPL.US,OrderSide.Buy,1,197.500,OrderStatus.New,2025-06-16T19:34:59.941726,,,,,"Signal(AAPL.US, BUY, price=197.50, confidence=0.06, quantity=7)"
+1119228735526924288,AAPL.US,OrderSide.Buy,1,197.600,OrderStatus.New,2025-06-16T19:35:24.877542,,,,,default
+1119228735526924288,AAPL.US,OrderSide.Buy,1,197.600,OrderStatus.New,2025-06-16T19:35:24.877542,,,,,"Signal(AAPL.US, BUY, price=197.60, confidence=0.06, quantity=7)"
+1119228817357758464,AAPL.US,OrderSide.Buy,1,197.640,OrderStatus.New,2025-06-16T19:35:44.400496,,,,,default
+1119228817357758464,AAPL.US,OrderSide.Buy,1,197.640,OrderStatus.New,2025-06-16T19:35:44.400496,,,,,"Signal(AAPL.US, BUY, price=197.64, confidence=0.06, quantity=7)"
+1119228827122135040,AAPL.US,OrderSide.Buy,1,197.640,OrderStatus.New,2025-06-16T19:35:46.704338,,,,,default
+1119228827122135040,AAPL.US,OrderSide.Buy,1,197.640,OrderStatus.New,2025-06-16T19:35:46.704338,,,,,"Signal(AAPL.US, BUY, price=197.64, confidence=0.06, quantity=7)"
+1119228868763185152,AAPL.US,OrderSide.Buy,1,197.650,OrderStatus.New,2025-06-16T19:35:56.638824,,,,,default
+1119228868763185152,AAPL.US,OrderSide.Buy,1,197.650,OrderStatus.New,2025-06-16T19:35:56.638824,,,,,"Signal(AAPL.US, BUY, price=197.65, confidence=0.06, quantity=7)"
+1119228972029501440,AAPL.US,OrderSide.Buy,1,197.600,OrderStatus.New,2025-06-16T19:36:21.268900,,,,,default
+1119228972029501440,AAPL.US,OrderSide.Buy,1,197.600,OrderStatus.New,2025-06-16T19:36:21.268900,,,,,"Signal(AAPL.US, BUY, price=197.60, confidence=0.05, quantity=7)"
+1119228974028382208,AAPL.US,OrderSide.Buy,1,197.550,OrderStatus.New,2025-06-16T19:36:21.734199,,,,,default
+1119228974028382208,AAPL.US,OrderSide.Buy,1,197.550,OrderStatus.New,2025-06-16T19:36:21.734199,,,,,"Signal(AAPL.US, BUY, price=197.55, confidence=0.05, quantity=7)"
+1119229006512517120,MSFT.US,OrderSide.Buy,1,475.880,OrderStatus.New,2025-06-16T19:36:29.498265,,,,,default
+1119229006512517120,MSFT.US,OrderSide.Buy,1,475.880,OrderStatus.New,2025-06-16T19:36:29.498265,,,,,"Signal(MSFT.US, BUY, price=475.88, confidence=0.20, quantity=3)"
+1119229074904838144,AAPL.US,OrderSide.Buy,1,197.550,OrderStatus.New,2025-06-16T19:36:45.792331,,,,,default
+1119229074904838144,AAPL.US,OrderSide.Buy,1,197.550,OrderStatus.New,2025-06-16T19:36:45.792331,,,,,"Signal(AAPL.US, BUY, price=197.55, confidence=0.05, quantity=7)"
+1119229077021319168,MSFT.US,OrderSide.Buy,1,475.880,OrderStatus.New,2025-06-16T19:36:46.366524,,,,,default
+1119229077021319168,MSFT.US,OrderSide.Buy,1,475.880,OrderStatus.New,2025-06-16T19:36:46.366524,,,,,"Signal(MSFT.US, BUY, price=475.88, confidence=0.20, quantity=3)"
+1119229083839455232,MSFT.US,OrderSide.Buy,1,476.000,OrderStatus.New,2025-06-16T19:36:47.915201,,,,,default
+1119229083839455232,MSFT.US,OrderSide.Buy,1,476.000,OrderStatus.New,2025-06-16T19:36:47.915201,,,,,"Signal(MSFT.US, BUY, price=476.00, confidence=0.19, quantity=3)"
+1119229399305641984,MSFT.US,OrderSide.Buy,1,476.270,OrderStatus.New,2025-06-16T19:38:03.131583,,,,,default
+1119229399305641984,MSFT.US,OrderSide.Buy,1,476.270,OrderStatus.New,2025-06-16T19:38:03.131583,,,,,"Signal(MSFT.US, BUY, price=476.27, confidence=0.19, quantity=3)"
+1119229401355907072,MSFT.US,OrderSide.Buy,1,476.490,OrderStatus.New,2025-06-16T19:38:03.635021,,,,,default
+1119229401355907072,MSFT.US,OrderSide.Buy,1,476.490,OrderStatus.New,2025-06-16T19:38:03.635021,,,,,"Signal(MSFT.US, BUY, price=476.49, confidence=0.18, quantity=3)"
+1119229910773456896,MSFT.US,OrderSide.Buy,1,476.200,OrderStatus.New,2025-06-16T19:40:05.086193,,,,,default
+1119229910773456896,MSFT.US,OrderSide.Buy,1,476.200,OrderStatus.New,2025-06-16T19:40:05.086193,,,,,"Signal(MSFT.US, BUY, price=476.20, confidence=0.18, quantity=3)"
+,MSFT.US,OrderSide.Sell,3,474.96,OrderStatus.Rejected,2025-06-16T19:48:32.377610,,,,"持仓不足，需要: 3, 实际: 0","Signal(MSFT.US, SELL, price=474.96, confidence=0.11, quantity=3)"
+1119232293828386816,MSFT.US,OrderSide.Buy,1,476.390,OrderStatus.New,2025-06-16T19:49:33.232810,,,,,default
+1119232293828386816,MSFT.US,OrderSide.Buy,1,476.390,OrderStatus.New,2025-06-16T19:49:33.232810,,,,,"Signal(MSFT.US, BUY, price=476.39, confidence=0.08, quantity=3)"
+1119232623664259072,MSFT.US,OrderSide.Buy,1,476.190,OrderStatus.New,2025-06-16T19:50:51.883580,,,,,default
+1119232623664259072,MSFT.US,OrderSide.Buy,1,476.190,OrderStatus.New,2025-06-16T19:50:51.883580,,,,,"Signal(MSFT.US, BUY, price=476.19, confidence=0.13, quantity=3)"
+1119232660984426496,MSFT.US,OrderSide.Sell,30,474.96,OrderStatus.New,2025-06-16T19:51:00.778206,,,,,default
+1119232660984426496,MSFT.US,OrderSide.Sell,30,474.96,OrderStatus.New,2025-06-16T19:51:00.778206,,,,,"Signal(MSFT.US, SELL, price=474.96, confidence=0.11, quantity=30)"
