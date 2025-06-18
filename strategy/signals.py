@@ -279,23 +279,32 @@ class SignalGenerator:
                     data["volume"]
                 ])
                 
-            # 转换为numpy数组并标准化
+            # 转换为numpy数组
             features = np.array(features, dtype=np.float64)
             
-            # 计算均值和标准差，确保数据类型兼容性
-            mean_vals = np.mean(features, axis=0)
-            std_vals = np.std(features, axis=0)
+            # 🔧 修复: 使用与训练时一致的Min-Max归一化方法
+            # 而不是Z-score标准化
+            data_norm = np.zeros_like(features, dtype=np.float32)
             
-            # 避免除零错误，同时确保数据类型兼容性
-            std_vals = np.where(std_vals == 0, 1e-8, std_vals)
-            
-            # 标准化特征
-            features = (features - mean_vals) / std_vals
+            for i in range(features.shape[1]):  # 对每个特征列
+                # 计算当前窗口的最小值和最大值
+                min_val = features[:, i].min()
+                max_val = features[:, i].max()
+                
+                if max_val > min_val:
+                    # Min-Max归一化到[0,1]范围，与训练时一致
+                    data_norm[:, i] = (features[:, i] - min_val) / (max_val - min_val)
+                else:
+                    # 如果最大值等于最小值，设为0.5（与训练时一致）
+                    data_norm[:, i] = 0.5
             
             # 添加批次维度
-            features = np.expand_dims(features, axis=0)
+            data_norm = np.expand_dims(data_norm, axis=0)
             
-            return features
+            self.logger.debug(f"数据标准化完成: {symbol}, 输入形状: {data_norm.shape}, "
+                            f"数据范围: [{data_norm.min():.3f}, {data_norm.max():.3f}]")
+            
+            return data_norm
             
         except Exception as e:
             self.logger.error(f"准备模型输入数据失败: {str(e)}")

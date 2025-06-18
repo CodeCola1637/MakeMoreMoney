@@ -26,8 +26,8 @@ strategy:
   lookback_period: 60  # 增加回溯周期到60天
   signal_interval: 600  # 信号生成间隔改为10分钟(600秒)
   signal_processing:
-    buy_threshold: 0.02   # 降低买入信号阈值到2%（之前是8%）
-    sell_threshold: -0.02 # 降低卖出信号阈值到-2%（之前是-8%）
+    buy_threshold: 0.05   # 提高买入信号阈值到5%（需要更强信号才买入）
+    sell_threshold: -0.01 # 提高卖出信号敏感度到-1%（更容易触发卖出）
     enable_hold: true     # 启用HOLD信号处理
   training:
     epochs: 200  # 增加训练轮数
