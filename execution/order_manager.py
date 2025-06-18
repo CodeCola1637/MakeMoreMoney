@@ -862,6 +862,33 @@ class OrderManager:
             # 自动调整价格到符合交易所规则
             adjusted_price = self._adjust_price_to_tick(symbol, price)
             
+            # 成本效益分析（仅对买入订单进行，假设默认置信度）
+            if order_type == "buy":
+                confidence = 0.1  # 默认置信度，实际应从信号中获取
+                is_effective, cost_reason = self._is_trade_cost_effective(symbol, quantity, adjusted_price, confidence)
+                
+                if not is_effective:
+                    self.logger.warning(f"交易被成本效益分析拒绝: {cost_reason}")
+                    
+                    # 尝试优化交易数量
+                    optimized_quantity = self._optimize_trade_size(symbol, quantity, adjusted_price, confidence)
+                    
+                    if optimized_quantity > 0 and optimized_quantity != quantity:
+                        self.logger.info(f"使用优化后的交易数量: {quantity} -> {optimized_quantity}")
+                        quantity = optimized_quantity
+                    elif optimized_quantity == 0:
+                        return OrderResult(
+                            order_id="",
+                            symbol=symbol,
+                            side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
+                            quantity=quantity,
+                            price=adjusted_price,
+                            status=OrderStatus.Rejected,
+                            submitted_at=datetime.now(),
+                            msg=f"成本效益分析失败: {cost_reason}",
+                            strategy_name=strategy_name
+                        )
+            
             # 记录详细的订单信息
             self.logger.info(f"准备提交订单 - 股票: {symbol}, 价格: {adjusted_price}, 数量: {quantity}, 类型: {order_type}, 策略: {strategy_name}")
             
@@ -2284,3 +2311,222 @@ class OrderManager:
             
         except Exception as e:
             self.logger.error(f"保存订单信息到CSV时出错: {e}")
+
+    def _calculate_transaction_costs(self, symbol: str, price: float, quantity: int) -> Dict[str, float]:
+        """
+        计算交易总成本（包括各种手续费）
+        
+        Args:
+            symbol: 股票代码
+            price: 价格
+            quantity: 数量
+            
+        Returns:
+            成本详情字典
+        """
+        try:
+            is_us_stock = '.US' in symbol
+            is_hk_stock = '.HK' in symbol
+            
+            # 基础交易金额
+            transaction_value = float(price) * int(quantity)
+            
+            if is_us_stock:
+                # 美股手续费结构（更精确）
+                commission_rate = 0.005  # 0.5% 佣金
+                platform_fee = max(0.99, transaction_value * 0.0001)  # 平台费，最低$0.99
+                sec_fee = transaction_value * 0.0000051  # SEC费用
+                finra_fee = max(0.01, quantity * 0.000119)  # FINRA费用
+                
+                total_cost = commission_rate + platform_fee + sec_fee + finra_fee
+                
+            elif is_hk_stock:
+                # 港股手续费结构（更精确）
+                commission_rate = transaction_value * 0.0025  # 0.25% 佣金
+                stamp_duty = transaction_value * 0.001  # 0.1% 印花税
+                trading_fee = transaction_value * 0.0000565  # 交易费
+                clearing_fee = max(2.5, transaction_value * 0.00002)  # 结算费
+                
+                total_cost = commission_rate + stamp_duty + trading_fee + clearing_fee
+                
+            else:
+                # 其他市场默认
+                total_cost = transaction_value * 0.003  # 0.3%
+            
+            return {
+                'transaction_value': transaction_value,
+                'total_cost': total_cost,
+                'cost_ratio': total_cost / transaction_value if transaction_value > 0 else 0,
+                'break_even_move': total_cost * 2 / quantity  # 双向交易需要的价格变动
+            }
+            
+        except Exception as e:
+            self.logger.error(f"计算交易成本失败: {e}")
+            # 返回保守估计
+            transaction_value = float(price) * int(quantity)
+            conservative_cost = transaction_value * 0.01  # 1%保守估计
+            return {
+                'transaction_value': transaction_value,
+                'total_cost': conservative_cost,
+                'cost_ratio': 0.01,
+                'break_even_move': conservative_cost * 2 / quantity
+            }
+
+    def _calculate_trading_costs(self, symbol: str, quantity: int, price: float) -> Dict[str, float]:
+        """
+        计算完整的交易成本
+        
+        Args:
+            symbol: 股票代码
+            quantity: 交易数量
+            price: 交易价格
+            
+        Returns:
+            交易成本详情字典
+        """
+        try:
+            # 基础交易金额
+            trade_value = float(price) * int(quantity)
+            
+            # 获取真实手续费率配置
+            if '.US' in symbol:
+                # 美股手续费结构
+                commission_rate = float(self.config.get('us_commission_rate', 0.005))  # 0.5%
+                platform_fee = float(self.config.get('us_platform_fee', 0.99))  # 平台费$0.99
+                sec_fee = trade_value * 0.0000278  # SEC费用
+                total_commission = max(platform_fee, trade_value * commission_rate) + sec_fee
+            elif '.HK' in symbol:
+                # 港股手续费结构
+                commission_rate = float(self.config.get('hk_commission_rate', 0.0025))  # 0.25%
+                stamp_duty = trade_value * 0.001  # 印花税0.1%
+                trading_fee = trade_value * 0.00005  # 交易费0.005%
+                clearing_fee = min(trade_value * 0.00002, 100)  # 结算费，最高$100
+                total_commission = trade_value * commission_rate + stamp_duty + trading_fee + clearing_fee
+            else:
+                # 其他市场默认
+                commission_rate = float(self.config.get('default_commission_rate', 0.0025))
+                total_commission = trade_value * commission_rate
+            
+            # 双向交易成本（买入+卖出）
+            round_trip_cost = total_commission * 2
+            
+            # 成本占比
+            cost_percentage = (round_trip_cost / trade_value) * 100
+            
+            return {
+                'trade_value': trade_value,
+                'single_commission': total_commission,
+                'round_trip_cost': round_trip_cost,
+                'cost_percentage': cost_percentage,
+                'break_even_change': cost_percentage  # 需要的最小价格变动百分比
+            }
+            
+        except Exception as e:
+            self.logger.error(f"计算交易成本失败: {e}")
+            return {
+                'trade_value': 0,
+                'single_commission': 0,
+                'round_trip_cost': 0,
+                'cost_percentage': 5.0,  # 保守估计5%
+                'break_even_change': 5.0
+            }
+
+    def _is_trade_cost_effective(self, symbol: str, quantity: int, price: float, confidence: float) -> Tuple[bool, str]:
+        """
+        检查交易是否具有成本效益
+        
+        Args:
+            symbol: 股票代码
+            quantity: 交易数量
+            price: 交易价格
+            confidence: 信号置信度
+            
+        Returns:
+            (是否具有成本效益, 详细说明)
+        """
+        try:
+            # 计算交易成本
+            costs = self._calculate_trading_costs(symbol, quantity, price)
+            
+            # 获取配置的最小盈利要求
+            min_profit_threshold = float(self.config.get('execution.min_profit_threshold', 2.0))  # 默认2%
+            max_cost_ratio = float(self.config.get('execution.max_cost_ratio', 1.5))  # 最大成本占比1.5%
+            
+            # 预期收益估算（基于信号置信度）
+            expected_return = abs(confidence) * 100  # 将置信度转换为预期收益百分比
+            
+            # 成本效益检查
+            cost_too_high = costs['cost_percentage'] > max_cost_ratio
+            insufficient_expected_return = expected_return < (costs['break_even_change'] + min_profit_threshold)
+            
+            # 小额交易特别检查
+            is_small_trade = costs['trade_value'] < 1000  # 小于$1000或等值
+            
+            if cost_too_high:
+                return False, f"交易成本过高: {costs['cost_percentage']:.2f}% > {max_cost_ratio}%"
+            
+            if insufficient_expected_return:
+                return False, f"预期收益不足: {expected_return:.2f}% < 盈亏平衡点{costs['break_even_change']:.2f}% + 最小利润{min_profit_threshold}%"
+            
+            if is_small_trade and costs['cost_percentage'] > 1.0:
+                return False, f"小额交易成本占比过高: ${costs['trade_value']:.0f}, 成本占比{costs['cost_percentage']:.2f}%"
+            
+            # 记录成本效益分析结果
+            self.logger.info(f"交易成本分析 {symbol}: 交易额=${costs['trade_value']:.0f}, "
+                           f"双向成本=${costs['round_trip_cost']:.2f}({costs['cost_percentage']:.2f}%), "
+                           f"预期收益{expected_return:.2f}%, 置信度{confidence:.3f}")
+            
+            return True, f"交易具有成本效益: 预期收益{expected_return:.2f}% > 成本{costs['cost_percentage']:.2f}%"
+            
+        except Exception as e:
+            self.logger.error(f"成本效益分析失败: {e}")
+            return False, f"成本效益分析失败: {e}"
+
+    def _optimize_trade_size(self, symbol: str, original_quantity: int, price: float, confidence: float) -> int:
+        """
+        优化交易数量以提高成本效益
+        
+        Args:
+            symbol: 股票代码
+            original_quantity: 原始数量
+            price: 交易价格
+            confidence: 信号置信度
+            
+        Returns:
+            优化后的交易数量
+        """
+        try:
+            # 获取最小有效交易金额
+            min_trade_value = float(self.config.get('execution.min_trade_value', 500))  # 默认$500
+            
+            # 计算当前交易金额
+            current_value = float(price) * original_quantity
+            
+            # 如果当前交易金额太小，尝试增加到最小有效金额
+            if current_value < min_trade_value:
+                optimized_quantity = max(int(min_trade_value / float(price)), 1)
+                
+                # 调整为合适的手数
+                optimized_quantity = self._adjust_lot_size(symbol, optimized_quantity)
+                
+                # 验证优化后的交易是否具有成本效益
+                is_effective, reason = self._is_trade_cost_effective(symbol, optimized_quantity, price, confidence)
+                
+                if is_effective:
+                    self.logger.info(f"优化交易数量: {symbol} {original_quantity} -> {optimized_quantity} 股 "
+                                   f"(${current_value:.0f} -> ${float(price) * optimized_quantity:.0f})")
+                    return optimized_quantity
+                else:
+                    self.logger.warning(f"即使优化后仍不具成本效益: {reason}")
+                    return 0  # 不执行交易
+            
+            return original_quantity
+            
+        except Exception as e:
+            self.logger.error(f"优化交易数量失败: {e}")
+
+    def _check_profitability(self, symbol: str, price: float, quantity: int, confidence: float) -> Tuple[bool, str]:
+        """
+        检查交易的盈利能力（保留原有方法兼容性）
+        """
+        return self._is_trade_cost_effective(symbol, quantity, price, confidence)

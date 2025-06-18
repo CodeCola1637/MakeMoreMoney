@@ -51,6 +51,18 @@ execution:
   max_position_size: 15000.0  # 最大仓位
   max_drawdown_pct: 10.0    # 最大回撤百分比
   trailing_stop_pct: 2.0  # 追踪止损百分比
+  
+  # 成本效益分析配置
+  min_profit_threshold: 3.0   # 最小盈利要求3%（覆盖手续费后的净盈利）
+  max_cost_ratio: 1.5        # 最大成本占比1.5%
+  min_trade_value: 1000      # 最小交易金额$1000（提高交易效率）
+  
+  # 真实手续费配置
+  us_commission_rate: 0.005   # 美股佣金率0.5%
+  us_platform_fee: 0.99      # 美股平台费$0.99
+  hk_commission_rate: 0.0025  # 港股佣金率0.25%
+  default_commission_rate: 0.0025  # 默认佣金率0.25%
+  
   order_types:
     default: "LO"  # 限价单
   # 限价单价格优化
