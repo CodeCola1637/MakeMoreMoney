@@ -15,6 +15,7 @@ import uuid
 import logging
 import csv
 import traceback
+import decimal
 
 from utils import ConfigLoader, setup_logger, setup_longport_env
 from strategy.signals import Signal, SignalType
@@ -858,150 +859,98 @@ class OrderManager:
             OrderResult: 订单结果
         """
         try:
+            # 自动调整价格到符合交易所规则
+            adjusted_price = self._adjust_price_to_tick(symbol, price)
+            
             # 记录详细的订单信息
-            self.logger.info(f"准备提交订单 - 股票: {symbol}, 价格: {price}, 数量: {quantity}, 类型: {order_type}, 策略: {strategy_name}")
+            self.logger.info(f"准备提交订单 - 股票: {symbol}, 价格: {adjusted_price}, 数量: {quantity}, 类型: {order_type}, 策略: {strategy_name}")
             
-            # 验证订单参数
-            is_valid, error_msg = self._validate_order_parameters(symbol, price, quantity)
-            if not is_valid:
-                self.logger.error(f"订单参数验证失败: {error_msg}")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
-                    quantity=quantity,
-                    price=price,
-                    status=OrderStatus.Rejected,
-                    submitted_at=datetime.now(),
-                    msg=error_msg,
-                    strategy_name=strategy_name
-                )
+            # 第二步：调整数量到符合手数要求
+            adjusted_quantity = self._adjust_lot_size(symbol, quantity)
+            self.logger.info(f"数量调整: {symbol} {quantity} -> {adjusted_quantity}")
             
-            # 执行风险控制检查
-            if not await self.risk_control_check(symbol, quantity, price, is_buy=(order_type.lower() == "buy")):
-                self.logger.warning(f"风险控制检查未通过: {symbol}")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
-                    quantity=quantity,
-                    price=price,
-                    status=OrderStatus.Rejected,
-                    submitted_at=datetime.now(),
-                    msg="风险控制检查未通过",
-                    strategy_name=strategy_name
-                )
-            
-            # 提交订单（移除await，因为submit_order是同步方法）
-            order = self.trade_ctx.submit_order(
+            # 第三步：调用富途API
+            order_resp = self.trade_ctx.submit_order(
                 symbol=symbol,
-                order_type=OrderType.LO,
-                side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
-                submitted_price=price,
+                order_type=OrderType.LO,  # 修复：使用正确的OrderType.LO
+                side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
                 submitted_quantity=quantity,
-                time_in_force=TimeInForceType.Day
+                time_in_force=TimeInForceType.Day,
+                submitted_price=Decimal(str(adjusted_price)),
+                remark=f"策略订单-{strategy_name}"
             )
+
+            self.logger.info(f"订单提交成功: {symbol}, 订单ID: {order_resp.order_id}")
             
-            if not order:
-                self.logger.error(f"订单提交失败: {symbol} - API返回空响应")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
-                    quantity=quantity,
-                    price=price,
-                    status=OrderStatus.Rejected,
-                    submitted_at=datetime.now(),
-                    msg="API返回空响应",
-                    strategy_name=strategy_name
-                )
+            # 增加今日订单计数
+            self.daily_order_count += 1
             
-            # 创建订单结果对象
-            order_result = OrderResult(
-                order_id=order.order_id,
+            # 创建订单结果对象（移除id参数）
+            result = OrderResult(
+                order_id=order_resp.order_id,
                 symbol=symbol,
-                side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
                 quantity=quantity,
-                price=price,
-                status=OrderStatus.New,
+                price=adjusted_price,
+                status=OrderStatus.NotReported,
                 submitted_at=datetime.now(),
+                msg="",
                 strategy_name=strategy_name
             )
             
-            # 保存订单
-            self._save_order(order_result, strategy_name)
+            # 保存到活跃订单
+            self.active_orders[order_resp.order_id] = result
+            self.order_update_time[order_resp.order_id] = time.time()
             
-            self.logger.info(f"订单提交成功: {order_result}")
-            return order_result
+            # 保存订单到CSV
+            self._save_order_to_csv(result)
+            
+            self.logger.info(f"订单提交完成: {result}")
+            return result
             
         except Exception as e:
-            error_msg = f"提交订单时发生错误: {str(e)}"
-            self.logger.error(error_msg)
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            self.logger.error(f"提交订单到交易所失败: {symbol}, 错误: {e}")
             
+            # 创建失败的订单结果（移除id参数）
             return OrderResult(
                 order_id="",
                 symbol=symbol,
-                side=OrderSide.Buy if order_type.lower() == "buy" else OrderSide.Sell,
+                side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
                 quantity=quantity,
-                price=price,
+                price=adjusted_price,
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
-                msg=error_msg,
+                msg=f"提交失败: {str(e)}",
                 strategy_name=strategy_name
             )
     
-    def _adjust_lot_size(self, symbol: str, quantity: int) -> int:
+    def _get_real_lot_size(self, symbol: str) -> int:
         """
-        调整股票手数，确保符合最小交易单位
+        获取真实的港股手数信息（如果可用）
         
         Args:
             symbol: 股票代码
-            quantity: 原始数量
             
         Returns:
-            调整后的数量
+            真实手数，如果无法获取则返回默认值
         """
-        if not self.trade_ctx:
-            try:
-                # 同步初始化
-                if hasattr(self, 'initialize'):
-                    self.initialize()
-            except Exception as e:
-                self.logger.error(f"初始化交易上下文失败: {e}")
-            
-        try:
-            # 获取股票交易信息
-            lot_size = self.get_lot_size(symbol)
-            self.logger.debug(f"{symbol} 获取到手数: {lot_size}")
-            
-            # 美股特殊处理 - 支持碎股交易
-            if '.US' in symbol:
-                # 美股最小交易单位为1股，不需要调整为整手
-                if quantity < 1:
-                    adjusted_quantity = 1
-                    self.logger.info(f"美股交易数量小于1股，调整为最小交易单位: 1股")
-                else:
-                    adjusted_quantity = quantity
-                return adjusted_quantity
-            
-            # 非美股市场，调整为整手数量
-            if lot_size > 0:
-                adjusted_quantity = (quantity // lot_size) * lot_size
-                if adjusted_quantity == 0 and quantity > 0:
-                    adjusted_quantity = lot_size
-                
-                if adjusted_quantity != quantity:
-                    self.logger.info(f"调整交易数量以符合最小交易单位: {quantity} -> {adjusted_quantity}")
-                
-                return adjusted_quantity
-            else:
-                self.logger.warning(f"无法获取正确的手数信息，使用原始数量: {quantity}")
-                return quantity
-        except Exception as e:
-            self.logger.warning(f"调整交易数量出错: {e}，使用原始数量: {quantity}")
-            return quantity
-            
+        # 已知的港股手数映射
+        known_lot_sizes = {
+            '700.HK': 100,      # 腾讯控股
+            '9988.HK': 100,     # 阿里巴巴
+            '388.HK': 100,      # 港交易所
+            '1299.HK': 500,     # 友邦保险 - 500股为1手
+            '941.HK': 500,      # 中国移动 - 500股为1手
+        }
+        
+        if symbol in known_lot_sizes:
+            self.logger.info(f"使用已知手数配置 {symbol}: {known_lot_sizes[symbol]}")
+            return known_lot_sizes[symbol]
+        
+        # 如果没有已知配置，返回默认100股
+        self.logger.warning(f"未找到 {symbol} 的确切手数信息，使用默认100股")
+        return 100
+
     def get_lot_size(self, symbol: str) -> int:
         """
         获取股票的最小交易单位
@@ -1015,9 +964,9 @@ class OrderManager:
         try:
             # 根据股票代码判断市场
             if '.HK' in symbol:
-                # 港股默认最小手数为100
-                lot_size = 100
-                self.logger.debug(f"{symbol} 默认使用港股手数: {lot_size}")
+                # 港股使用真实手数信息
+                lot_size = self._get_real_lot_size(symbol)
+                self.logger.debug(f"{symbol} 使用港股手数: {lot_size}")
             elif '.US' in symbol:
                 # 美股最小手数为1（支持碎股交易）
                 lot_size = 1
@@ -1032,9 +981,9 @@ class OrderManager:
                 self.logger.debug(f"{symbol} 未知市场，使用默认手数: {lot_size}")
                 
             # 确保最小交易单位也更新到 min_quantity_unit 字典中
-            if symbol.endswith('.US') and symbol in self.min_quantity_unit and self.min_quantity_unit[symbol] != 1:
-                self.min_quantity_unit[symbol] = 1
-                self.logger.info(f"更新 {symbol} 的最小交易单位为 1 股")
+            if symbol not in self.min_quantity_unit:
+                self.min_quantity_unit[symbol] = lot_size
+                self.logger.info(f"更新 {symbol} 的最小交易单位为 {lot_size} 股")
                 
             return lot_size
         except Exception as e:
@@ -1452,11 +1401,12 @@ class OrderManager:
         # 否则返回True
         return True
 
-    def is_enough_balance(self, cost: float) -> bool:
+    def is_enough_balance(self, cost: float, symbol: str = None) -> bool:
         """检查账户余额是否足够支付交易成本
         
         Args:
             cost: 交易成本
+            symbol: 股票代码，用于判断使用哪种货币
             
         Returns:
             是否有足够余额
@@ -1465,34 +1415,40 @@ class OrderManager:
             # 获取账户余额
             balance_response = self.trade_ctx.account_balance()
             
-            # 优先使用港币账户，避免负余额美元账户
+            # 根据股票类型确定使用的货币
+            is_us_stock = symbol and '.US' in symbol
+            is_hk_stock = symbol and '.HK' in symbol
+            
             if isinstance(balance_response, list):
-                # 查找港币账户
-                hkd_available = 0.0
+                # 查找对应货币账户
+                target_currency = "USD" if is_us_stock else "HKD"
+                available_balance = 0.0
                 
                 for item in balance_response:
                     if hasattr(item, 'cash_infos') and item.cash_infos:
                         for cash_info in item.cash_infos:
-                            if hasattr(cash_info, 'currency') and cash_info.currency == "HKD" and hasattr(cash_info, 'available_cash'):
-                                hkd_available = float(cash_info.available_cash)
-                                self.logger.info(f"使用港币账户进行交易，可用余额: {hkd_available} HKD")
+                            if hasattr(cash_info, 'currency') and cash_info.currency == target_currency and hasattr(cash_info, 'available_cash'):
+                                available_balance = float(cash_info.available_cash)
+                                self.logger.info(f"检查{target_currency}账户余额: {available_balance}")
                                 break
                 
-                # 如果有港币余额且足够
-                if hkd_available > 0 and hkd_available >= cost:
+                # 检查对应货币账户余额
+                if available_balance >= cost:
+                    self.logger.info(f"{target_currency}账户余额充足: {available_balance} >= {cost}")
                     return True
                 else:
-                    self.logger.warning(f"港币账户余额不足: {hkd_available} HKD < {cost} HKD")
-                    
-            # 获取总可用资金
+                    self.logger.warning(f"{target_currency}账户余额不足: {available_balance} < {cost}")
+            return False
+            
+            # 如果无法获取具体货币余额，使用总可用资金（兼容性处理）
             total_available = self.get_account_balance()
             
             # 检查是否足够
             if total_available >= cost:
-                self.logger.info(f"账户余额充足: {total_available} >= {cost}")
+                self.logger.info(f"总账户余额充足: {total_available} >= {cost}")
                 return True
             else:
-                self.logger.warning(f"账户余额不足: {total_available} < {cost}")
+                self.logger.warning(f"总账户余额不足: {total_available} < {cost}")
                 return False
                 
         except Exception as e:
@@ -1549,16 +1505,27 @@ class OrderManager:
                 cost = price_float * quantity_float * (1 + commission_rate)
                 self.logger.info(f"计算交易成本: {cost}")
                 
-                # 美股小额交易特殊处理
-                if is_us_stock and quantity <= 10:
-                    self.logger.info(f"美股小额交易({quantity}股)，放宽账户余额限制")
+                # 首先进行基本的资金检查
+                balance_check = self.is_enough_balance(cost, symbol)
+                
+                # 如果资金充足，正常通过
+                if balance_check:
                     return True
                 
-                # 常规余额检查
-                balance_check = self.is_enough_balance(cost)
-                if not balance_check:
-                    self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前可用资金: {self.get_account_balance()}")
-                return balance_check
+                # 资金不足的情况下，检查账户总余额是否为负
+                total_balance = self.get_account_balance()
+                if total_balance < 0:
+                    self.logger.warning(f"风险控制: 账户总余额为负({total_balance})，禁止任何买入交易: {symbol}")
+                    return False
+                
+                # 美股小额交易特殊处理（仅在总余额为正时）
+                if is_us_stock and quantity <= 5 and total_balance > cost:
+                    self.logger.info(f"美股小额交易({quantity}股)，在总余额为正的情况下放宽部分限制")
+                    return True
+                
+                # 其他情况拒绝交易
+                self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前可用资金: {total_balance}")
+                return False
             else:
                 # 4. 卖出风险控制
                 # 4.1 检查卖出数量是否超过当前持仓
@@ -1578,77 +1545,144 @@ class OrderManager:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
-    def _validate_order_parameters(self, symbol: str, price: float, quantity: int) -> Tuple[bool, str]:
+    def _get_hk_price_tick(self, price) -> float:
         """
-        验证订单参数是否符合交易所要求
+        获取港股价格的最小变动单位（价格精度）
+        
+        Args:
+            price: 股票价格 (支持 float 或 Decimal)
+            
+        Returns:
+            最小价格变动单位
+        """
+        try:
+            # 统一转换为 float 进行计算
+            price_float = float(price) if price else 0.0
+            
+            if price_float <= 0.25:
+                return 0.001
+            elif price_float <= 0.50:
+                return 0.005
+            elif price_float <= 10.00:
+                return 0.01
+            elif price_float <= 20.00:
+                return 0.02
+            elif price_float <= 100.00:
+                return 0.05
+            elif price_float <= 200.00:
+                return 0.10
+            elif price_float <= 500.00:
+                return 0.20
+            else:
+                return 0.50
+        except (ValueError, TypeError) as e:
+            self.logger.error(f"获取港股价格精度时出错: {e}, 使用默认精度0.05")
+            return 0.05
+    
+    def _adjust_price_to_tick(self, symbol: str, price) -> float:
+        """
+        调整价格到符合最小变动单位的价格
         
         Args:
             symbol: 股票代码
-            price: 价格
+            price: 原始价格 (支持 float 或 Decimal)
+            
+        Returns:
+            调整后的价格
+        """
+        try:
+            # 统一转换为 float，支持 Decimal 和 float 类型
+            if isinstance(price, Decimal):
+                price_float = float(price)
+            elif isinstance(price, (int, float)):
+                price_float = float(price)
+            else:
+                # 尝试转换字符串或其他类型
+                price_float = float(str(price))
+            
+            if ".HK" in symbol:
+                tick = self._get_hk_price_tick(price_float)
+                # 调整到最接近的有效价格点
+                adjusted_price = round(price_float / tick) * tick
+                if abs(adjusted_price - price_float) > 0.001:
+                    self.logger.info(f"调整港股价格 {symbol}: {price_float} -> {adjusted_price} (精度: {tick})")
+                return round(adjusted_price, 3)  # 保留3位小数
+            elif ".US" in symbol:
+                # 美股精度为0.01
+                adjusted_price = round(price_float, 2)
+                return adjusted_price
+            else:
+                # 其他市场默认精度为0.01
+                adjusted_price = round(price_float, 2)
+                return adjusted_price
+        except (ValueError, TypeError, decimal.InvalidOperation) as e:
+            self.logger.error(f"调整价格精度时出错: {e}, 使用原始价格: {price}")
+            try:
+                return float(price) if price else 0.0
+            except:
+                return 0.0
+
+    def _validate_order_parameters(self, symbol: str, price, quantity: int) -> Tuple[bool, str]:
+        """
+        验证订单参数是否符合交易所规则
+        
+        Args:
+            symbol: 股票代码
+            price: 价格 (支持 float 或 Decimal)
             quantity: 数量
             
         Returns:
-            Tuple[bool, str]: (是否通过验证, 错误信息)
+            (是否有效, 错误信息)
         """
         try:
-            # 验证价格
-            if symbol not in self.min_price_unit:
-                # 根据市场类型获取默认价格单位
-                if ".US" in symbol:
-                    min_price_unit = 0.01  # 美股最小价格变动单位
-                elif ".HK" in symbol:
-                    min_price_unit = 0.2   # 港股最小价格变动单位
-                else:
-                    min_price_unit = 0.01  # 其他市场默认
-                self.logger.warning(f"未配置{symbol}的最小价格变动单位，使用默认值: {min_price_unit}")
+            # 统一转换价格类型
+            if isinstance(price, Decimal):
+                price_float = float(price)
+            elif isinstance(price, (int, float)):
+                price_float = float(price)
             else:
-                min_price_unit = float(self.min_price_unit[symbol])
-                
-            if price <= 0:
-                return False, f"价格必须大于0"
-                
-            # 确保所有值都是浮点数
-            price_float = float(price)
+                price_float = float(str(price))
             
-            # 使用近似比较而不是 % 运算符，避免 float 和 Decimal 类型问题
-            if abs(price_float / min_price_unit - round(price_float / min_price_unit)) > 0.0001:
-                return False, f"价格{price}不符合最小价格变动单位{min_price_unit}"
-                
-            # 验证数量
-            if symbol not in self.min_quantity_unit:
-                # 根据市场类型获取默认交易单位
-                if ".US" in symbol:
-                    min_quantity = 1  # 美股最小交易单位为1股
-                elif ".HK" in symbol:
-                    min_quantity = 100  # 港股最小交易单位为100股
-                else:
-                    min_quantity = 100  # 其他市场默认
-                self.logger.warning(f"未配置{symbol}的最小交易单位，使用默认值: {min_quantity}")
-                # 动态添加到字典中
-                self.min_quantity_unit[symbol] = min_quantity
-            else:
-                min_quantity = int(self.min_quantity_unit[symbol])
-                
+            # 检查基本参数
+            if price_float <= 0:
+                return False, "价格必须大于0"
+            
             if quantity <= 0:
-                return False, f"数量必须大于0"
+                return False, "数量必须大于0"
+            
+            # 港股特殊验证
+            if ".HK" in symbol:
+                # 获取港股价格精度
+                tick = self._get_hk_price_tick(price_float)
                 
-            # 确保数量是整数
-            quantity_int = int(quantity)
+                # 检查价格精度
+                remainder = price_float % tick
+                if remainder > 0.0001:  # 考虑浮点数精度误差
+                    # 尝试调整价格
+                    adjusted_price = round(price_float / tick) * tick
+                    adjusted_price = round(adjusted_price, 3)
+                    self.logger.warning(f"价格{price_float}不符合最小价格变动单位{tick}，建议使用{adjusted_price}")
+                    return False, f"价格{price_float}不符合最小价格变动单位{tick}，建议使用{adjusted_price}"
                 
-            # 如果是美股，允许1股起交易，否则检查是否符合最小交易单位
-            if ".US" in symbol:
-                if quantity_int < 1:
-                    return False, f"美股交易数量至少为1股"
-            else:
-                # 使用整除验证是否为最小交易单位的整数倍
-                if quantity_int % min_quantity != 0:
-                    return False, f"数量{quantity}不符合最小交易单位{min_quantity}"
-                
+                # 检查手数
+                lot_size = self.get_lot_size(symbol)
+                if quantity % lot_size != 0:
+                    return False, f"数量{quantity}不符合最小交易手数{lot_size}的倍数"
+            
+            # 美股验证
+            elif ".US" in symbol:
+                # 美股价格精度为0.01
+                if round(price_float, 2) != price_float:
+                    adjusted_price = round(price_float, 2)
+                    return False, f"价格{price_float}精度过高，建议使用{adjusted_price}"
+            
             return True, ""
             
         except Exception as e:
-            return False, f"验证订单参数时发生错误: {str(e)}"
-            
+            error_msg = f"验证订单参数时发生错误: {e}"
+            self.logger.error(error_msg)
+            return False, error_msg
+
     async def submit_buy_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default") -> OrderResult:
         """
         提交买入订单
@@ -1988,3 +2022,265 @@ class OrderManager:
             self.logger.error(f"下单失败: {str(e)}")
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return None
+
+    def _adjust_lot_size(self, symbol: str, quantity: int) -> int:
+        """
+        调整股票手数，确保符合最小交易单位
+        
+        Args:
+            symbol: 股票代码
+            quantity: 原始数量
+            
+        Returns:
+            调整后的数量
+        """
+        if not self.trade_ctx:
+            try:
+                # 同步初始化
+                if hasattr(self, 'initialize'):
+                    self.initialize()
+            except Exception as e:
+                self.logger.error(f"初始化交易上下文失败: {e}")
+            
+        try:
+            # 获取股票交易信息
+            lot_size = self.get_lot_size(symbol)
+            self.logger.debug(f"{symbol} 获取到手数: {lot_size}")
+            
+            # 美股特殊处理 - 支持碎股交易
+            if '.US' in symbol:
+                # 美股最小交易单位为1股，不需要调整为整手
+                if quantity < 1:
+                    adjusted_quantity = 1
+                    self.logger.info(f"美股交易数量小于1股，调整为最小交易单位: 1股")
+                else:
+                    adjusted_quantity = quantity
+                return adjusted_quantity
+            
+            # 非美股市场，调整为整手数量
+            if lot_size > 0:
+                adjusted_quantity = (quantity // lot_size) * lot_size
+                if adjusted_quantity == 0 and quantity > 0:
+                    adjusted_quantity = lot_size
+                
+                if adjusted_quantity != quantity:
+                    self.logger.info(f"调整交易数量以符合最小交易单位: {quantity} -> {adjusted_quantity}")
+                
+                return adjusted_quantity
+            else:
+                self.logger.warning(f"无法获取正确的手数信息，使用原始数量: {quantity}")
+                return quantity
+        except Exception as e:
+            self.logger.warning(f"调整交易数量出错: {e}，使用原始数量: {quantity}")
+            return quantity
+
+    def _get_real_lot_size(self, symbol: str) -> int:
+        """
+        获取真实的港股手数信息（如果可用）
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            真实手数，如果无法获取则返回默认值
+        """
+        # 已知的港股手数映射
+        known_lot_sizes = {
+            '700.HK': 100,      # 腾讯控股
+            '9988.HK': 100,     # 阿里巴巴
+            '388.HK': 100,      # 港交易所
+            '1299.HK': 500,     # 友邦保险 - 500股为1手
+            '941.HK': 500,      # 中国移动 - 500股为1手
+        }
+        
+        if symbol in known_lot_sizes:
+            self.logger.info(f"使用已知手数配置 {symbol}: {known_lot_sizes[symbol]}")
+            return known_lot_sizes[symbol]
+        
+        # 如果没有已知配置，返回默认100股
+        self.logger.warning(f"未找到 {symbol} 的确切手数信息，使用默认100股")
+        return 100
+
+    async def _risk_control_check(self, symbol: str, quantity: int, price: float, is_buy: bool) -> bool:
+        """
+        执行风险控制检查（内部方法）
+        
+        Args:
+            symbol: 股票代码
+            quantity: 数量
+            price: 价格
+            is_buy: 是否为买入操作
+            
+        Returns:
+            bool: 如果通过风险控制检查则返回True，否则返回False
+        """
+        try:
+            self.logger.info(f"开始风险控制检查: {symbol}, 数量={quantity}, 价格={price}, 买入={is_buy}")
+            
+            # 1. 检查每日订单上限
+            if not self._check_daily_order_limit():
+                self.logger.warning(f"风险控制: 今日订单数已达上限 {self.daily_order_count}/{self.max_daily_orders}")
+                return False
+                
+            # 2. 获取当前持仓
+            positions = self.get_positions(symbol)
+            self.logger.info(f"当前持仓: {positions}")
+            
+            # 判断是否是美股交易
+            is_us_stock = '.US' in symbol
+            
+            if is_buy:
+                # 3. 买入风险控制
+                # 3.1 检查是否超过最大持仓数量
+                current_position = 0
+                for pos in positions:
+                    if pos.symbol == symbol:
+                        current_position += float(pos.quantity)
+                
+                self.logger.info(f"当前持仓数量: {current_position}, 最大持仓限制: {self.max_position_size}")
+                if current_position + float(quantity) > self.max_position_size:
+                    self.logger.warning(f"风险控制: 买入{symbol}的数量{quantity}会导致持仓({current_position})超过最大限制({self.max_position_size})")
+                    return False
+                
+                # 3.2 检查账户余额是否足够
+                try:
+                    # 确保所有类型转换为float
+                    price_float = float(price)
+                    quantity_float = float(quantity)
+                    commission_rate = float(self.config.get('commission_rate', 0.0025))
+                    
+                    cost = price_float * quantity_float * (1 + commission_rate)
+                    self.logger.info(f"计算交易成本: {cost}")
+                    
+                    # 获取账户余额
+                    balance_response = self.trade_ctx.account_balance()
+                    
+                    # 根据股票类型确定使用的货币
+                    target_currency = "USD" if is_us_stock else "HKD"
+                    available_balance = 0.0
+                    
+                    if isinstance(balance_response, list):
+                        self.logger.debug(f"账户余额对象类型: {type(balance_response)}")
+                        self.logger.info(f"账户余额是列表格式，包含 {len(balance_response)} 项")
+                        
+                        # 获取USD和HKD可用资金
+                        usd_balance = 0.0
+                        hkd_balance = 0.0
+                        
+                        for item in balance_response:
+                            if hasattr(item, 'cash_infos') and item.cash_infos:
+                                for cash_info in item.cash_infos:
+                                    if hasattr(cash_info, 'currency') and hasattr(cash_info, 'available_cash'):
+                                        if cash_info.currency == "USD":
+                                            usd_balance = float(cash_info.available_cash)
+                                            self.logger.info(f"获取到USD可用资金: {usd_balance}")
+                                        elif cash_info.currency == "HKD":
+                                            hkd_balance = float(cash_info.available_cash)
+                                            self.logger.info(f"获取到HKD可用资金: {hkd_balance}")
+                        
+                        # 检查目标货币余额
+                        if target_currency == "USD":
+                            available_balance = usd_balance
+                        else:
+                            available_balance = hkd_balance
+                        
+                        # 检查对应货币账户余额
+                        if available_balance >= cost:
+                            self.logger.info(f"{target_currency}账户余额充足: {available_balance} >= {cost}")
+                            return True
+                        else:
+                            self.logger.warning(f"{target_currency}账户余额不足: {available_balance} < {cost}")
+                            
+                            # 计算总可用资金（按汇率转换）
+                            # 假设汇率为 1 USD = 7.8 HKD
+                            exchange_rate = 7.8
+                            if target_currency == "USD":
+                                # 需要USD，检查能否用HKD兑换
+                                total_available = usd_balance + (hkd_balance / exchange_rate)
+                            else:
+                                # 需要HKD，检查能否用USD兑换
+                                total_available = hkd_balance + (usd_balance * exchange_rate)
+                            
+                            self.logger.info(f"账户总可用资金: {total_available}")
+                            
+                            if total_available >= cost:
+                                self.logger.info(f"总可用资金充足，允许跨币种交易")
+                                return True
+                            else:
+                                self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前可用资金: {total_available}")
+                                return False
+                    else:
+                        # 兼容处理：如果不是列表格式，直接获取总余额
+                        total_balance = self.get_account_balance()
+                        if total_balance >= cost:
+                            self.logger.info(f"总余额充足: {total_balance} >= {cost}")
+                            return True
+                        else:
+                            self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前总余额: {total_balance}")
+                            return False
+                            
+                except Exception as e:
+                    self.logger.error(f"风险控制检查中发生错误: {e}")
+                    return False
+            else:
+                # 4. 卖出风险控制
+                # 4.1 检查卖出数量是否超过当前持仓
+                current_position = 0
+                for pos in positions:
+                    if pos.symbol == symbol:
+                        current_position += float(pos.quantity)
+                
+                self.logger.info(f"当前持仓数量: {current_position}, 计划卖出数量: {quantity}")
+                if float(quantity) > current_position:
+                    self.logger.warning(f"风险控制: 卖出{symbol}的数量{quantity}超过当前持仓{current_position}")
+                    return False
+                    
+                return True
+        except Exception as e:
+            self.logger.error(f"执行风险控制检查时发生错误: {str(e)}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
+
+    def _save_order_to_csv(self, result: OrderResult):
+        """
+        保存订单信息到CSV文件
+        
+        Args:
+            result: 订单结果对象
+        """
+        try:
+            # 确保logs目录存在
+            os.makedirs("logs", exist_ok=True)
+            
+            # CSV文件路径
+            csv_file = "logs/orders.csv"
+            
+            # 检查文件是否存在，不存在则创建并写入标题行
+            file_exists = os.path.exists(csv_file)
+            
+            with open(csv_file, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                
+                # 如果文件不存在，写入标题行
+                if not file_exists:
+                    writer.writerow([
+                        'timestamp', 'order_id', 'symbol', 'side', 'quantity', 
+                        'price', 'status', 'executed_quantity'
+                    ])
+                
+                # 写入订单数据
+                writer.writerow([
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    result.id,
+                    result.symbol,
+                    result.side.value,
+                    result.quantity,
+                    result.price,
+                    result.status.value,
+                    result.executed_quantity
+                ])
+                
+            self.logger.info(f"订单信息已保存到 {csv_file}")
+            
+        except Exception as e:
+            self.logger.error(f"保存订单信息到CSV时出错: {e}")
