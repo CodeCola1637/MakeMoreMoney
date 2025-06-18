@@ -644,27 +644,26 @@ class OrderManager:
         is_us_stock = '.US' in symbol
         minimum_quantity = 1 if is_us_stock else self.get_lot_size(symbol)
         
-        if available_cash <= 0:
-            # 对于美股，如果账户余额不足但仍然要尝试交易，可以使用小数量尝试
-            if is_us_stock:
-                self.logger.warning(f"可用资金不足，尝试降低美股买入数量至 {minimum_quantity} 股: {symbol}")
-                quantity = minimum_quantity
-            else:
-                self.logger.warning(f"可用资金不足，无法买入: {symbol}")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=OrderSide.Buy, 
-                    quantity=quantity,
-                    price=price,
-                    status=OrderStatus.Rejected,
-                    submitted_at=datetime.now(),
-                    msg="可用资金不足",
-                    strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
-                )
+        # 计算最小买入所需资金
+        price_float = float(price) if hasattr(price, '__float__') else price
+        min_required_cash = price_float * minimum_quantity * 1.01  # 包含1%手续费缓冲
+        
+        # 严格的资金检查：如果连最小买入都无法负担，直接拒绝
+        if available_cash < min_required_cash:
+            self.logger.warning(f"可用资金不足以买入最小单位: {symbol}, 可用资金: {available_cash:.2f}, 最小所需: {min_required_cash:.2f}")
+            return OrderResult(
+                order_id="",
+                symbol=symbol,
+                side=OrderSide.Buy, 
+                quantity=quantity,
+                price=price,
+                status=OrderStatus.Rejected,
+                submitted_at=datetime.now(),
+                msg=f"可用资金不足，需要{min_required_cash:.2f}，实际{available_cash:.2f}",
+                strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+            )
         
         # 计算所需资金（加上一些手续费的缓冲）
-        price_float = float(price) if hasattr(price, '__float__') else price
         required_cash = price_float * quantity * 1.01  # 假设1%的手续费缓冲
         
         # 检查资金是否足够

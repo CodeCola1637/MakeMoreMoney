@@ -280,7 +280,7 @@ async def main():
                             cost_price = current_price * 0.95  # 假设成本价比当前价格低5%
                             await profit_stop_mgr.update_position_status(
                                 position.symbol, 
-                                position.quantity, 
+                                int(position.quantity), 
                                 cost_price, 
                                 current_price
                             )
