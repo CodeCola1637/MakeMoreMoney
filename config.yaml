@@ -9,11 +9,18 @@ api:
 # 行情订阅配置
 quote:
   symbols:
+    # 港股
     - "700.HK"   # 腾讯控股
     - "9988.HK"  # 阿里巴巴
     - "1299.HK"  # 友邦保险
     - "388.HK"   # 香港交易所
     - "941.HK"   # 中国移动
+    # 美股
+    - "AAPL.US"  # 苹果
+    - "GOOGL.US" # 谷歌
+    - "MSFT.US"  # 微软
+    - "NVDA.US"  # 英伟达
+    - "TSLA.US"  # 特斯拉
   sub_types:
     - "Quote"      # 实时报价
   use_mock_data: false  # 禁止使用本地mock数据
