@@ -52,10 +52,29 @@ execution:
   max_drawdown_pct: 10.0    # 最大回撤百分比
   trailing_stop_pct: 2.0  # 追踪止损百分比
   
+  # 止盈止损策略配置
+  profit_taking:
+    enable: true             # 启用止盈功能
+    fixed_profit_pct: 15.0   # 固定止盈点15%
+    partial_profit_pct: 8.0  # 部分止盈点8%（卖出50%）
+    trailing_profit_pct: 5.0 # 追踪止盈起始点5%
+    trailing_profit_step: 1.0 # 追踪止盈步长1%
+    
+  stop_loss:
+    enable: true             # 启用止损功能
+    fixed_stop_pct: 8.0      # 固定止损点8%
+    trailing_stop_pct: 3.0   # 追踪止损百分比3%
+    max_loss_per_day: 5.0    # 单日最大亏损5%
+    emergency_stop_pct: 15.0 # 紧急止损点15%
+  
   # 成本效益分析配置
-  min_profit_threshold: 3.0   # 最小盈利要求3%（覆盖手续费后的净盈利）
-  max_cost_ratio: 1.5        # 最大成本占比1.5%
-  min_trade_value: 1000      # 最小交易金额$1000（提高交易效率）
+  min_profit_threshold: 2.0   # 最小盈利要求2%（覆盖手续费后的净盈利）
+  max_cost_ratio: 2.5        # 最大成本占比2.5%（放宽限制支持小额交易）
+  min_trade_value: 100       # 最小交易金额$100（允许小额交易）
+  
+  # 小额交易特殊处理
+  small_trade_threshold: 500  # 小额交易阈值$500
+  small_trade_max_cost_ratio: 3.0  # 小额交易最大成本占比3.0%
   
   # 真实手续费配置
   us_commission_rate: 0.005   # 美股佣金率0.5%

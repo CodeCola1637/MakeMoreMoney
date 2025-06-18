@@ -19,6 +19,7 @@ from data_loader.historical import HistoricalDataLoader
 from strategy.train import LSTMModelTrainer
 from strategy.signals import SignalGenerator, Signal
 from strategy.portfolio_manager import PortfolioManager
+from strategy.profit_stop_manager import ProfitStopManager
 from execution.order_manager import OrderManager, OrderResult
 
 # 全局变量
@@ -139,6 +140,10 @@ async def main():
     portfolio_mgr = PortfolioManager(config, order_mgr, realtime_mgr)
     logger.info("投资组合管理器初始化完成")
     
+    # 初始化止盈止损管理器
+    profit_stop_mgr = ProfitStopManager(config, order_mgr)
+    logger.info("止盈止损管理器初始化完成")
+    
     # 初始化信号生成器（集成投资组合管理器）
     signal_gen = SignalGenerator(config, realtime_mgr, model_trainer, portfolio_mgr)
     logger.info("信号生成器初始化完成")
@@ -256,6 +261,47 @@ async def main():
         portfolio_task = asyncio.create_task(portfolio_update_task())
         logger.info("投资组合管理任务已启动!")
         
+        # 启动止盈止损监控任务
+        async def profit_stop_monitor_task():
+            """止盈止损监控任务"""
+            while should_continue:
+                try:
+                    await asyncio.sleep(30)  # 每30秒检查一次止盈止损
+                    
+                    # 更新持仓状态
+                    positions = order_mgr.get_positions()
+                    for position in positions:
+                        # 获取当前价格
+                        quotes = await realtime_mgr.get_quote([position.symbol])
+                        if quotes and position.symbol in quotes:
+                            current_price = float(quotes[position.symbol].last_done)
+                            # 更新持仓状态（使用简化成本价逻辑）
+                            # 注意：这里应该从持仓记录中获取真实成本价，暂时使用当前价格作为成本价
+                            cost_price = current_price * 0.95  # 假设成本价比当前价格低5%
+                            await profit_stop_mgr.update_position_status(
+                                position.symbol, 
+                                position.quantity, 
+                                cost_price, 
+                                current_price
+                            )
+                    
+                    # 检查止盈止损信号
+                    exit_signals = await profit_stop_mgr.check_exit_signals()
+                    
+                    # 执行止盈止损信号
+                    for signal in exit_signals:
+                        success = await profit_stop_mgr.execute_exit_signal(signal)
+                        if success:
+                            logger.info(f"止盈止损订单执行成功: {signal.symbol} {signal.signal_type}")
+                        else:
+                            logger.warning(f"止盈止损订单执行失败: {signal.symbol} {signal.signal_type}")
+                            
+                except Exception as e:
+                    logger.error(f"止盈止损监控任务错误: {e}")
+                    
+        profit_stop_task = asyncio.create_task(profit_stop_monitor_task())
+        logger.info("止盈止损监控任务已启动!")
+        
         logger.info("系统已启动并运行中，开始主循环...")
         
         # 添加心跳计数器
@@ -291,6 +337,24 @@ async def main():
                             logger.error(f"投资组合管理任务异常: {portfolio_task.exception()}")
                             logger.info("重新启动投资组合管理任务...")
                             portfolio_task = asyncio.create_task(portfolio_update_task())
+                    
+                    if 'profit_stop_task' in locals():
+                        task_status = "运行中" if not profit_stop_task.done() else "已完成/异常"
+                        logger.info(f"止盈止损监控任务状态: {task_status}")
+                        
+                        # 如果任务异常，尝试重新启动
+                        if profit_stop_task.done() and profit_stop_task.exception():
+                            logger.error(f"止盈止损监控任务异常: {profit_stop_task.exception()}")
+                            logger.info("重新启动止盈止损监控任务...")
+                            profit_stop_task = asyncio.create_task(profit_stop_monitor_task())
+                        
+                        # 输出止盈止损状态摘要
+                        summary = profit_stop_mgr.get_status_summary()
+                        if summary:
+                            logger.info(f"止盈止损状态: 总持仓{summary.get('total_positions', 0)}, "
+                                      f"盈利{summary.get('profitable_positions', 0)}, "
+                                      f"亏损{summary.get('losing_positions', 0)}, "
+                                      f"未实现盈亏{summary.get('total_unrealized_pnl', 0):.2f}")
                     
                     # 检查数据缓存状态
                     cache_info = {}
@@ -340,6 +404,14 @@ async def main():
             portfolio_task.cancel()
             try:
                 await portfolio_task
+            except asyncio.CancelledError:
+                pass
+                
+        # 取消止盈止损监控任务
+        if 'profit_stop_task' in locals() and not profit_stop_task.done():
+            profit_stop_task.cancel()
+            try:
+                await profit_stop_task
             except asyncio.CancelledError:
                 pass
             

@@ -810,8 +810,8 @@ class OrderManager:
         positions = self.get_positions()
         position = next((p for p in positions if p.symbol.lower() == symbol.lower()), None)
         
-        if not position or position.quantity < quantity:
-            self.logger.warning(f"持仓不足: {symbol}, 需要: {quantity}, 实际: {position.quantity if position else 0}")
+        if not position or position.quantity <= 0:
+            self.logger.warning(f"无持仓可卖出: {symbol}, 实际持仓: {position.quantity if position else 0}")
             return OrderResult(
                 order_id="",
                 symbol=symbol,
@@ -820,9 +820,30 @@ class OrderManager:
                 price=price,
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
-                msg=f"持仓不足，需要: {quantity}, 实际: {position.quantity if position else 0}",
+                msg=f"无持仓可卖出，实际持仓: {position.quantity if position else 0}",
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
+        
+        # 如果持仓不足信号数量，调整为实际可卖出数量
+        if position.quantity < quantity:
+            original_quantity = quantity
+            quantity = int(position.quantity)  # 确保是整数
+            self.logger.info(f"持仓不足，调整卖出数量: {symbol}, 原始: {original_quantity}, 调整后: {quantity}, 实际持仓: {position.quantity}")
+            
+            # 如果调整后数量仍然为0，则拒绝
+            if quantity <= 0:
+                self.logger.warning(f"调整后卖出数量为0: {symbol}")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Sell,
+                    quantity=original_quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg=f"调整后卖出数量为0，实际持仓: {position.quantity}",
+                    strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                )
         
         # 调整批量大小
         adjusted_quantity = self._adjust_lot_size(symbol, quantity)
@@ -2298,7 +2319,7 @@ class OrderManager:
                 # 写入订单数据
                 writer.writerow([
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    result.id,
+                    result.order_id,
                     result.symbol,
                     result.side.value,
                     result.quantity,
@@ -2448,35 +2469,44 @@ class OrderManager:
             # 计算交易成本
             costs = self._calculate_trading_costs(symbol, quantity, price)
             
-            # 获取配置的最小盈利要求
+            # 获取配置的成本效益参数
             min_profit_threshold = float(self.config.get('execution.min_profit_threshold', 2.0))  # 默认2%
-            max_cost_ratio = float(self.config.get('execution.max_cost_ratio', 1.5))  # 最大成本占比1.5%
+            max_cost_ratio = float(self.config.get('execution.max_cost_ratio', 2.5))  # 默认最大成本占比2.5%
+            min_trade_value = float(self.config.get('execution.min_trade_value', 100))  # 默认最小交易$100
             
-            # 预期收益估算（基于信号置信度）
+            # 小额交易特殊参数
+            small_trade_threshold = float(self.config.get('execution.small_trade_threshold', 500))  # 小额交易阈值$500
+            small_trade_max_cost_ratio = float(self.config.get('execution.small_trade_max_cost_ratio', 3.0))  # 小额交易最大成本占比3.0%
+            
+            # 判断是否为小额交易
+            is_small_trade = costs['trade_value'] < small_trade_threshold
+            
+            # 根据交易大小选择不同的成本阈值
+            effective_max_cost_ratio = small_trade_max_cost_ratio if is_small_trade else max_cost_ratio
+            
+            # 基础检查：交易金额是否过小
+            if costs['trade_value'] < min_trade_value:
+                return False, f"交易金额过小: ${costs['trade_value']:.0f} < ${min_trade_value:.0f}"
+            
+            # 成本占比检查
+            if costs['cost_percentage'] > effective_max_cost_ratio:
+                trade_type = "小额交易" if is_small_trade else "常规交易"
+                return False, f"{trade_type}成本过高: {costs['cost_percentage']:.2f}% > {effective_max_cost_ratio}%"
+            
+            # 预期收益检查（基于信号置信度）
             expected_return = abs(confidence) * 100  # 将置信度转换为预期收益百分比
+            required_return = costs['break_even_change'] + min_profit_threshold
             
-            # 成本效益检查
-            cost_too_high = costs['cost_percentage'] > max_cost_ratio
-            insufficient_expected_return = expected_return < (costs['break_even_change'] + min_profit_threshold)
+            if expected_return < required_return:
+                return False, f"预期收益不足: {expected_return:.2f}% < 需求{required_return:.2f}% (成本{costs['break_even_change']:.2f}% + 利润{min_profit_threshold}%)"
             
-            # 小额交易特别检查
-            is_small_trade = costs['trade_value'] < 1000  # 小于$1000或等值
+            # 记录成功的成本效益分析
+            trade_type = "小额交易" if is_small_trade else "常规交易"
+            self.logger.info(f"{trade_type}成本分析通过 {symbol}: 交易额=${costs['trade_value']:.0f}, "
+                           f"成本{costs['cost_percentage']:.2f}%(<{effective_max_cost_ratio}%), "
+                           f"预期收益{expected_return:.2f}%(>{required_return:.2f}%)")
             
-            if cost_too_high:
-                return False, f"交易成本过高: {costs['cost_percentage']:.2f}% > {max_cost_ratio}%"
-            
-            if insufficient_expected_return:
-                return False, f"预期收益不足: {expected_return:.2f}% < 盈亏平衡点{costs['break_even_change']:.2f}% + 最小利润{min_profit_threshold}%"
-            
-            if is_small_trade and costs['cost_percentage'] > 1.0:
-                return False, f"小额交易成本占比过高: ${costs['trade_value']:.0f}, 成本占比{costs['cost_percentage']:.2f}%"
-            
-            # 记录成本效益分析结果
-            self.logger.info(f"交易成本分析 {symbol}: 交易额=${costs['trade_value']:.0f}, "
-                           f"双向成本=${costs['round_trip_cost']:.2f}({costs['cost_percentage']:.2f}%), "
-                           f"预期收益{expected_return:.2f}%, 置信度{confidence:.3f}")
-            
-            return True, f"交易具有成本效益: 预期收益{expected_return:.2f}% > 成本{costs['cost_percentage']:.2f}%"
+            return True, f"交易具有成本效益: 预期收益{expected_return:.2f}% > 成本要求{required_return:.2f}%"
             
         except Exception as e:
             self.logger.error(f"成本效益分析失败: {e}")
@@ -2497,7 +2527,7 @@ class OrderManager:
         """
         try:
             # 获取最小有效交易金额
-            min_trade_value = float(self.config.get('execution.min_trade_value', 500))  # 默认$500
+            min_trade_value = float(self.config.get('execution.min_trade_value', 100))  # 默认$100
             
             # 计算当前交易金额
             current_value = float(price) * original_quantity
