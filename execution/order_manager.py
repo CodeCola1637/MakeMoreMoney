@@ -367,6 +367,7 @@ class OrderManager:
         self.order_check_interval = self.config.get("execution.order_tracking.check_interval", 60)
         self.order_timeout = self.config.get("execution.order_tracking.timeout", 300)
         self.retry_count = self.config.get("execution.order_tracking.retry_count", 3)
+        self.max_pending_orders = self.config.get("execution.order_tracking.max_pending_orders", 5)
         
         # 初始化交易上下文
         await self._init_trade_context()
@@ -393,6 +394,9 @@ class OrderManager:
                 # 检查是否有活跃订单
                 if not self.active_orders:
                     continue
+                    
+                # 🔧 主动清理过多挂单
+                await self._cleanup_excessive_orders()
                     
                 self.logger.info(f"检查活跃订单状态，共{len(self.active_orders)}个订单")
                 current_time = datetime.now()
@@ -432,8 +436,8 @@ class OrderManager:
                             if elapsed > self.order_timeout:
                                 self.logger.warning(f"订单超时: {order_id}, 已等待{elapsed:.1f}秒")
                                 
-                                # 尝试取消并重新提交
-                                await self._handle_timeout_order(order)
+                                # 🔧 直接取消超时订单，不重新提交（避免资金占用）
+                                await self._cancel_order(order_id)
                     except Exception as e:
                         self.logger.error(f"处理订单{order_id}状态时出错: {e}")
                 
@@ -514,6 +518,29 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"处理超时订单时出错: {e}")
             self.logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    async def _cleanup_excessive_orders(self):
+        """主动清理过多的挂单"""
+        try:
+            # 获取所有未成交的活跃订单
+            pending_orders = [
+                (order_id, order) for order_id, order in self.active_orders.items()
+                if not order.is_filled() and not order.is_canceled() and not order.is_rejected()
+            ]
+            
+            if len(pending_orders) > self.max_pending_orders:
+                # 按提交时间排序，取消最旧的订单
+                pending_orders.sort(key=lambda x: x[1].submitted_at)
+                orders_to_cancel = pending_orders[:len(pending_orders) - self.max_pending_orders + 1]
+                
+                self.logger.warning(f"清理过多挂单: {len(pending_orders)} -> {self.max_pending_orders}, 取消{len(orders_to_cancel)}个旧订单")
+                
+                for order_id, order in orders_to_cancel:
+                    await self._cancel_order(order_id)
+                    await asyncio.sleep(0.1)  # 避免API频率限制
+                    
+        except Exception as e:
+            self.logger.error(f"清理挂单时出错: {e}")
 
     async def _cancel_order(self, order_id: str) -> bool:
         """
@@ -823,11 +850,17 @@ class OrderManager:
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
         
-        # 如果持仓不足信号数量，调整为实际可卖出数量
-        if position.quantity < quantity:
+        # 🔧 修复：使用可用数量而不是总持仓数量来判断卖出限制
+        available_quantity = getattr(position, 'available_quantity', position.quantity)
+        total_quantity = position.quantity
+        
+        self.logger.debug(f"持仓检查 {symbol}: 总持仓={total_quantity}, 可用={available_quantity}, 信号数量={quantity}")
+        
+        # 如果可用持仓不足信号数量，调整为实际可卖出数量
+        if available_quantity < quantity:
             original_quantity = quantity
-            quantity = int(position.quantity)  # 确保是整数
-            self.logger.info(f"持仓不足，调整卖出数量: {symbol}, 原始: {original_quantity}, 调整后: {quantity}, 实际持仓: {position.quantity}")
+            quantity = int(available_quantity)  # 使用可用数量
+            self.logger.info(f"可用持仓不足，调整卖出数量: {symbol}, 原始: {original_quantity}, 调整后: {quantity}, 总持仓: {total_quantity}, 可用: {available_quantity}")
             
             # 如果调整后数量仍然为0，则拒绝
             if quantity <= 0:
@@ -840,7 +873,7 @@ class OrderManager:
                     price=price,
                     status=OrderStatus.Rejected,
                     submitted_at=datetime.now(),
-                    msg=f"调整后卖出数量为0，实际持仓: {position.quantity}",
+                    msg=f"可用持仓不足，总持仓: {total_quantity}, 可用: {available_quantity}",
                     strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
                 )
         
@@ -879,6 +912,24 @@ class OrderManager:
             OrderResult: 订单结果
         """
         try:
+            # 🔧 检查挂单数量限制
+            pending_count = len([order for order in self.active_orders.values() 
+                               if not order.is_filled() and not order.is_canceled() and not order.is_rejected()])
+            
+            if pending_count >= self.max_pending_orders:
+                self.logger.warning(f"达到最大挂单数量限制: {pending_count}/{self.max_pending_orders}")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg=f"达到最大挂单数量限制({pending_count}/{self.max_pending_orders})",
+                    strategy_name=strategy_name
+                )
+            
             # 自动调整价格到符合交易所规则
             adjusted_price = self._adjust_price_to_tick(symbol, price)
             

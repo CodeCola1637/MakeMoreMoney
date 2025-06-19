@@ -97,12 +97,15 @@ execution:
     sell: 0.003  # 卖出价格下浮0.3%
   # 订单跟踪配置
   order_tracking:
-    check_interval: 60  # 订单状态检查间隔(秒)
-    timeout: 300        # 订单超时时间(秒)
-    retry_count: 3      # 失败重试次数
+    check_interval: 30  # 订单状态检查间隔(秒) - 缩短到30秒
+    timeout: 120        # 订单超时时间(秒) - 缩短到2分钟
+    retry_count: 2      # 失败重试次数 - 减少重试次数
+    max_pending_orders: 5  # 最大挂单数量限制
   risk_control:
     position_pct: 100.0  # 单笔交易可以使用全部资金
     daily_loss_pct: 5.0  # 单日亏损达到5%停止交易
+  # 订单数量限制
+  max_daily_orders: 200  # 每日最大订单数 (提高到200个)
   # 交易货币配置
   preferred_currency: "HKD"  # 优先使用港币进行交易
 
