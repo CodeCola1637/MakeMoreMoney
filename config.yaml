@@ -55,7 +55,7 @@ strategy:
 # 交易执行配置
 execution:
   initial_capital: 15000.0  # 初始资金15,000美元
-  max_position_size: 15000.0  # 最大仓位
+  max_position_size: 1500.0   # 最大仓位$1,500 (10%)
   max_drawdown_pct: 10.0    # 最大回撤百分比
   trailing_stop_pct: 2.0  # 追踪止损百分比
   
@@ -102,7 +102,7 @@ execution:
     retry_count: 2      # 失败重试次数 - 减少重试次数
     max_pending_orders: 5  # 最大挂单数量限制
   risk_control:
-    position_pct: 100.0  # 单笔交易可以使用全部资金
+    position_pct: 2.0  # 单笔交易最多使用2%资金 (安全限制)
     daily_loss_pct: 5.0  # 单日亏损达到5%停止交易
   # 订单数量限制
   max_daily_orders: 200  # 每日最大订单数 (提高到200个)
@@ -112,7 +112,7 @@ execution:
 # 投资组合管理配置
 portfolio:
   allocation_strategy: "signal_strength_weight"  # 配置策略: equal_weight, signal_strength_weight
-  max_position_weight: 0.4     # 单个仓位最大权重40%
+  max_position_weight: 0.05    # 单个仓位最大权重5% (安全限制)
   min_position_weight: 0.05    # 单个仓位最小权重5%
   rebalance_threshold: 0.20    # 再平衡阈值20%（提高阈值减少再平衡频率）
   cash_reserve_ratio: 0.1      # 现金储备比例10%

@@ -474,39 +474,61 @@ class PortfolioManager:
                     cash_available = self.portfolio_status.cash_available
                     required_amount = quantity * current_price
                     
-                    # 如果账户余额为负，但仍有总权益价值，使用保守策略
+                    # 🔧 关键修复：严格的负余额检查
                     if cash_available <= 0:
-                        # 计算可用于投资的资金（基于总权益的一小部分）
-                        total_equity = self.portfolio_status.total_equity
-                        conservative_available = max(0.0, total_equity * 0.05)  # 使用5%的总权益作为保守可用资金
+                        self.logger.warning(f"资金不足或为负，拒绝买入建议: {symbol}, 可用资金: {cash_available:.2f}")
+                        return "HOLD", 0
+                    
+                    # 🔧 应用严格的资金限制 (基于position_pct配置)
+                    total_equity = self.portfolio_status.total_equity
+                    max_position_pct = 2.0  # 从配置读取，这里硬编码为安全起见
+                    max_trade_value = abs(total_equity) * (max_position_pct / 100.0) if total_equity != 0 else 0
+                    max_safe_quantity = int(max_trade_value / current_price) if current_price > 0 else 0
+                    
+                    self.logger.info(f"投资组合风控 {symbol}: 总权益={total_equity:.2f}, 限制={max_position_pct}%, "
+                                   f"最大安全金额={max_trade_value:.2f}, 原始建议={quantity}股, 限制后={max_safe_quantity}股")
+                    
+                    # 应用更严格的限制
+                    quantity = min(quantity, max_safe_quantity)
+                    
+                    # 如果总权益为负，使用超保守策略
+                    if total_equity < 0:
+                        # 计算可用于投资的极小比例（0.1%的绝对值）
+                        ultra_conservative_value = abs(total_equity) * 0.001  
+                        ultra_conservative_quantity = max(1, int(ultra_conservative_value / current_price))
                         
-                        if conservative_available > current_price:
-                            # 使用保守资金进行小额买入
-                            max_conservative_quantity = min(5, int(conservative_available / current_price))  # 最多买入5股
-                            if max_conservative_quantity > 0:
-                                quantity = min(max_conservative_quantity, quantity)
-                                self.logger.debug(f"使用保守资金策略: {symbol}, 可用权益: {total_equity:.2f}, "
-                                                f"保守可用: {conservative_available:.2f}, 买入: {quantity}股")
-                            else:
-                                self.logger.debug(f"保守策略下仍资金不足: {symbol}, 权益: {total_equity:.2f}")
-                                return "HOLD", 0
-                        else:
-                            self.logger.debug(f"资金不足，跳过买入建议: {symbol}, 可用资金: {cash_available:.2f}, "
-                                            f"总权益: {total_equity:.2f}")
+                        quantity = min(quantity, ultra_conservative_quantity, 3)  # 最多3股
+                        self.logger.warning(f"总权益为负，使用超保守策略: {symbol}, 权益={total_equity:.2f}, "
+                                          f"超保守数量={quantity}股")
+                        
+                        if quantity <= 0:
+                            self.logger.warning(f"超保守策略下仍无法交易: {symbol}")
                             return "HOLD", 0
+                    
+                    # 再次检查可用资金
                     elif required_amount > cash_available:
                         # 根据可用资金调整买入数量
                         max_affordable_quantity = int(cash_available / current_price)
                         if max_affordable_quantity > 0:
                             quantity = min(max_affordable_quantity, quantity)
-                            self.logger.debug(f"资金约束调整买入数量: {symbol}, 原计划: {abs(quantity_diff)}, "
-                                            f"调整后: {quantity}, 可用资金: {cash_available:.2f}")
+                            self.logger.info(f"资金约束调整买入数量: {symbol}, 原计划: {abs(quantity_diff)}, "
+                                           f"调整后: {quantity}, 可用资金: {cash_available:.2f}")
                         else:
-                            self.logger.debug(f"资金不足买入1股，跳过: {symbol}, 可用资金: {cash_available:.2f}, "
-                                            f"单股价格: {current_price:.2f}")
+                            self.logger.warning(f"资金不足买入1股，跳过: {symbol}, 可用资金: {cash_available:.2f}, "
+                                              f"单股价格: {current_price:.2f}")
                             return "HOLD", 0
                 
-                self.logger.debug(f"仓位建议 {symbol}: 信号置信度={signal_confidence:.2f}, "
+                # 🔧 最终安全检查：确保建议数量合理
+                if quantity <= 0:
+                    return "HOLD", 0
+                
+                # 限制最大建议数量（防止异常大单）
+                MAX_SUGGESTION = 10  # 单次最多建议买入10股
+                if quantity > MAX_SUGGESTION:
+                    self.logger.warning(f"建议数量过大，限制为{MAX_SUGGESTION}股: {symbol}, 原建议={quantity}")
+                    quantity = MAX_SUGGESTION
+                
+                self.logger.info(f"最终仓位建议 {symbol}: 信号置信度={signal_confidence:.2f}, "
                                 f"调整因子={signal_factor:.2f}, 当前={position.current_quantity}, "
                                 f"目标={adjusted_target_quantity}, 建议={action} {quantity}")
                 

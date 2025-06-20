@@ -664,16 +664,58 @@ class OrderManager:
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
         
-        # 获取可用资金
+        # 获取可用资金和总权益
         available_cash = self.get_account_balance()
+        total_equity = available_cash  # 简化处理，实际应该包括持仓市值
+        
+        # 🔧 应用position_pct限制 - 关键修复！
+        max_trade_value = abs(total_equity) * (self.max_position_pct / 100.0)
+        price_float = float(price) if hasattr(price, '__float__') else price
+        max_allowed_quantity = int(max_trade_value / price_float) if price_float > 0 else 0
+        
+        self.logger.info(f"风控检查 {symbol}: 总权益={total_equity:.2f}, position_pct限制={self.max_position_pct}%, "
+                        f"最大交易金额={max_trade_value:.2f}, 原始数量={quantity}, 限制后数量={max_allowed_quantity}")
+        
+        # 应用position_pct限制
+        if quantity > max_allowed_quantity:
+            if max_allowed_quantity <= 0:
+                self.logger.warning(f"position_pct限制：无法进行任何交易 {symbol}, 权益={total_equity:.2f}, 限制={self.max_position_pct}%")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Buy,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg=f"单笔交易限制{self.max_position_pct}%：无可用资金",
+                    strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                )
+            
+            self.logger.warning(f"position_pct限制：调整买入数量 {symbol}: {quantity} -> {max_allowed_quantity} (限制{self.max_position_pct}%)")
+            quantity = max_allowed_quantity
         
         # 判断是否是美股，美股支持碎股交易
         is_us_stock = '.US' in symbol
         minimum_quantity = 1 if is_us_stock else self.get_lot_size(symbol)
         
         # 计算最小买入所需资金
-        price_float = float(price) if hasattr(price, '__float__') else price
         min_required_cash = price_float * minimum_quantity * 1.01  # 包含1%手续费缓冲
+        
+        # 🔧 严格资金检查：账户余额为负时拒绝交易
+        if available_cash < 0:
+            self.logger.warning(f"账户余额为负数，拒绝买入: {symbol}, 余额={available_cash:.2f}")
+            return OrderResult(
+                order_id="",
+                symbol=symbol,
+                side=OrderSide.Buy, 
+                quantity=quantity,
+                price=price,
+                status=OrderStatus.Rejected,
+                submitted_at=datetime.now(),
+                msg=f"账户余额为负数：{available_cash:.2f}",
+                strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+            )
         
         # 严格的资金检查：如果连最小买入都无法负担，直接拒绝
         if available_cash < min_required_cash:
@@ -691,7 +733,7 @@ class OrderManager:
             )
         
         # 计算所需资金（加上一些手续费的缓冲）
-        required_cash = price_float * quantity * 1.01  # 假设1%的手续费缓冲
+        required_cash = price_float * quantity * 1.01
         
         # 检查资金是否足够
         if required_cash > available_cash:
@@ -784,6 +826,12 @@ class OrderManager:
             
             self.logger.warning(f"调整买入数量以符合持仓限制: {quantity} -> {adjusted_quantity}")
             quantity = adjusted_quantity
+        
+        # 🔧 最终安全检查
+        final_trade_value = price_float * quantity
+        final_position_pct = (final_trade_value / abs(total_equity)) * 100 if total_equity != 0 else 0
+        self.logger.info(f"最终交易检查 {symbol}: 数量={quantity}, 金额={final_trade_value:.2f}, "
+                        f"占总权益={final_position_pct:.2f}%, 限制={self.max_position_pct}%")
         
         # 创建买入订单
         if quantity <= 0:
