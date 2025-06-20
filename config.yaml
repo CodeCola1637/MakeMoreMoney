@@ -75,13 +75,13 @@ execution:
     emergency_stop_pct: 15.0 # 紧急止损点15%
   
   # 成本效益分析配置
-  min_profit_threshold: 2.0   # 最小盈利要求2%（覆盖手续费后的净盈利）
-  max_cost_ratio: 2.5        # 最大成本占比2.5%（放宽限制支持小额交易）
-  min_trade_value: 100       # 最小交易金额$100（允许小额交易）
+  min_profit_threshold: 3.0   # 最小盈利要求3%（覆盖手续费后的净盈利）
+  max_cost_ratio: 2.0        # 最大成本占比2.0%（更严格的成本控制）
+  min_trade_value: 300       # 最小交易金额$300（防止过小交易）
   
   # 小额交易特殊处理
-  small_trade_threshold: 500  # 小额交易阈值$500
-  small_trade_max_cost_ratio: 3.0  # 小额交易最大成本占比3.0%
+  small_trade_threshold: 800  # 小额交易阈值$800
+  small_trade_max_cost_ratio: 2.5  # 小额交易最大成本占比2.5%（更严格）
   
   # 真实手续费配置
   us_commission_rate: 0.005   # 美股佣金率0.5%
@@ -97,10 +97,10 @@ execution:
     sell: 0.003  # 卖出价格下浮0.3%
   # 订单跟踪配置
   order_tracking:
-    check_interval: 30  # 订单状态检查间隔(秒) - 缩短到30秒
-    timeout: 120        # 订单超时时间(秒) - 缩短到2分钟
-    retry_count: 2      # 失败重试次数 - 减少重试次数
-    max_pending_orders: 5  # 最大挂单数量限制
+    check_interval: 20  # 订单状态检查间隔(秒) - 进一步缩短到20秒
+    timeout: 60         # 订单超时时间(秒) - 缩短到1分钟
+    retry_count: 1      # 失败重试次数 - 进一步减少
+    max_pending_orders: 15  # 最大挂单数量限制 - 从5提高到15
   risk_control:
     position_pct: 2.0  # 单笔交易最多使用2%资金 (安全限制)
     daily_loss_pct: 5.0  # 单日亏损达到5%停止交易

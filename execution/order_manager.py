@@ -542,6 +542,30 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"清理挂单时出错: {e}")
 
+    async def _cleanup_one_low_quality_order(self):
+        """清理一个低质量订单，为高质量信号让路"""
+        try:
+            # 获取所有未成交的活跃订单
+            pending_orders = [
+                (order_id, order) for order_id, order in self.active_orders.items()
+                if not order.is_filled() and not order.is_canceled() and not order.is_rejected()
+            ]
+            
+            if not pending_orders:
+                return
+            
+            # 优先清理低置信度、长时间未成交的订单
+            # 这里简化处理，按时间排序，取消最旧的一个订单
+            pending_orders.sort(key=lambda x: x[1].submitted_at)
+            
+            if pending_orders:
+                order_id, order = pending_orders[0]
+                self.logger.info(f"为高质量信号让路，取消旧订单: {order_id}, {order.symbol}")
+                await self._cancel_order(order_id)
+                
+        except Exception as e:
+            self.logger.error(f"清理低质量订单时出错: {e}")
+
     async def _cancel_order(self, order_id: str) -> bool:
         """
         取消订单
@@ -636,19 +660,54 @@ class OrderManager:
             return None
     
     async def _create_buy_order(self, signal: Signal) -> OrderResult:
-        """
-        创建买入订单
-        
-        Args:
-            signal: 买入信号
-            
-        Returns:
-            OrderResult: 订单结果
-        """
+        """创建买入订单"""
         symbol = signal.symbol
         price = signal.price
         quantity = signal.quantity
+        price_float = float(price)
         
+        # 🔧 严格的最小交易金额检查
+        min_effective_trade_value = float(self.config.get('execution.min_trade_value', 200))  # 提高到$200
+        current_trade_value = price_float * quantity
+        
+        # 如果交易金额过小，直接拒绝
+        if current_trade_value < min_effective_trade_value:
+            self.logger.warning(f"交易金额过小，拒绝执行: {symbol}, 金额=${current_trade_value:.2f} < ${min_effective_trade_value}")
+            return OrderResult(
+                order_id="",
+                symbol=symbol,
+                side=OrderSide.Buy,
+                quantity=quantity,
+                price=price,
+                status=OrderStatus.Rejected,
+                submitted_at=datetime.now(),
+                msg=f"交易金额过小：${current_trade_value:.2f} < ${min_effective_trade_value}",
+                strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+            )
+        
+        # 先进行成本效益分析
+        confidence = getattr(signal, 'confidence', 0.1)
+        is_effective, reason = self._is_trade_cost_effective(symbol, quantity, price_float, confidence)
+        if not is_effective:
+            # 尝试优化交易数量
+            optimized_quantity = self._optimize_trade_size(symbol, quantity, price_float, confidence)
+            if optimized_quantity <= 0:
+                self.logger.warning(f"成本效益不佳且无法优化，拒绝交易: {symbol}, 原因: {reason}")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Buy,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg=f"成本效益不佳: {reason}",
+                    strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                )
+            else:
+                quantity = optimized_quantity
+                self.logger.info(f"优化交易数量 {symbol}: {signal.quantity} -> {quantity}")
+
         # 检查日内最大订单数量
         if not self._check_daily_order_limit():
             self.logger.warning(f"达到日内最大订单数量限制，拒绝买入信号: {signal}")
@@ -848,8 +907,11 @@ class OrderManager:
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
         
-        # 提交订单
-        return await self._submit_order(symbol, price, quantity, "buy", signal.strategy_name if hasattr(signal, 'strategy_name') else "")
+        # 提交订单（传递置信度信息）
+        strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+        if hasattr(signal, 'confidence'):
+            strategy_info += f" confidence={signal.confidence:.3f}"
+        return await self._submit_order(symbol, price, quantity, "buy", strategy_info)
 
     async def _create_sell_order(self, signal):
         """
@@ -942,8 +1004,11 @@ class OrderManager:
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
         
-        # 提交订单
-        return await self._submit_order(symbol, price, adjusted_quantity, "sell", signal.strategy_name if hasattr(signal, 'strategy_name') else "")
+        # 提交订单（传递置信度信息）
+        strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+        if hasattr(signal, 'confidence'):
+            strategy_info += f" confidence={signal.confidence:.3f}"
+        return await self._submit_order(symbol, price, adjusted_quantity, "sell", strategy_info)
                 
     async def _submit_order(self, symbol: str, price: float, quantity: int, order_type: str, strategy_name: str) -> OrderResult:
         """
@@ -960,23 +1025,58 @@ class OrderManager:
             OrderResult: 订单结果
         """
         try:
-            # 🔧 检查挂单数量限制
+            # 🔧 检查挂单数量限制并实施智能降级策略
             pending_count = len([order for order in self.active_orders.values() 
                                if not order.is_filled() and not order.is_canceled() and not order.is_rejected()])
             
             if pending_count >= self.max_pending_orders:
                 self.logger.warning(f"达到最大挂单数量限制: {pending_count}/{self.max_pending_orders}")
-                return OrderResult(
-                    order_id="",
-                    symbol=symbol,
-                    side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
-                    quantity=quantity,
-                    price=price,
-                    status=OrderStatus.Rejected,
-                    submitted_at=datetime.now(),
-                    msg=f"达到最大挂单数量限制({pending_count}/{self.max_pending_orders})",
-                    strategy_name=strategy_name
-                )
+                
+                # 🚀 智能市价单降级机制
+                # 尝试从不同来源获取置信度信息
+                confidence = 0.05  # 默认低置信度
+                
+                # 如果strategy_name包含置信度信息，尝试解析
+                if isinstance(strategy_name, str) and 'confidence' in strategy_name.lower():
+                    try:
+                        # 简单的置信度解析（可能需要根据实际格式调整）
+                        import re
+                        confidence_match = re.search(r'confidence[=:]?\s*([0-9.]+)', strategy_name.lower())
+                        if confidence_match:
+                            confidence = float(confidence_match.group(1))
+                    except:
+                        pass
+                
+                # 高置信度信号转为市价单执行
+                if confidence > 0.10:  # 置信度大于10%
+                    self.logger.info(f"高置信度信号({confidence:.2%})转为市价单执行: {symbol}")
+                    
+                    # 先主动清理一个旧订单，为新的高质量信号让路
+                    await self._cleanup_one_low_quality_order()
+                    
+                    # 重新计算挂单数量
+                    pending_count = len([order for order in self.active_orders.values() 
+                                       if not order.is_filled() and not order.is_canceled() and not order.is_rejected()])
+                    
+                    # 如果仍然超限，转为市价单
+                    if pending_count >= self.max_pending_orders:
+                        self.logger.info(f"转为市价单执行: {symbol}, 置信度: {confidence:.2%}")
+                        # 这里可以实现市价单逻辑，暂时先用限价单但优先级更高
+                        pass
+                
+                # 低置信度信号直接拒绝或延迟执行
+                else:
+                    return OrderResult(
+                        order_id="",
+                        symbol=symbol,
+                        side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
+                        quantity=quantity,
+                        price=price,
+                        status=OrderStatus.Rejected,
+                        submitted_at=datetime.now(),
+                        msg=f"挂单限制且置信度低({confidence:.2%})，拒绝执行",
+                        strategy_name=strategy_name
+                    )
             
             # 自动调整价格到符合交易所规则
             adjusted_price = self._adjust_price_to_tick(symbol, price)
@@ -2568,9 +2668,9 @@ class OrderManager:
             costs = self._calculate_trading_costs(symbol, quantity, price)
             
             # 获取配置的成本效益参数
-            min_profit_threshold = float(self.config.get('execution.min_profit_threshold', 2.0))  # 默认2%
-            max_cost_ratio = float(self.config.get('execution.max_cost_ratio', 2.5))  # 默认最大成本占比2.5%
-            min_trade_value = float(self.config.get('execution.min_trade_value', 100))  # 默认最小交易$100
+            min_profit_threshold = float(self.config.get('execution.min_profit_threshold', 3.0))  # 默认3%
+            max_cost_ratio = float(self.config.get('execution.max_cost_ratio', 2.0))  # 默认最大成本占比2.0%
+            min_trade_value = float(self.config.get('execution.min_trade_value', 300))  # 默认最小交易$300
             
             # 小额交易特殊参数
             small_trade_threshold = float(self.config.get('execution.small_trade_threshold', 500))  # 小额交易阈值$500
@@ -2625,13 +2725,29 @@ class OrderManager:
         """
         try:
             # 获取最小有效交易金额
-            min_trade_value = float(self.config.get('execution.min_trade_value', 100))  # 默认$100
+            min_trade_value = float(self.config.get('execution.min_trade_value', 300))  # 默认$300
             
             # 计算当前交易金额
             current_value = float(price) * original_quantity
             
+            # 🔧 严格检查：如果信号置信度过低，不值得进行大额交易
+            if abs(confidence) < 0.1:  # 置信度低于10%
+                max_low_confidence_value = 500  # 低置信度最大交易$500
+                if current_value > max_low_confidence_value:
+                    self.logger.warning(f"信号置信度过低({confidence:.1%})，限制交易金额到${max_low_confidence_value}")
+                    optimized_quantity = int(max_low_confidence_value / float(price))
+                    optimized_quantity = self._adjust_lot_size(symbol, optimized_quantity)
+                    if optimized_quantity * float(price) < min_trade_value:
+                        return 0  # 优化后仍低于最小交易金额，拒绝交易
+                    return optimized_quantity
+            
             # 如果当前交易金额太小，尝试增加到最小有效金额
             if current_value < min_trade_value:
+                # 检查是否值得增加交易量
+                if abs(confidence) < 0.15:  # 置信度低于15%时不增加交易量
+                    self.logger.warning(f"信号置信度过低({confidence:.1%})，不增加交易量")
+                    return 0
+                
                 optimized_quantity = max(int(min_trade_value / float(price)), 1)
                 
                 # 调整为合适的手数
@@ -2648,10 +2764,17 @@ class OrderManager:
                     self.logger.warning(f"即使优化后仍不具成本效益: {reason}")
                     return 0  # 不执行交易
             
+            # 对于现有数量合适的交易，仍需验证成本效益
+            is_effective, reason = self._is_trade_cost_effective(symbol, original_quantity, price, confidence)
+            if not is_effective:
+                self.logger.warning(f"原始交易量不具成本效益: {reason}")
+                return 0
+            
             return original_quantity
             
         except Exception as e:
             self.logger.error(f"优化交易数量失败: {e}")
+            return 0  # 发生错误时拒绝交易
 
     def _check_profitability(self, symbol: str, price: float, quantity: int, confidence: float) -> Tuple[bool, str]:
         """
