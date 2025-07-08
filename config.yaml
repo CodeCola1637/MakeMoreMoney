@@ -1,125 +1,115 @@
-# 长桥API配置
 api:
+  access_token: ${LONGPORT_ACCESS_TOKEN}
   app_key: ${LONGPORT_APP_KEY}
   app_secret: ${LONGPORT_APP_SECRET}
-  access_token: ${LONGPORT_ACCESS_TOKEN}
-  quote_ws_url: ${API_WS_URL}
   base_url: ${API_BASE_URL}
-
-# 行情订阅配置
-quote:
-  symbols:
-    # 港股
-    - "700.HK"   # 腾讯控股
-    - "9988.HK"  # 阿里巴巴
-    - "1299.HK"  # 友邦保险
-    - "388.HK"   # 香港交易所
-    - "941.HK"   # 中国移动
-    # 美股
-    - "AAPL.US"  # 苹果
-    - "GOOGL.US" # 谷歌
-    - "MSFT.US"  # 微软
-    - "NVDA.US"  # 英伟达
-    - "TSLA.US"  # 特斯拉
-  sub_types:
-    - "Quote"      # 实时报价
-  use_mock_data: false  # 禁止使用本地mock数据
-  historical_days: 1250  # 5年的交易日数量
-  data_quality_threshold: 0.5  # 降低数据质量检查阈值，要求至少50%的检查项通过
-
-# 策略配置
-strategy:
-  model_path: "./models/lstm_model.h5"
-  lookback_period: 60  # 增加回溯周期到60天
-  signal_interval: 600  # 信号生成间隔改为10分钟(600秒)
-  signal_processing:
-    buy_threshold: 0.05   # 提高买入信号阈值到5%（需要更强信号才买入）
-    sell_threshold: -0.01 # 提高卖出信号敏感度到-1%（更容易触发卖出）
-    enable_hold: true     # 启用HOLD信号处理
-  training:
-    epochs: 200  # 增加训练轮数
-    batch_size: 64  # 增加批次大小
-    test_size: 0.15  # 减少测试集比例
-    features:
-      - "close"
-      - "volume"
-      - "high"
-      - "low"
-      - "turnover"  # 添加成交额特征
-    force_retrain: true  # 强制重新训练
-    model_architecture:
-      lstm_units: [128, 64]  # 增加LSTM单元数量
-      dropout_rate: 0.3  # 增加dropout率
-      learning_rate: 0.0005  # 降低学习率
-
-# 交易执行配置
+  quote_ws_url: ${API_WS_URL}
 execution:
-  initial_capital: 15000.0  # 初始资金15,000美元
-  max_position_size: 1500.0   # 最大仓位$1,500 (10%)
-  max_drawdown_pct: 10.0    # 最大回撤百分比
-  trailing_stop_pct: 2.0  # 追踪止损百分比
-  
-  # 止盈止损策略配置
-  profit_taking:
-    enable: true             # 启用止盈功能
-    fixed_profit_pct: 15.0   # 固定止盈点15%
-    partial_profit_pct: 8.0  # 部分止盈点8%（卖出50%）
-    trailing_profit_pct: 5.0 # 追踪止盈起始点5%
-    trailing_profit_step: 1.0 # 追踪止盈步长1%
-    
-  stop_loss:
-    enable: true             # 启用止损功能
-    fixed_stop_pct: 8.0      # 固定止损点8%
-    trailing_stop_pct: 3.0   # 追踪止损百分比3%
-    max_loss_per_day: 5.0    # 单日最大亏损5%
-    emergency_stop_pct: 15.0 # 紧急止损点15%
-  
-  # 成本效益分析配置
-  min_profit_threshold: 3.0   # 最小盈利要求3%（覆盖手续费后的净盈利）
-  max_cost_ratio: 2.0        # 最大成本占比2.0%（更严格的成本控制）
-  min_trade_value: 300       # 最小交易金额$300（防止过小交易）
-  
-  # 小额交易特殊处理
-  small_trade_threshold: 800  # 小额交易阈值$800
-  small_trade_max_cost_ratio: 2.5  # 小额交易最大成本占比2.5%（更严格）
-  
-  # 真实手续费配置
-  us_commission_rate: 0.005   # 美股佣金率0.5%
-  us_platform_fee: 0.99      # 美股平台费$0.99
-  hk_commission_rate: 0.0025  # 港股佣金率0.25%
-  default_commission_rate: 0.0025  # 默认佣金率0.25%
-  
-  order_types:
-    default: "LO"  # 限价单
-  # 限价单价格优化
-  price_adjust_rate:
-    buy: 0.003  # 买入价格上浮0.3%
-    sell: 0.003  # 卖出价格下浮0.3%
-  # 订单跟踪配置
+  default_commission_rate: 0.0025
+  enable_hk_trading: true
+  enable_us_trading: true
+  hk_commission_rate: 0.0025
+  initial_capital: 15000.0
+  max_cost_ratio: 2.0
+  max_daily_orders: 200
+  max_drawdown_pct: 10.0
+  max_position_size: 2000.0
+  min_profit_threshold: 3.0
+  min_trade_value: 300
   order_tracking:
-    check_interval: 20  # 订单状态检查间隔(秒) - 进一步缩短到20秒
-    timeout: 60         # 订单超时时间(秒) - 缩短到1分钟
-    retry_count: 1      # 失败重试次数 - 进一步减少
-    max_pending_orders: 15  # 最大挂单数量限制 - 从5提高到15
+    check_interval: 30
+    max_pending_orders: 10
+    retry_count: 1
+    smart_pricing: true
+    timeout: 90
+  order_types:
+    default: LO
+  preferred_currency: HKD
+  price_adjust_rate:
+    buy: 0.003
+    sell: 0.003
+  profit_taking:
+    enable: true
+    fixed_profit_pct: 15.0
+    partial_profit_pct: 8.0
+    trailing_profit_pct: 5.0
+    trailing_profit_step: 1.0
   risk_control:
-    position_pct: 2.0  # 单笔交易最多使用2%资金 (安全限制)
-    daily_loss_pct: 5.0  # 单日亏损达到5%停止交易
-  # 订单数量限制
-  max_daily_orders: 200  # 每日最大订单数 (提高到200个)
-  # 交易货币配置
-  preferred_currency: "HKD"  # 优先使用港币进行交易
-
-# 投资组合管理配置
-portfolio:
-  allocation_strategy: "signal_strength_weight"  # 配置策略: equal_weight, signal_strength_weight
-  max_position_weight: 0.05    # 单个仓位最大权重5% (安全限制)
-  min_position_weight: 0.05    # 单个仓位最小权重5%
-  rebalance_threshold: 0.20    # 再平衡阈值20%（提高阈值减少再平衡频率）
-  cash_reserve_ratio: 0.1      # 现金储备比例10%
-  rebalance_frequency: 3600    # 再平衡频率60分钟(3600秒)
-  signal_weight_factor: 1.5    # 信号权重因子
-
-# 日志配置
+    daily_loss_pct: 3.0
+    max_correlation: 0.7
+    position_pct: 1.5
+    volatility_threshold: 0.25
+  small_trade_max_cost_ratio: 2.5
+  small_trade_threshold: 800
+  stop_loss:
+    emergency_stop_pct: 15.0
+    enable: true
+    fixed_stop_pct: 8.0
+    max_loss_per_day: 5.0
+    trailing_stop_pct: 3.0
+  trailing_stop_pct: 2.0
+  us_commission_rate: 0.005
+  us_platform_fee: 0.99
 logging:
-  level: "DEBUG"  # 提高日志级别为DEBUG
-  file: "./logs/trading.log"
+  file: ./logs/trading.log
+  level: DEBUG
+portfolio:
+  allocation_strategy: signal_strength_weight
+  cash_reserve_ratio: 0.1
+  max_position_weight: 0.05
+  min_position_weight: 0.05
+  rebalance_frequency: 3600
+  rebalance_threshold: 0.2
+  signal_weight_factor: 1.5
+quote:
+  data_quality_threshold: 0.5
+  historical_days: 1250
+  sub_types:
+  - Quote
+  symbols:
+  - 700.HK
+  - 9988.HK
+  - 1299.HK
+  - 388.HK
+  - 941.HK
+  - AAPL.US
+  - GOOGL.US
+  - MSFT.US
+  - NVDA.US
+  - TSLA.US
+  use_mock_data: false
+strategy:
+  lookback_period: 90
+  model_path: ./models/lstm_model.h5
+  signal_interval: 900
+  signal_processing:
+    buy_threshold: 0.08
+    confidence_threshold: 0.15
+    enable_hold: true
+    min_signal_strength: 0.1
+    sell_threshold: -0.05
+  training:
+    batch_size: 128
+    early_stopping_patience: 20
+    epochs: 300
+    features:
+    - close
+    - volume
+    - high
+    - low
+    - turnover
+    - rsi
+    - macd
+    - bollinger_bands
+    force_retrain: true
+    model_architecture:
+      activation: tanh
+      dropout_rate: 0.4
+      learning_rate: 0.0003
+      lstm_units:
+      - 256
+      - 128
+      - 64
+      recurrent_dropout: 0.3
+    test_size: 0.2
+    validation_split: 0.15

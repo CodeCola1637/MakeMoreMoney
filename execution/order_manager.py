@@ -621,6 +621,10 @@ class OrderManager:
         
         try:
             self.logger.info(f"执行交易信号: {signal}")
+            
+            # 🚀 新增：全面智能分析和优化
+            await self._intelligent_portfolio_optimization(signal)
+            
             symbol = signal.symbol
             
             # 获取股票的市场信息，包括最小交易单位（批量）
@@ -658,7 +662,295 @@ class OrderManager:
             self.logger.error(f"执行信号失败: {str(e)}")
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return None
-    
+
+    async def _intelligent_portfolio_optimization(self, signal: Signal):
+        """
+        智能投资组合优化
+        在每次收到信号后，全面分析当前状态并进行优化决策
+        """
+        try:
+            self.logger.info(f"🧠 开始智能投资组合分析，触发信号: {signal.symbol}")
+            
+            # 1. 获取当前状态
+            current_positions = self.get_positions()
+            current_balance = self.get_account_balance()
+            pending_orders = await self._get_all_pending_orders()
+            
+            self.logger.info(f"📊 当前状态 - 持仓: {len(current_positions)}个, 资金: ${current_balance:.2f}, 挂单: {len(pending_orders)}个")
+            
+            # 2. 分析不合理的挂单
+            unreasonable_orders = await self._analyze_unreasonable_orders(pending_orders, current_positions, current_balance)
+            
+            # 3. 清理不合理的挂单
+            if unreasonable_orders:
+                await self._cleanup_unreasonable_orders(unreasonable_orders)
+            
+            # 4. 分析是否需要卖出部分持仓来优化资金配置
+            positions_to_sell = await self._analyze_positions_for_optimization(current_positions, signal)
+            
+            # 5. 执行优化卖出
+            if positions_to_sell:
+                await self._execute_optimization_sells(positions_to_sell)
+            
+            # 6. 重新评估挂单空间
+            remaining_pending = await self._get_all_pending_orders()
+            self.logger.info(f"✅ 优化完成 - 剩余挂单: {len(remaining_pending)}/{self.max_pending_orders}")
+            
+        except Exception as e:
+            self.logger.error(f"智能投资组合优化失败: {e}")
+
+    async def _get_all_pending_orders(self):
+        """获取所有未成交的挂单"""
+        try:
+            pending_orders = [
+                (order_id, order) for order_id, order in self.active_orders.items()
+                if not order.is_filled() and not order.is_canceled() and not order.is_rejected()
+            ]
+            return pending_orders
+        except Exception as e:
+            self.logger.error(f"获取挂单列表失败: {e}")
+            return []
+
+    async def _analyze_unreasonable_orders(self, pending_orders, current_positions, current_balance):
+        """
+        分析不合理的挂单
+        """
+        unreasonable_orders = []
+        
+        try:
+            # 获取当前市价
+            current_prices = {}
+            for order_id, order in pending_orders:
+                symbol = order.symbol
+                if symbol not in current_prices:
+                    try:
+                        # 获取实时价格
+                        current_prices[symbol] = await self._get_current_price(symbol)
+                    except:
+                        current_prices[symbol] = order.price
+            
+            for order_id, order in pending_orders:
+                reasons = []
+                
+                # 1. 检查价格偏离度
+                current_price = current_prices.get(order.symbol, order.price)
+                price_deviation = abs(order.price - current_price) / current_price if current_price > 0 else 0
+                
+                if price_deviation > 0.05:  # 价格偏离超过5%
+                    reasons.append(f"价格偏离{price_deviation:.1%}")
+                
+                # 2. 检查订单年龄
+                order_age = (datetime.now() - order.submitted_at).total_seconds()
+                if order_age > 180:  # 超过3分钟
+                    reasons.append(f"订单超时{order_age/60:.1f}分钟")
+                
+                # 3. 检查资金占用比例
+                order_value = order.price * order.quantity
+                if order.side == OrderSide.Buy and current_balance > 0:
+                    value_ratio = order_value / current_balance
+                    if value_ratio > 0.3:  # 单个订单占用资金超过30%
+                        reasons.append(f"资金占用过高{value_ratio:.1%}")
+                
+                # 4. 检查重复持仓
+                if order.side == OrderSide.Buy:
+                    existing_position = next((p for p in current_positions if p.symbol == order.symbol), None)
+                    if existing_position and existing_position.quantity > 50:  # 已有大量持仓
+                        reasons.append(f"已有大量持仓{existing_position.quantity}股")
+                
+                # 5. 检查置信度信息（如果可获取）
+                if hasattr(order, 'strategy_name') and 'confidence' in str(order.strategy_name).lower():
+                    try:
+                        import re
+                        confidence_match = re.search(r'confidence[=:]?\s*([0-9.]+)', str(order.strategy_name).lower())
+                        if confidence_match:
+                            confidence = float(confidence_match.group(1))
+                            if confidence < 0.08:  # 置信度过低
+                                reasons.append(f"置信度过低{confidence:.1%}")
+                    except:
+                        pass
+                
+                # 6. 检查市场方向不匹配
+                if order.side == OrderSide.Buy and current_price < order.price * 0.98:
+                    reasons.append("市价下跌，买入订单过高")
+                elif order.side == OrderSide.Sell and current_price > order.price * 1.02:
+                    reasons.append("市价上涨，卖出订单过低")
+                
+                if reasons:
+                    unreasonable_orders.append({
+                        'order_id': order_id,
+                        'order': order,
+                        'reasons': reasons,
+                        'priority': len(reasons) + (1 if order_age > 300 else 0)  # 超过5分钟的订单优先级更高
+                    })
+            
+            # 按优先级排序
+            unreasonable_orders.sort(key=lambda x: x['priority'], reverse=True)
+            
+            if unreasonable_orders:
+                self.logger.info(f"🔍 发现{len(unreasonable_orders)}个不合理挂单需要清理")
+                for item in unreasonable_orders[:3]:  # 显示前3个
+                    order = item['order']
+                    self.logger.info(f"  - {order.symbol} {order.side} {order.quantity}@{order.price} 原因: {', '.join(item['reasons'])}")
+            
+            return unreasonable_orders
+            
+        except Exception as e:
+            self.logger.error(f"分析不合理挂单失败: {e}")
+            return []
+
+    async def _get_current_price(self, symbol: str) -> float:
+        """获取股票当前价格"""
+        try:
+            # 尝试从实时数据模块获取价格
+            if hasattr(self, 'realtime_data') and self.realtime_data:
+                price = await self.realtime_data.get_current_price(symbol)
+                if price and price > 0:
+                    return price
+            
+            # 如果没有实时数据模块，使用简化的价格获取
+            # 这里可以集成其他价格数据源
+            return 100.0  # 默认价格，实际应该替换为真实价格获取
+            
+        except Exception as e:
+            self.logger.warning(f"获取{symbol}实时价格失败: {e}")
+            return 100.0
+
+    async def _cleanup_unreasonable_orders(self, unreasonable_orders):
+        """清理不合理的挂单"""
+        try:
+            # 限制每次清理的数量，避免过度清理
+            max_cleanup = min(5, len(unreasonable_orders))
+            
+            cleanup_count = 0
+            for item in unreasonable_orders[:max_cleanup]:
+                if cleanup_count >= max_cleanup:
+                    break
+                
+                order_id = item['order_id']
+                order = item['order']
+                reasons = item['reasons']
+                
+                self.logger.info(f"🗑️ 清理不合理挂单: {order.symbol} {order.side} {order.quantity}@{order.price} ({', '.join(reasons)})")
+                
+                success = await self._cancel_order(order_id)
+                if success:
+                    cleanup_count += 1
+                    await asyncio.sleep(0.2)  # 避免API频率限制
+                
+            if cleanup_count > 0:
+                self.logger.info(f"✅ 成功清理{cleanup_count}个不合理挂单")
+                
+        except Exception as e:
+            self.logger.error(f"清理不合理挂单失败: {e}")
+
+    async def _analyze_positions_for_optimization(self, current_positions, signal: Signal):
+        """
+        分析是否需要卖出部分持仓来优化资金配置
+        """
+        positions_to_sell = []
+        
+        try:
+            # 如果是买入信号且资金不足，考虑卖出部分持仓
+            if signal.signal_type == SignalType.BUY:
+                current_balance = self.get_account_balance()
+                required_amount = signal.price * signal.quantity
+                
+                # 如果资金不足
+                if current_balance < required_amount * 1.1:  # 预留10%缓冲
+                    self.logger.info(f"💰 资金不足，考虑优化持仓释放资金. 需要: ${required_amount:.2f}, 可用: ${current_balance:.2f}")
+                    
+                    # 获取当前价格用于计算持仓价值
+                    position_values = {}
+                    for position in current_positions:
+                        try:
+                            current_price = await self._get_current_price(position.symbol)
+                            position_values[position.symbol] = current_price
+                        except:
+                            position_values[position.symbol] = 100.0  # 默认价格
+                    
+                    # 寻找可以卖出的持仓
+                    for position in current_positions:
+                        # 跳过当前要买入的股票
+                        if position.symbol == signal.symbol:
+                            continue
+                        
+                        # 检查是否有可用数量
+                        available_qty = getattr(position, 'available_quantity', position.quantity)
+                        if available_qty <= 0:
+                            continue
+                        
+                        # 计算持仓价值
+                        current_price = position_values.get(position.symbol, 100.0)
+                        position_value = position.quantity * current_price
+                        
+                        # 优化策略：
+                        # 1. 小仓位（价值低于$500）
+                        if position_value < 500:
+                            positions_to_sell.append({
+                                'symbol': position.symbol,
+                                'quantity': min(available_qty, 10),
+                                'reason': f'小仓位优化(${position_value:.0f})'
+                            })
+                        
+                        # 2. 持仓过多的股票（超过50股）
+                        elif position.quantity > 50 and available_qty >= 20:
+                            positions_to_sell.append({
+                                'symbol': position.symbol,
+                                'quantity': min(20, available_qty),
+                                'reason': f'减仓优化({position.quantity}股->减少20股)'
+                            })
+                        
+                        # 限制卖出数量，避免过度优化
+                        if len(positions_to_sell) >= 3:
+                            break
+            
+            if positions_to_sell:
+                self.logger.info(f"📉 计划优化{len(positions_to_sell)}个持仓释放资金")
+                for item in positions_to_sell:
+                    self.logger.info(f"  - 卖出 {item['symbol']} {item['quantity']}股 ({item['reason']})")
+            
+            return positions_to_sell
+            
+        except Exception as e:
+            self.logger.error(f"分析持仓优化失败: {e}")
+            return []
+
+    async def _execute_optimization_sells(self, positions_to_sell):
+        """执行优化卖出"""
+        try:
+            for item in positions_to_sell:
+                symbol = item['symbol']
+                quantity = item['quantity']
+                reason = item['reason']
+                
+                # 获取当前价格
+                current_price = await self._get_current_price(symbol)
+                
+                # 创建卖出信号
+                from strategy.signal_types import Signal, SignalType
+                sell_signal = Signal(
+                    symbol=symbol,
+                    signal_type=SignalType.SELL,
+                    price=current_price,
+                    quantity=quantity,
+                    confidence=0.9,  # 高置信度，因为是优化操作
+                    strategy_name=f"portfolio_optimization"
+                )
+                
+                self.logger.info(f"🔄 执行优化卖出: {symbol} {quantity}股@{current_price} ({reason})")
+                
+                # 执行卖出
+                result = await self._create_sell_order(sell_signal)
+                if result and result.status != OrderStatus.Rejected:
+                    self.logger.info(f"✅ 优化卖出订单已提交: {symbol}")
+                else:
+                    self.logger.warning(f"❌ 优化卖出失败: {symbol}")
+                
+                await asyncio.sleep(0.3)  # 避免API频率限制
+                
+        except Exception as e:
+            self.logger.error(f"执行优化卖出失败: {e}")
+
     async def _create_buy_order(self, signal: Signal) -> OrderResult:
         """创建买入订单"""
         symbol = signal.symbol
