@@ -10,18 +10,18 @@ execution:
   enable_us_trading: true
   hk_commission_rate: 0.0025
   initial_capital: 15000.0
-  max_cost_ratio: 1.8
+  max_cost_ratio: 2.0
   max_daily_orders: 200
   max_drawdown_pct: 10.0
   max_position_size: 2000.0
-  min_profit_threshold: 2.5
-  min_trade_value: 200
+  min_profit_threshold: 3.0
+  min_trade_value: 300
   order_tracking:
     check_interval: 30
-    max_pending_orders: 8
+    max_pending_orders: 10
     retry_count: 1
     smart_pricing: true
-    timeout: 120
+    timeout: 90
   order_types:
     default: LO
   preferred_currency: HKD
@@ -37,7 +37,7 @@ execution:
   risk_control:
     daily_loss_pct: 3.0
     max_correlation: 0.7
-    position_pct: 2.0
+    position_pct: 1.5
     volatility_threshold: 0.25
   small_trade_max_cost_ratio: 2.5
   small_trade_threshold: 800
@@ -55,12 +55,12 @@ logging:
   level: DEBUG
 portfolio:
   allocation_strategy: signal_strength_weight
-  cash_reserve_ratio: 0.15
-  max_position_weight: 0.08
+  cash_reserve_ratio: 0.1
+  max_position_weight: 0.05
   min_position_weight: 0.05
-  rebalance_frequency: 1800
+  rebalance_frequency: 3600
   rebalance_threshold: 0.2
-  signal_weight_factor: 2.0
+  signal_weight_factor: 1.5
 quote:
   data_quality_threshold: 0.5
   historical_days: 1250
@@ -81,25 +81,17 @@ quote:
 strategy:
   lookback_period: 90
   model_path: ./models/lstm_model.h5
-  risk_management:
-    correlation_limit: 0.7
-    max_positions: 8
-    sector_limit: 0.4
-    volatility_filter: 0.3
-  signal_interval: 600
+  signal_interval: 900
   signal_processing:
-    buy_threshold: 0.04
-    confidence_threshold: 0.1
+    buy_threshold: 0.08
+    confidence_threshold: 0.15
     enable_hold: true
-    min_signal_strength: 0.02
-    sell_threshold: -0.04
-    signal_decay_factor: 0.95
-    trend_confirmation: true
-    volume_confirmation: true
+    min_signal_strength: 0.1
+    sell_threshold: -0.05
   training:
-    batch_size: 64
-    early_stopping_patience: 15
-    epochs: 200
+    batch_size: 128
+    early_stopping_patience: 20
+    epochs: 300
     features:
     - close
     - volume
@@ -109,17 +101,15 @@ strategy:
     - rsi
     - macd
     - bollinger_bands
-    - sma_20
-    - ema_12
     force_retrain: true
     model_architecture:
-      activation: relu
-      dropout_rate: 0.3
-      learning_rate: 0.0005
+      activation: tanh
+      dropout_rate: 0.4
+      learning_rate: 0.0003
       lstm_units:
+      - 256
       - 128
       - 64
-      - 32
-      recurrent_dropout: 0.2
+      recurrent_dropout: 0.3
     test_size: 0.2
     validation_split: 0.15
