@@ -13,6 +13,11 @@ from enum import Enum
 
 from utils import ConfigLoader, setup_logger
 
+# 延迟导入以避免循环依赖
+def _get_correlation_filter():
+    from strategy.correlation_filter import CorrelationFilter
+    return CorrelationFilter
+
 
 class AllocationStrategy(Enum):
     """配置策略类型"""
@@ -96,16 +101,34 @@ class PortfolioManager:
         self.price_cache: Dict[str, float] = {}
         self.price_update_time: Dict[str, datetime] = {}
         
-    async def initialize(self, symbols: List[str]):
+        # 🔧 相关性过滤器 - 用于风险分散检查
+        self.correlation_filter = None  # 延迟初始化
+        self._correlation_filter_initialized = False
+        
+    async def initialize(self, symbols: List[str], historical_loader=None):
         """
         初始化投资组合
         
         Args:
             symbols: 目标股票列表
+            historical_loader: 历史数据加载器（可选，用于初始化相关性过滤器）
         """
         try:
             self.logger.info(f"初始化投资组合管理器，目标股票: {symbols}")
             self.target_symbols = symbols
+            
+            # 🔧 初始化相关性过滤器
+            if historical_loader and not self._correlation_filter_initialized:
+                try:
+                    CorrelationFilter = _get_correlation_filter()
+                    self.correlation_filter = CorrelationFilter(self.config, historical_loader, self.logger)
+                    self._correlation_filter_initialized = True
+                    self.logger.info("✅ 相关性过滤器初始化完成")
+                    
+                    # 异步更新相关性矩阵
+                    asyncio.create_task(self._update_correlation_matrix())
+                except Exception as e:
+                    self.logger.warning(f"初始化相关性过滤器失败: {e}")
             
             # 获取初始投资组合状态
             await self.update_portfolio_status()
@@ -116,6 +139,15 @@ class PortfolioManager:
         except Exception as e:
             self.logger.error(f"初始化投资组合管理器失败: {e}")
             return False
+    
+    async def _update_correlation_matrix(self):
+        """更新相关性矩阵"""
+        if self.correlation_filter and self.target_symbols:
+            try:
+                await self.correlation_filter.update_correlation_matrix(self.target_symbols)
+                self.logger.info("相关性矩阵更新完成")
+            except Exception as e:
+                self.logger.error(f"更新相关性矩阵失败: {e}")
     
     async def update_portfolio_status(self) -> PortfolioStatus:
         """更新投资组合状态"""
@@ -570,4 +602,53 @@ class PortfolioManager:
             
         except Exception as e:
             self.logger.error(f"获取投资组合摘要失败: {e}")
-            return {} 
+            return {}
+    
+    def check_correlation(self, new_symbol: str) -> Tuple[bool, str]:
+        """
+        检查新股票与现有持仓的相关性
+        
+        Args:
+            new_symbol: 新股票代码
+            
+        Returns:
+            Tuple[bool, str]: (是否通过检查, 消息)
+        """
+        if self.correlation_filter is None:
+            return True, "相关性过滤器未初始化，允许交易"
+        
+        # 获取当前持仓的股票列表
+        current_positions = []
+        if self.portfolio_status and self.portfolio_status.positions:
+            current_positions = [
+                symbol for symbol, pos in self.portfolio_status.positions.items()
+                if pos.current_quantity > 0
+            ]
+        
+        return self.correlation_filter.check_correlation(new_symbol, current_positions)
+    
+    def get_portfolio_correlation_stats(self) -> Dict:
+        """
+        获取投资组合的相关性统计
+        
+        Returns:
+            相关性统计字典
+        """
+        if self.correlation_filter is None:
+            return {'error': '相关性过滤器未初始化'}
+        
+        # 获取当前持仓的股票列表
+        current_positions = []
+        if self.portfolio_status and self.portfolio_status.positions:
+            current_positions = [
+                symbol for symbol, pos in self.portfolio_status.positions.items()
+                if pos.current_quantity > 0
+            ]
+        
+        return self.correlation_filter.get_portfolio_correlation(current_positions)
+    
+    async def refresh_correlation_matrix(self):
+        """刷新相关性矩阵"""
+        if self.correlation_filter:
+            await self.correlation_filter.update_correlation_matrix(self.target_symbols, force=True)
+            self.logger.info("相关性矩阵已刷新")

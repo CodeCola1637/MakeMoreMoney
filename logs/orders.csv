@@ -8630,3 +8630,718 @@ order_id,symbol,side,quantity,price,status,signal_id,signal_type,submitted_at,fi
 ,388.HK,OrderSide.Buy,10,412.800,OrderStatus.Rejected,2025-07-09T10:51:35.903191,,,,单笔交易限制2.0%：无可用资金,"Signal(388.HK, BUY, price=412.80, confidence=0.05, quantity=10)"
 ,388.HK,OrderSide.Buy,10,412.800,OrderStatus.Rejected,2025-07-09T10:52:14.631233,,,,单笔交易限制2.0%：无可用资金,"Signal(388.HK, BUY, price=412.80, confidence=0.04, quantity=10)"
 ,388.HK,OrderSide.Buy,10,412.800,OrderStatus.Rejected,2025-07-09T10:52:44.643884,,,,单笔交易限制2.0%：无可用资金,"Signal(388.HK, BUY, price=412.80, confidence=0.04, quantity=10)"
+,GOOGL.US,OrderSide.Sell,10,176.79,OrderStatus.Rejected,2025-07-09T10:53:45.730050,,,,无持仓可卖出，实际持仓: -118,"Signal(GOOGL.US, SELL, price=176.79, confidence=0.05, quantity=10)"
+,MSFT.US,OrderSide.Sell,10,497.72,OrderStatus.Rejected,2025-07-09T10:53:46.050452,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=497.72, confidence=0.06, quantity=10)"
+,NVDA.US,OrderSide.Sell,10,158.24,OrderStatus.Rejected,2025-07-09T10:53:46.367738,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=158.24, confidence=0.06, quantity=10)"
+1127435528692277248,700.HK,OrderSide.Sell,100,495.6,OrderStatus.NotReported,2025-07-09T11:06:16.817833,,,,,"Signal(700.HK, SELL, price=495.60, confidence=0.12, quantity=23)"
+,9988.HK,OrderSide.Sell,23,105.3,OrderStatus.Rejected,2025-07-09T11:06:17.277743,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.12, quantity=23)"
+,941.HK,OrderSide.Sell,18,85.8,OrderStatus.Rejected,2025-07-09T11:06:17.873670,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.80, confidence=0.09, quantity=18)"
+1127435536688836608,GOOGL.US,OrderSide.Buy,6,174.36,OrderStatus.NotReported,2025-07-09T11:06:18.724534,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127435683688587264,700.HK,OrderSide.Sell,100,496.0,OrderStatus.NotReported,2025-07-09T11:06:53.757495,,,,,"Signal(700.HK, SELL, price=496.00, confidence=0.12, quantity=23)"
+,9988.HK,OrderSide.Sell,23,105.3,OrderStatus.Rejected,2025-07-09T11:06:54.217769,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.12, quantity=23)"
+,1299.HK,OrderSide.Sell,4,68.45,OrderStatus.Rejected,2025-07-09T11:06:54.649983,,,,无持仓可卖出，实际持仓: 0,"Signal(1299.HK, SELL, price=68.45, confidence=0.02, quantity=4)"
+1127435689613320192,388.HK,OrderSide.Sell,100,411.6,OrderStatus.NotReported,2025-07-09T11:06:55.170504,,,,,"Signal(388.HK, SELL, price=411.60, confidence=0.03, quantity=5)"
+,941.HK,OrderSide.Sell,23,85.8,OrderStatus.Rejected,2025-07-09T11:06:55.705254,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.80, confidence=0.12, quantity=23)"
+1127435695447437312,GOOGL.US,OrderSide.Buy,16,174.36,OrderStatus.NotReported,2025-07-09T11:06:56.573395,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T11:06:57.217284,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T11:06:57.766516,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+1127436050444939264,700.HK,OrderSide.Sell,100,496.6,OrderStatus.NotReported,2025-07-09T11:08:21.204568,,,,,"Signal(700.HK, SELL, price=496.60, confidence=0.12, quantity=23)"
+,9988.HK,OrderSide.Sell,23,105.5,OrderStatus.Rejected,2025-07-09T11:08:21.646131,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.50, confidence=0.12, quantity=23)"
+,1299.HK,OrderSide.Sell,4,68.45,OrderStatus.Rejected,2025-07-09T11:08:22.071588,,,,无持仓可卖出，实际持仓: 0,"Signal(1299.HK, SELL, price=68.45, confidence=0.02, quantity=4)"
+1127436056411217920,388.HK,OrderSide.Sell,100,412.8,OrderStatus.NotReported,2025-07-09T11:08:22.628975,,,,,"Signal(388.HK, SELL, price=412.80, confidence=0.02, quantity=4)"
+,941.HK,OrderSide.Sell,22,85.85,OrderStatus.Rejected,2025-07-09T11:08:23.145872,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.85, confidence=0.11, quantity=22)"
+1127436062337769472,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T11:08:24.053416,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T11:08:24.753673,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T11:08:25.313733,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+1127438586790899712,700.HK,OrderSide.Sell,100,496.2,OrderStatus.NotReported,2025-07-09T11:18:25.917456,,,,,"Signal(700.HK, SELL, price=496.20, confidence=0.09, quantity=21)"
+,9988.HK,OrderSide.Sell,18,105.2,OrderStatus.Rejected,2025-07-09T11:18:26.368518,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.20, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,4,68.35,OrderStatus.Rejected,2025-07-09T11:18:26.828132,,,,成本效益不佳: 预期收益不足: 2.21% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.35, confidence=0.02, quantity=4)"
+1127438593742839808,388.HK,OrderSide.Buy,100,412.0,OrderStatus.NotReported,2025-07-09T11:18:27.571702,,,,,"Signal(388.HK, BUY, price=412.00, confidence=0.03, quantity=5)"
+,941.HK,OrderSide.Sell,21,85.9,OrderStatus.Rejected,2025-07-09T11:18:28.065647,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.90, confidence=0.09, quantity=21)"
+1127438599522590720,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T11:18:28.956289,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T11:18:29.555649,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T11:18:30.111209,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,20,496.8,OrderStatus.Rejected,2025-07-09T11:28:30.614293,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.80, confidence=0.09, quantity=20)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T11:28:30.989681,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,4,68.4,OrderStatus.Rejected,2025-07-09T11:28:31.406015,,,,成本效益不佳: 预期收益不足: 2.05% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.40, confidence=0.02, quantity=4)"
+1127441129310875648,388.HK,OrderSide.Buy,100,412.6,OrderStatus.NotReported,2025-07-09T11:28:32.099806,,,,,"Signal(388.HK, BUY, price=412.60, confidence=0.02, quantity=4)"
+,941.HK,OrderSide.Sell,21,86.0,OrderStatus.Rejected,2025-07-09T11:28:32.587968,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=21)"
+1127441134973186048,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T11:28:33.457315,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T11:28:34.029820,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T11:28:34.571963,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,496.8,OrderStatus.Rejected,2025-07-09T11:38:35.027430,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.80, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T11:38:35.428415,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,21,86.0,OrderStatus.Rejected,2025-07-09T11:38:35.950903,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=21)"
+1127443665184858112,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T11:38:36.711093,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T11:38:37.245302,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T11:38:37.666736,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,496.2,OrderStatus.Rejected,2025-07-09T11:48:38.157803,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.20, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.2,OrderStatus.Rejected,2025-07-09T11:48:39.197328,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.20, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,20,85.9,OrderStatus.Rejected,2025-07-09T11:48:39.708786,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.90, confidence=0.09, quantity=20)"
+1127446197898551296,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T11:48:40.550318,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T11:48:41.003202,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T11:48:41.416115,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.8,OrderStatus.Rejected,2025-07-09T12:15:11.684340,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.80, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T12:15:12.051184,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,18,86.05,OrderStatus.Rejected,2025-07-09T12:15:12.569210,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=18)"
+1127452878533812224,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T12:15:13.349348,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T12:15:13.819457,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T12:15:14.239000,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.8,OrderStatus.Rejected,2025-07-09T12:25:14.752983,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.80, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T12:25:15.139860,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,18,86.05,OrderStatus.Rejected,2025-07-09T12:25:15.678967,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=18)"
+1127455408174899200,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T12:25:16.479120,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T12:25:16.932919,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T12:25:17.371909,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.8,OrderStatus.Rejected,2025-07-09T12:35:17.836551,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.80, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T12:35:18.213520,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,18,86.05,OrderStatus.Rejected,2025-07-09T12:35:18.753007,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=18)"
+1127457937625423872,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T12:35:19.527724,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T12:35:20.008383,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T12:35:20.454688,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.8,OrderStatus.Rejected,2025-07-09T12:45:20.918040,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.80, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T12:45:21.299244,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,18,86.05,OrderStatus.Rejected,2025-07-09T12:45:21.816247,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=18)"
+1127460466933342208,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T12:45:22.558117,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T12:45:23.015500,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T12:45:23.467861,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.8,OrderStatus.Rejected,2025-07-09T12:55:23.935522,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.80, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,105.3,OrderStatus.Rejected,2025-07-09T12:55:24.323377,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.30, confidence=0.09, quantity=18)"
+,941.HK,OrderSide.Sell,18,86.05,OrderStatus.Rejected,2025-07-09T12:55:24.841086,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=18)"
+1127462996142813184,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T12:55:25.578149,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T12:55:26.067706,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T12:55:26.497934,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,24,496.6,OrderStatus.Rejected,2025-07-09T13:05:26.952237,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,18,105.0,OrderStatus.Rejected,2025-07-09T13:05:27.358236,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=105.00, confidence=0.09, quantity=18)"
+1127465523429076992,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T13:05:28.127898,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.02, quantity=4)"
+,941.HK,OrderSide.Sell,20,86.15,OrderStatus.Rejected,2025-07-09T13:05:28.532787,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.15, confidence=0.09, quantity=20)"
+1127465528690712576,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T13:05:29.387675,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T13:05:29.941099,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T13:05:30.469851,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,23,496.0,OrderStatus.Rejected,2025-07-09T13:47:18.624562,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.00, confidence=0.09, quantity=23)"
+,9988.HK,OrderSide.Sell,18,103.4,OrderStatus.Rejected,2025-07-09T13:47:18.994831,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.40, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,500,68.45,OrderStatus.Rejected,2025-07-09T13:47:19.640657,,,,"提交失败: OpenApiException: (code=602001, trace_id=a96a33c0e3ada579842f8e41669d97ed) The submitted quantity does not comply with the required multiple of the lot size.  Please refer to https://open.longportapp.com/docs/quote/pull/static for the latest trading lot size.","Signal(1299.HK, BUY, price=68.45, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,18,86.0,OrderStatus.Rejected,2025-07-09T13:47:20.074967,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=18)"
+1127476062567768064,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T13:47:20.847521,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T13:47:21.324624,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T13:47:21.767113,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,22,496.4,OrderStatus.Rejected,2025-07-09T13:57:22.268478,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.40, confidence=0.09, quantity=22)"
+,9988.HK,OrderSide.Sell,18,103.7,OrderStatus.Rejected,2025-07-09T13:57:22.678292,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.70, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,6,68.6,OrderStatus.Rejected,2025-07-09T13:57:23.074667,,,,成本效益不佳: 预期收益不足: 3.19% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.2,OrderStatus.Rejected,2025-07-09T13:57:23.501300,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.20, confidence=0.09, quantity=21)"
+1127478593490493440,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T13:57:24.264368,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T13:57:24.765128,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T13:57:25.238158,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,22,495.6,OrderStatus.Rejected,2025-07-09T14:07:25.712642,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.60, confidence=0.09, quantity=22)"
+,9988.HK,OrderSide.Sell,18,103.1,OrderStatus.Rejected,2025-07-09T14:07:26.080377,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.10, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,5,68.4,OrderStatus.Rejected,2025-07-09T14:07:26.484969,,,,成本效益不佳: 预期收益不足: 2.94% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.40, confidence=0.03, quantity=5)"
+,941.HK,OrderSide.Sell,20,86.15,OrderStatus.Rejected,2025-07-09T14:07:26.910808,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.15, confidence=0.09, quantity=20)"
+1127481124285411328,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T14:07:27.649324,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T14:07:28.182570,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T14:07:28.615063,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.6,OrderStatus.Rejected,2025-07-09T14:17:29.083657,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.60, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,103.5,OrderStatus.Rejected,2025-07-09T14:17:29.516929,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.50, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,4,68.35,OrderStatus.Rejected,2025-07-09T14:17:29.933157,,,,成本效益不佳: 预期收益不足: 2.09% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.35, confidence=0.02, quantity=4)"
+,941.HK,OrderSide.Sell,18,86.0,OrderStatus.Rejected,2025-07-09T14:17:30.403694,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=18)"
+1127483655889592320,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T14:17:31.238112,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T14:17:31.732348,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T14:17:32.151835,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,18,495.6,OrderStatus.Rejected,2025-07-09T14:27:32.639538,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.60, confidence=0.09, quantity=18)"
+,9988.HK,OrderSide.Sell,18,103.4,OrderStatus.Rejected,2025-07-09T14:27:32.995929,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.40, confidence=0.09, quantity=18)"
+,1299.HK,OrderSide.Buy,4,68.35,OrderStatus.Rejected,2025-07-09T14:27:33.364245,,,,成本效益不佳: 预期收益不足: 2.40% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.35, confidence=0.02, quantity=4)"
+,941.HK,OrderSide.Sell,18,86.05,OrderStatus.Rejected,2025-07-09T14:27:33.809362,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=18)"
+1127486186455801856,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T14:27:34.584761,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T14:27:35.062328,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T14:27:35.493714,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,20,495.6,OrderStatus.Rejected,2025-07-09T14:37:35.973633,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=495.60, confidence=0.09, quantity=20)"
+,9988.HK,OrderSide.Sell,20,103.3,OrderStatus.Rejected,2025-07-09T14:37:36.366123,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.30, confidence=0.09, quantity=20)"
+1127488713740087296,388.HK,OrderSide.Buy,100,409.8,OrderStatus.NotReported,2025-07-09T14:37:37.128665,,,,,"Signal(388.HK, BUY, price=409.80, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,18,86.0,OrderStatus.Rejected,2025-07-09T14:37:37.580762,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=18)"
+1127488719079436288,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T14:37:38.394695,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T14:37:38.981587,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T14:37:39.514876,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,20,496.2,OrderStatus.Rejected,2025-07-09T14:54:50.995626,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.20, confidence=0.09, quantity=20)"
+,9988.HK,OrderSide.Sell,22,103.1,OrderStatus.Rejected,2025-07-09T14:54:51.374309,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.10, confidence=0.09, quantity=22)"
+,1299.HK,OrderSide.Buy,4,68.5,OrderStatus.Rejected,2025-07-09T14:54:51.783555,,,,成本效益不佳: 预期收益不足: 2.36% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.02, quantity=4)"
+1127493056128184320,388.HK,OrderSide.Buy,100,409.8,OrderStatus.NotReported,2025-07-09T14:54:52.421595,,,,,"Signal(388.HK, BUY, price=409.80, confidence=0.03, quantity=5)"
+,941.HK,OrderSide.Sell,20,86.0,OrderStatus.Rejected,2025-07-09T14:54:52.844102,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=20)"
+1127493061305933824,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T14:54:53.656053,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T14:54:54.190531,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T14:54:54.682069,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,22,496.8,OrderStatus.Rejected,2025-07-09T15:04:55.200048,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.80, confidence=0.09, quantity=22)"
+,9988.HK,OrderSide.Sell,22,103.0,OrderStatus.Rejected,2025-07-09T15:04:55.581402,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.00, confidence=0.09, quantity=22)"
+,1299.HK,OrderSide.Buy,500,68.5,OrderStatus.Rejected,2025-07-09T15:04:56.213101,,,,"提交失败: OpenApiException: (code=602001, trace_id=9718af0473c3f5e58236a32c0a6966bc) The submitted quantity does not comply with the required multiple of the lot size.  Please refer to https://open.longportapp.com/docs/quote/pull/static for the latest trading lot size.","Signal(1299.HK, BUY, price=68.50, confidence=0.04, quantity=7)"
+1127495591400562688,388.HK,OrderSide.Buy,100,410.6,OrderStatus.NotReported,2025-07-09T15:04:56.871136,,,,,"Signal(388.HK, BUY, price=410.60, confidence=0.04, quantity=7)"
+,941.HK,OrderSide.Sell,20,86.0,OrderStatus.Rejected,2025-07-09T15:04:57.333075,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.00, confidence=0.09, quantity=20)"
+1127495596934668288,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T15:04:58.195682,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T15:04:58.727212,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T15:04:59.221467,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,24,496.4,OrderStatus.Rejected,2025-07-09T15:14:59.790195,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=496.40, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,22,102.9,OrderStatus.Rejected,2025-07-09T15:15:00.174630,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=22)"
+,1299.HK,OrderSide.Buy,500,68.5,OrderStatus.Rejected,2025-07-09T15:15:00.939128,,,,"提交失败: OpenApiException: (code=602001, trace_id=ebcd57425b0546216f5c72a8415a698b) The submitted quantity does not comply with the required multiple of the lot size.  Please refer to https://open.longportapp.com/docs/quote/pull/static for the latest trading lot size.","Signal(1299.HK, BUY, price=68.50, confidence=0.04, quantity=7)"
+1127498128050331648,388.HK,OrderSide.Buy,100,409.8,OrderStatus.NotReported,2025-07-09T15:15:01.663968,,,,,"Signal(388.HK, BUY, price=409.80, confidence=0.03, quantity=5)"
+,941.HK,OrderSide.Sell,18,85.9,OrderStatus.Rejected,2025-07-09T15:15:02.131342,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.90, confidence=0.09, quantity=18)"
+1127498134033625088,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T15:15:03.083609,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T15:15:03.628513,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T15:15:04.158872,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,25,497.2,OrderStatus.Rejected,2025-07-09T15:25:04.593529,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.20, confidence=0.09, quantity=25)"
+,9988.HK,OrderSide.Sell,21,102.8,OrderStatus.Rejected,2025-07-09T15:25:04.977579,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.80, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,500,68.6,OrderStatus.Rejected,2025-07-09T15:25:05.622063,,,,"提交失败: OpenApiException: (code=602001, trace_id=b87ffff85bc67a36aaf19cd551cb36d0) The submitted quantity does not comply with the required multiple of the lot size.  Please refer to https://open.longportapp.com/docs/quote/pull/static for the latest trading lot size.","Signal(1299.HK, BUY, price=68.60, confidence=0.04, quantity=7)"
+1127500664230735872,388.HK,OrderSide.Buy,100,409.8,OrderStatus.NotReported,2025-07-09T15:25:06.334679,,,,,"Signal(388.HK, BUY, price=409.80, confidence=0.03, quantity=5)"
+,941.HK,OrderSide.Sell,20,85.95,OrderStatus.Rejected,2025-07-09T15:25:06.781627,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.95, confidence=0.09, quantity=20)"
+1127500669488177152,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T15:25:07.588081,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T15:25:08.137533,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T15:25:08.630863,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,25,497.8,OrderStatus.Rejected,2025-07-09T15:35:09.175048,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.80, confidence=0.09, quantity=25)"
+,9988.HK,OrderSide.Sell,23,103.1,OrderStatus.Rejected,2025-07-09T15:35:09.596176,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.10, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,500,68.7,OrderStatus.Rejected,2025-07-09T15:35:10.315346,,,,"提交失败: OpenApiException: (code=602001, trace_id=ad2631925c0ca934f0ddb15454d0c93e) The submitted quantity does not comply with the required multiple of the lot size.  Please refer to https://open.longportapp.com/docs/quote/pull/static for the latest trading lot size.","Signal(1299.HK, BUY, price=68.70, confidence=0.04, quantity=7)"
+1127503200270671872,388.HK,OrderSide.Buy,100,410.0,OrderStatus.NotReported,2025-07-09T15:35:10.990752,,,,,"Signal(388.HK, BUY, price=410.00, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T15:35:11.419178,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127503205567918080,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T15:35:12.243964,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T15:35:12.809829,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T15:35:13.316892,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,25,497.8,OrderStatus.Rejected,2025-07-09T15:45:13.796103,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.80, confidence=0.09, quantity=25)"
+,9988.HK,OrderSide.Sell,22,102.8,OrderStatus.Rejected,2025-07-09T15:45:14.150569,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.80, confidence=0.09, quantity=22)"
+,1299.HK,OrderSide.Buy,500,68.65,OrderStatus.Rejected,2025-07-09T15:45:14.794062,,,,"提交失败: OpenApiException: (code=602001, trace_id=dddf9c2bbc39296ea822de11482c4031) The submitted quantity does not comply with the required multiple of the lot size.  Please refer to https://open.longportapp.com/docs/quote/pull/static for the latest trading lot size.","Signal(1299.HK, BUY, price=68.65, confidence=0.04, quantity=7)"
+1127505735624400896,388.HK,OrderSide.Buy,100,410.6,OrderStatus.NotReported,2025-07-09T15:45:15.449419,,,,,"Signal(388.HK, BUY, price=410.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,85.95,OrderStatus.Rejected,2025-07-09T15:45:15.854786,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=85.95, confidence=0.09, quantity=21)"
+1127505740567666688,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T15:45:16.632941,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T15:45:17.180713,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T15:45:17.717115,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T16:00:34.949659,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,25,103.0,OrderStatus.Rejected,2025-07-09T16:00:35.302777,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=103.00, confidence=0.09, quantity=25)"
+,1299.HK,OrderSide.Buy,6,68.7,OrderStatus.Rejected,2025-07-09T16:00:35.662247,,,,成本效益不佳: 预期收益不足: 3.11% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.70, confidence=0.03, quantity=6)"
+1127509598026952704,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T16:00:36.338502,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,22,86.05,OrderStatus.Rejected,2025-07-09T16:00:36.822223,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=22)"
+,AAPL.US,OrderSide.Sell,4,210.01,OrderStatus.Rejected,2025-07-09T16:00:37.233179,,,,无持仓可卖出，实际持仓: -150,"Signal(AAPL.US, SELL, price=210.01, confidence=0.02, quantity=4)"
+1127509604840480768,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T16:00:37.947284,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=22)"
+,MSFT.US,OrderSide.Sell,4,496.62,OrderStatus.Rejected,2025-07-09T16:00:38.473528,,,,无持仓可卖出，实际持仓: -34,"Signal(MSFT.US, SELL, price=496.62, confidence=0.02, quantity=4)"
+,NVDA.US,OrderSide.Sell,4,160.0,OrderStatus.Rejected,2025-07-09T16:00:38.972252,,,,无持仓可卖出，实际持仓: -7,"Signal(NVDA.US, SELL, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T16:10:39.424836,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T16:10:39.804269,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T16:10:40.177461,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127512133617938432,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T16:10:40.861588,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T16:10:41.307876,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127512139032784896,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T16:10:42.140688,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T16:20:42.925566,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T16:20:43.348325,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T16:20:43.789668,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127514667520598016,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T16:20:44.986690,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T16:20:45.532376,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127514674325975040,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T16:20:46.611805,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T16:30:47.456386,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T16:30:47.927836,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T16:30:48.363329,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127517201461243904,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T16:30:49.143303,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T16:30:49.709089,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127517207276527616,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T16:30:50.508452,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T16:40:51.098587,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T16:40:51.461037,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T16:40:51.847743,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127519732505604096,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T16:40:52.565774,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T16:40:53.062153,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127519738018897920,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T16:40:53.885622,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T16:50:55.709794,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T16:50:56.139507,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T16:50:57.347242,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127522272137682944,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T16:50:58.060467,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T16:50:58.571218,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127522278045638656,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T16:50:59.468511,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T17:18:01.947749,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T17:18:02.302704,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T17:18:02.715411,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127529089112989696,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T17:18:03.351889,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T17:18:03.910792,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127529094779334656,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T17:18:04.701471,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127529098413580288,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T17:18:05.573207,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T17:28:06.183556,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T17:28:06.610660,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T17:28:07.057831,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127531624359882752,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T17:28:07.809947,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T17:28:08.378128,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127531630324342784,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T17:28:09.230394,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127531634346680320,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T17:28:10.182306,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T17:38:10.711857,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T17:38:11.148738,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T17:38:11.601557,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127534160190103552,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T17:38:12.399525,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T17:38:13.012451,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127534166323994624,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T17:38:13.853968,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127534170627350528,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T17:38:14.887080,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T17:48:15.507207,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T17:48:15.914628,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T17:48:16.389974,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127536696898592768,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T17:48:17.201904,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T17:48:17.783350,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127536702928023552,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T17:48:18.628597,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127536706854051840,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T17:48:19.561350,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T17:58:20.098137,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T17:58:20.504259,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T17:58:20.926201,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127539232401498112,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T17:58:21.708782,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T17:58:22.217856,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127539238036664320,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T17:58:23.055985,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127539242109333504,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T17:58:24.022064,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T18:08:24.608765,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T18:08:25.020291,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T18:08:25.446067,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127541767659155456,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T18:08:26.158932,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T18:08:26.687382,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127541773367603200,GOOGL.US,OrderSide.Buy,18,174.36,OrderStatus.NotReported,2025-07-09T18:08:27.514544,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=18)"
+1127541777259917312,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T18:08:28.445086,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.02, quantity=4)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T18:28:08.739122,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T18:28:09.168453,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T18:28:09.623383,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127546734472044544,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T18:28:10.441532,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T18:28:11.000382,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127546741245845504,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T18:28:11.948479,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T18:38:12.800835,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T18:38:13.213386,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T18:38:13.666490,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127549268006002688,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T18:38:14.390568,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T18:38:15.000899,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127549274236362752,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T18:38:15.865786,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T18:48:16.536602,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T18:48:16.925425,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T18:48:17.353859,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127551800203636736,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T18:48:18.102998,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T18:48:18.633637,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127551805928861696,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T18:48:19.455418,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T18:58:20.205758,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T18:58:20.622556,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T18:58:21.044429,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127554332223053824,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T18:58:21.786665,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T18:58:22.317894,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127554338025992192,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T18:58:23.164564,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T19:08:23.829343,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T19:08:24.254429,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T19:08:24.692369,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127556864118857728,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T19:08:25.446493,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T19:08:26.060313,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127556870441889792,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T19:08:26.930547,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+1127556874430672896,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T19:08:27.890520,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T19:18:28.489910,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T19:18:28.930293,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T19:18:29.350401,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127559400246714368,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T19:18:30.096924,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T19:18:30.644294,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127559406238396416,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T19:18:31.516645,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+1127559410157854720,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T19:18:32.456144,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T19:29:55.090716,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T19:29:55.512105,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T19:29:55.958527,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127562280156504064,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T19:29:56.716720,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T19:29:57.261016,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127562286156574720,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T19:29:58.141724,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.11, quantity=22)"
+1127562289822556160,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T19:29:59.024624,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=6)"
+1127562293863489536,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T19:29:59.978890,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T19:40:00.628926,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T19:40:01.054209,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T19:40:01.487294,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127564819765633024,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T19:40:02.197885,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T19:40:02.711723,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127564825757315072,GOOGL.US,OrderSide.Buy,22,174.36,OrderStatus.NotReported,2025-07-09T19:40:03.627624,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.11, quantity=22)"
+1127564829446086656,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T19:40:04.507936,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=6)"
+1127564833340616704,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T19:40:05.443302,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,700.HK,OrderSide.Sell,24,497.6,OrderStatus.Rejected,2025-07-09T19:50:06.006139,,,,无持仓可卖出，实际持仓: 0,"Signal(700.HK, SELL, price=497.60, confidence=0.09, quantity=24)"
+,9988.HK,OrderSide.Sell,23,102.9,OrderStatus.Rejected,2025-07-09T19:50:06.478971,,,,无持仓可卖出，实际持仓: 0,"Signal(9988.HK, SELL, price=102.90, confidence=0.09, quantity=23)"
+,1299.HK,OrderSide.Buy,5,68.5,OrderStatus.Rejected,2025-07-09T19:50:06.934890,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=5)"
+1127567359404122112,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T19:50:07.699104,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T19:50:08.241497,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127567365307723776,GOOGL.US,OrderSide.Buy,21,174.36,OrderStatus.NotReported,2025-07-09T19:50:09.105186,,,,,"Signal(GOOGL.US, BUY, price=174.36, confidence=0.09, quantity=21)"
+1127567369598656512,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T19:50:10.136284,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=6)"
+1127567373650354176,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T19:50:11.100307,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T20:00:12.200760,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127569898432458752,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T20:00:13.050862,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T20:00:13.668315,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127569906160345088,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T20:00:14.891847,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=10)"
+1127569910164086784,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T20:00:15.850206,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T20:10:16.624460,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127572433222492160,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T20:10:17.409188,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T20:10:17.960575,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127572439645790208,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T20:10:18.929873,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=10)"
+1127572443498377216,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T20:10:19.843963,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T20:20:20.645328,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127574966716166144,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T20:20:21.494718,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T20:20:22.044336,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127574973517111296,MSFT.US,OrderSide.Buy,11,496.62,OrderStatus.NotReported,2025-07-09T20:20:23.050702,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.04, quantity=11)"
+1127574977329733632,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T20:20:23.953038,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T20:39:33.732316,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127579802767433728,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T20:39:34.453350,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T20:39:34.998802,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127579809455529984,MSFT.US,OrderSide.Buy,11,496.62,OrderStatus.NotReported,2025-07-09T20:39:36.041930,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.04, quantity=11)"
+1127579813018312704,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T20:39:36.883464,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T20:49:37.630439,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127582335820865536,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T20:49:38.370770,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T20:49:38.921319,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127582342233956352,MSFT.US,OrderSide.Buy,11,496.62,OrderStatus.NotReported,2025-07-09T20:49:39.892573,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.04, quantity=11)"
+1127582346120097792,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T20:49:40.868094,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T20:59:42.388912,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127584872401707008,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T20:59:43.136188,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T20:59:43.665259,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127584878686990336,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T20:59:44.632553,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=10)"
+1127584882478641152,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T20:59:45.539626,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T21:09:46.339033,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127587405509664768,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T21:09:47.071834,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T21:09:47.610940,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127587411620765696,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T21:09:48.526027,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=10)"
+1127587415378862080,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T21:09:49.427701,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T21:19:50.238932,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127589938571485184,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T21:19:50.995789,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T21:19:52.342519,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127589948054806528,MSFT.US,OrderSide.Buy,11,496.62,OrderStatus.NotReported,2025-07-09T21:19:53.263135,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.04, quantity=11)"
+1127589951582216192,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T21:19:54.107054,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T21:29:54.832865,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127592474435100672,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T21:29:55.592394,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T21:29:56.134383,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127592480948854784,MSFT.US,OrderSide.Buy,1,496.62,OrderStatus.NotReported,2025-07-09T21:29:57.147491,,,,,"Signal(MSFT.US, BUY, price=496.62, confidence=0.03, quantity=10)"
+1127592484789018624,NVDA.US,OrderSide.Buy,3,160.0,OrderStatus.NotReported,2025-07-09T21:29:58.068599,,,,,"Signal(NVDA.US, BUY, price=160.00, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T21:55:12.119974,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127598838284787712,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T21:55:12.882120,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T21:55:13.402831,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127598843808686080,AAPL.US,OrderSide.Buy,2,210.09,OrderStatus.NotReported,2025-07-09T21:55:14.187931,,,,,"Signal(AAPL.US, BUY, price=210.09, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T22:21:19.615268,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127605412709507072,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T22:21:20.358837,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T22:21:20.906035,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T22:31:21.851295,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127607938576117760,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T22:31:22.546668,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T22:31:23.019432,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T22:41:23.927443,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127610463859482624,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T22:41:24.618053,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T22:41:25.722145,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T22:51:26.818020,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127612992557248512,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T22:51:27.497969,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T22:51:27.970050,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,AAPL.US,OrderSide.Sell,5,208.125,OrderStatus.Rejected,2025-07-09T22:51:28.423771,,,,无持仓可卖出，实际持仓: -148,"Signal(AAPL.US, SELL, price=208.12, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T23:01:29.315472,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127615519782576128,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T23:01:30.050873,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T23:01:30.564450,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,AAPL.US,OrderSide.Sell,5,207.745,OrderStatus.Rejected,2025-07-09T23:01:31.001397,,,,无持仓可卖出，实际持仓: -148,"Signal(AAPL.US, SELL, price=207.75, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T23:11:31.812576,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127618046817181696,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T23:11:32.530458,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T23:11:33.092228,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,AAPL.US,OrderSide.Sell,5,207.575,OrderStatus.Rejected,2025-07-09T23:11:33.509475,,,,无持仓可卖出，实际持仓: -148,"Signal(AAPL.US, SELL, price=207.57, confidence=0.03, quantity=5)"
+1127618054593421312,NVDA.US,OrderSide.Buy,3,163.37,OrderStatus.NotReported,2025-07-09T23:11:34.390862,,,,,"Signal(NVDA.US, BUY, price=163.37, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-09T23:56:11.781235,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127629287572873216,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-09T23:56:12.527787,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-09T23:56:13.042641,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127629293902077952,NVDA.US,OrderSide.Buy,3,163.24,OrderStatus.NotReported,2025-07-09T23:56:14.028914,,,,,"Signal(NVDA.US, BUY, price=163.24, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T00:06:14.672093,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127631816157392896,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T00:06:15.402915,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T00:06:15.888825,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127631822524346368,NVDA.US,OrderSide.Buy,3,163.21,OrderStatus.NotReported,2025-07-10T00:06:16.896088,,,,,"Signal(NVDA.US, BUY, price=163.21, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T00:16:17.615881,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127634345173688320,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T00:16:18.364947,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T00:16:18.857664,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T00:26:19.868033,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127636870996140032,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T00:26:20.570980,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T00:26:21.074713,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T00:36:23.325770,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127639402143379456,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T00:36:24.016958,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T00:36:24.494854,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127639408514527232,NVDA.US,OrderSide.Buy,3,163.2,OrderStatus.NotReported,2025-07-10T00:36:25.533379,,,,,"Signal(NVDA.US, BUY, price=163.20, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T00:46:26.221137,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127641930702495744,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T00:46:26.875660,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T00:46:27.336054,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T00:56:28.383130,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127644456334225408,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T00:56:29.042354,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T00:56:29.490606,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127644461641998336,GOOGL.US,OrderSide.Buy,2,177.59,OrderStatus.NotReported,2025-07-10T00:56:30.303029,,,,,"Signal(GOOGL.US, BUY, price=177.59, confidence=0.03, quantity=10)"
+1127644465029017600,MSFT.US,OrderSide.Buy,1,500.81,OrderStatus.NotReported,2025-07-10T00:56:31.115856,,,,,"Signal(MSFT.US, BUY, price=500.81, confidence=0.02, quantity=8)"
+1127644468617125888,NVDA.US,OrderSide.Buy,3,163.25,OrderStatus.NotReported,2025-07-10T00:56:31.960122,,,,,"Signal(NVDA.US, BUY, price=163.25, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T01:06:32.751031,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127646991344181248,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T01:06:33.438827,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T01:06:33.931853,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T01:16:34.894545,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127649517210951680,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T01:16:35.660857,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T01:16:36.150082,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T01:26:37.114248,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127652042672693248,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T01:26:37.768168,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T01:26:38.263104,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127652048527941632,MSFT.US,OrderSide.Buy,1,501.56,OrderStatus.NotReported,2025-07-10T01:26:39.159616,,,,,"Signal(MSFT.US, BUY, price=501.56, confidence=0.02, quantity=8)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T01:36:40.679917,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127654574306074624,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T01:36:41.356738,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T01:36:41.829732,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127654580255973376,MSFT.US,OrderSide.Buy,1,501.75,OrderStatus.NotReported,2025-07-10T01:36:42.770595,,,,,"Signal(MSFT.US, BUY, price=501.75, confidence=0.03, quantity=9)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T01:46:43.489998,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127657102762549248,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T01:46:44.191414,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T01:46:44.715504,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127657108806541312,MSFT.US,OrderSide.Buy,1,501.42,OrderStatus.NotReported,2025-07-10T01:46:45.622905,,,,,"Signal(MSFT.US, BUY, price=501.42, confidence=0.02, quantity=8)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T01:59:37.061749,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127660347101011968,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T01:59:37.692080,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T01:59:38.199685,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T02:09:39.158465,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127662872610709504,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T02:09:39.822149,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T02:09:40.279682,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127662878126219264,AAPL.US,OrderSide.Buy,2,209.58,OrderStatus.NotReported,2025-07-10T02:09:41.137668,,,,,"Signal(AAPL.US, BUY, price=209.58, confidence=0.03, quantity=5)"
+1127662881848782848,MSFT.US,OrderSide.Buy,1,502.09,OrderStatus.NotReported,2025-07-10T02:09:42.025997,,,,,"Signal(MSFT.US, BUY, price=502.09, confidence=0.02, quantity=8)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T02:19:42.697442,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127665404078694400,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T02:19:43.379755,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T02:19:43.862100,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127665409223127040,AAPL.US,OrderSide.Buy,2,209.71,OrderStatus.NotReported,2025-07-10T02:19:44.597438,,,,,"Signal(AAPL.US, BUY, price=209.71, confidence=0.02, quantity=4)"
+1127665413098663936,MSFT.US,OrderSide.Buy,1,502.38,OrderStatus.NotReported,2025-07-10T02:19:45.522483,,,,,"Signal(MSFT.US, BUY, price=502.38, confidence=0.02, quantity=8)"
+1127665416814977024,NVDA.US,OrderSide.Buy,3,162.93,OrderStatus.NotReported,2025-07-10T02:19:46.405457,,,,,"Signal(NVDA.US, BUY, price=162.93, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T02:29:47.068900,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127667938918899712,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T02:29:47.732226,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T02:29:48.209018,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127667943937503232,AAPL.US,OrderSide.Buy,2,209.72,OrderStatus.NotReported,2025-07-10T02:29:48.932633,,,,,"Signal(AAPL.US, BUY, price=209.72, confidence=0.02, quantity=4)"
+1127667947563360256,MSFT.US,OrderSide.Buy,1,502.81,OrderStatus.NotReported,2025-07-10T02:29:49.786201,,,,,"Signal(MSFT.US, BUY, price=502.81, confidence=0.03, quantity=9)"
+1127667951332061184,NVDA.US,OrderSide.Buy,3,162.82,OrderStatus.NotReported,2025-07-10T02:29:50.677881,,,,,"Signal(NVDA.US, BUY, price=162.82, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T02:39:51.269887,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127670473216061440,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T02:39:51.950040,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T02:39:52.430999,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127670478368645120,AAPL.US,OrderSide.Buy,2,209.82,OrderStatus.NotReported,2025-07-10T02:39:53.195427,,,,,"Signal(AAPL.US, BUY, price=209.82, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T02:49:54.075298,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127673001561268224,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T02:49:54.759290,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T02:49:55.250336,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T03:15:18.278683,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127679394500669440,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T03:15:18.960476,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T03:15:19.416033,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T03:25:20.355801,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127681919765278720,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T03:25:21.030031,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T03:25:21.510953,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127681924850753536,AAPL.US,OrderSide.Buy,2,209.85,OrderStatus.NotReported,2025-07-10T03:25:22.243364,,,,,"Signal(AAPL.US, BUY, price=209.85, confidence=0.02, quantity=4)"
+1127681928768233472,NVDA.US,OrderSide.Buy,3,163.13,OrderStatus.NotReported,2025-07-10T03:25:23.161067,,,,,"Signal(NVDA.US, BUY, price=163.13, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T03:35:24.815045,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127684455112994816,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T03:35:25.509826,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T03:35:25.979951,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127684460127166464,AAPL.US,OrderSide.Buy,2,210.04,OrderStatus.NotReported,2025-07-10T03:35:26.710105,,,,,"Signal(AAPL.US, BUY, price=210.04, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T03:45:27.510208,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127686982959079424,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T03:45:28.203746,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T03:45:28.679323,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127686988061569024,AAPL.US,OrderSide.Buy,2,210.33,OrderStatus.NotReported,2025-07-10T03:45:29.406773,,,,,"Signal(AAPL.US, BUY, price=210.33, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T03:55:30.332920,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127689511415554048,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T03:55:31.028242,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T03:55:31.509819,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127689516633268224,AAPL.US,OrderSide.Buy,2,211.16,OrderStatus.NotReported,2025-07-10T03:55:32.257199,,,,,"Signal(AAPL.US, BUY, price=211.16, confidence=0.03, quantity=6)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T04:05:34.254451,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127692044513144832,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T04:05:34.967768,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T04:05:35.428185,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T04:31:17.818063,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127698518547197952,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T04:31:18.525783,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T04:31:19.029605,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T04:41:19.854561,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127701043660812288,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T04:41:20.541957,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T04:41:21.024569,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T04:51:21.938927,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127703569093193728,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T04:51:22.637758,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T04:51:23.095180,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T05:01:24.806826,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127706097757167616,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T05:01:25.528411,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T05:01:25.996590,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127706103551877120,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T05:01:26.891682,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T05:11:27.470319,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127708625322471424,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T05:11:28.142511,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T05:11:28.612400,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T05:21:29.598504,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127711150796795904,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T05:21:30.262337,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T05:21:30.753968,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T05:47:42.435872,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127717747828813824,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T05:47:43.116967,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T05:47:43.597421,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127717753841229824,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T05:47:44.533830,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T05:57:45.188012,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127720275966521344,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T05:57:45.881089,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T05:57:46.433372,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127720282373201920,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T05:57:47.389531,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T06:07:48.071987,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127722804693409792,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T06:07:48.802685,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T06:07:50.019885,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127722815315603456,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T06:07:51.286553,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T06:17:51.882340,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127725337188999168,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T06:17:52.561733,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T06:17:53.040949,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127725343375597568,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T06:17:54.022516,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.03, quantity=5)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T06:27:54.732479,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127727865790455808,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T06:27:55.432719,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T06:27:55.901650,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127727872087924736,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T06:27:56.917567,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T06:37:57.646425,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127730394760454144,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T06:37:58.389873,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T06:37:58.963043,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127730401754734592,MSFT.US,OrderSide.Buy,1,503.51,OrderStatus.NotReported,2025-07-10T06:38:00.046076,,,,,"Signal(MSFT.US, BUY, price=503.51, confidence=0.02, quantity=8)"
+1127730405789655040,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T06:38:00.994339,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T06:51:23.646842,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127733775132618752,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T06:51:24.315378,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T06:51:24.769081,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127733781214359552,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T06:51:25.747713,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Buy,7,68.5,OrderStatus.Rejected,2025-07-10T07:01:26.388252,,,,成本效益不佳: 预期收益不足: 2.63% < 需求3.21% (成本0.71% + 利润2.5%),"Signal(1299.HK, BUY, price=68.50, confidence=0.03, quantity=7)"
+1127736303266131968,388.HK,OrderSide.Buy,100,411.6,OrderStatus.NotReported,2025-07-10T07:01:27.063488,,,,,"Signal(388.HK, BUY, price=411.60, confidence=0.03, quantity=6)"
+,941.HK,OrderSide.Sell,21,86.05,OrderStatus.Rejected,2025-07-10T07:01:27.541717,,,,无持仓可卖出，实际持仓: 0,"Signal(941.HK, SELL, price=86.05, confidence=0.09, quantity=21)"
+1127736309289152512,NVDA.US,OrderSide.Buy,3,162.88,OrderStatus.NotReported,2025-07-10T07:01:28.493894,,,,,"Signal(NVDA.US, BUY, price=162.88, confidence=0.02, quantity=4)"
+,1299.HK,OrderSide.Sell,4,82.45,OrderStatus.Rejected,2026-01-23T10:37:08.205069,,,,无持仓可卖出，实际持仓: 0,ensemble|1299.HK_SELL_20260123103707888201
+,941.HK,OrderSide.Sell,6,78.6,OrderStatus.Rejected,2026-01-23T10:37:08.673277,,,,无持仓可卖出，实际持仓: 0,ensemble|941.HK_SELL_20260123103708358528
+1199180997350920192,GOOGL.US,OrderSide.Buy,5,330.54,OrderStatus.NotReported,2026-01-23T10:37:09.513326,,,,,ensemble|GOOGL.US_BUY_20260123103708829467
+,1299.HK,OrderSide.Buy,4,82.65,OrderStatus.Rejected,2026-01-23T10:47:13.555679,,,,成本效益不佳: 预期收益不足: 2.31% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123104712694052
+1199183544262356992,GOOGL.US,OrderSide.Buy,5,330.54,OrderStatus.NotReported,2026-01-23T10:47:16.744615,,,,,ensemble|GOOGL.US_BUY_20260123104714707240
+,700.HK,OrderSide.Sell,8,598.0,OrderStatus.Rejected,2026-01-23T10:51:10.164168,,,,无持仓可卖出，实际持仓: 0,ensemble|700.HK_SELL_20260123105109823900
+,1299.HK,OrderSide.Sell,4,82.5,OrderStatus.Rejected,2026-01-23T10:51:10.692022,,,,无持仓可卖出，实际持仓: 0,ensemble|1299.HK_SELL_20260123105110317784
+1199184527818256384,388.HK,OrderSide.Sell,100,430.8,OrderStatus.NotReported,2026-01-23T10:51:11.250321,,,,,ensemble|388.HK_SELL_20260123105110772888
+,941.HK,OrderSide.Sell,6,78.7,OrderStatus.Rejected,2026-01-23T10:51:11.749081,,,,无持仓可卖出，实际持仓: 0,ensemble|941.HK_SELL_20260123105111332723
+1199184533820305408,GOOGL.US,OrderSide.Buy,7,330.54,OrderStatus.NotReported,2026-01-23T10:51:12.703060,,,,,ensemble|GOOGL.US_BUY_20260123105111911673
+1199186068851683328,388.HK,OrderSide.Buy,100,430.2,OrderStatus.NotReported,2026-01-23T10:57:18.653066,,,,,ensemble|388.HK_BUY_20260123105717882820
+1199186072945311744,GOOGL.US,OrderSide.Buy,5,330.54,OrderStatus.NotReported,2026-01-23T10:57:19.639275,,,,,ensemble|GOOGL.US_BUY_20260123105718848324
+,1299.HK,OrderSide.Buy,4,82.45,OrderStatus.Rejected,2026-01-23T11:01:13.606258,,,,成本效益不佳: 预期收益不足: 2.32% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123110113184901
+1199187058791301120,GOOGL.US,OrderSide.Buy,5,330.54,OrderStatus.NotReported,2026-01-23T11:01:14.690817,,,,,ensemble|GOOGL.US_BUY_20260123110113933097
+1199188594833506304,388.HK,OrderSide.Buy,100,429.6,OrderStatus.NotReported,2026-01-23T11:07:20.889181,,,,,ensemble|388.HK_BUY_20260123110720127472
+1199188599145250816,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:07:21.959288,,,,,ensemble|GOOGL.US_BUY_20260123110721110194
+,388.HK,OrderSide.Buy,1,429.8,OrderStatus.Rejected,2026-01-23T11:11:15.813047,,,,可用资金不足，需要43409.80，实际41312.42,ensemble|388.HK_BUY_20260123111115238340
+1199189584211087360,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:11:16.795973,,,,,ensemble|GOOGL.US_BUY_20260123111116063511
+,388.HK,OrderSide.Buy,1,429.6,OrderStatus.Rejected,2026-01-23T11:17:23.099147,,,,可用资金不足，需要43389.60，实际41312.42,ensemble|388.HK_BUY_20260123111722547272
+1199191124820914176,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:17:24.107433,,,,,ensemble|GOOGL.US_BUY_20260123111723316665
+,388.HK,OrderSide.Buy,1,429.8,OrderStatus.Rejected,2026-01-23T11:21:18.647560,,,,可用资金不足，需要43409.80，实际41312.42,ensemble|388.HK_BUY_20260123112118090320
+1199192112516579328,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:21:19.573390,,,,,ensemble|GOOGL.US_BUY_20260123112118882929
+,1299.HK,OrderSide.Buy,6,82.6,OrderStatus.Rejected,2026-01-23T11:27:25.146724,,,,可用资金不足，需要41713.00，实际41312.42,ensemble|1299.HK_BUY_20260123112724573602
+1199193650068738048,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:27:26.173719,,,,,ensemble|GOOGL.US_BUY_20260123112725470369
+,388.HK,OrderSide.Buy,1,429.2,OrderStatus.Rejected,2026-01-23T11:31:23.538835,,,,可用资金不足，需要43349.20，实际41312.42,ensemble|388.HK_BUY_20260123113122994237
+1199194649877561344,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:31:24.552028,,,,,ensemble|GOOGL.US_BUY_20260123113123835159
+,1299.HK,OrderSide.Buy,5,82.55,OrderStatus.Rejected,2026-01-23T11:37:27.090328,,,,成本效益不佳: 预期收益不足: 2.60% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123113726660540
+,388.HK,OrderSide.Buy,1,429.0,OrderStatus.Rejected,2026-01-23T11:37:27.651822,,,,可用资金不足，需要43329.00，实际41312.42,ensemble|388.HK_BUY_20260123113727168661
+1199196176109277184,941.HK,OrderSide.Buy,500,78.95,OrderStatus.NotReported,2026-01-23T11:37:28.409692,,,,,ensemble|941.HK_BUY_20260123113727739726
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T11:37:29.146202,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123113728567833
+,700.HK,OrderSide.Buy,6,596.0,OrderStatus.Rejected,2026-01-23T11:41:25.341390,,,,成本效益不佳: 预期收益不足: 2.37% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123114124911320
+1199197175490310144,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T11:41:26.681353,,,,,ensemble|GOOGL.US_BUY_20260123114125984309
+,700.HK,OrderSide.Buy,7,596.5,OrderStatus.Rejected,2026-01-23T11:47:29.750499,,,,成本效益不佳: 预期收益不足: 2.78% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123114729427673
+,1299.HK,OrderSide.Buy,7,82.55,OrderStatus.Rejected,2026-01-23T11:47:30.347964,,,,可用资金不足，需要41687.75，实际41143.70,ensemble|1299.HK_BUY_20260123114729917119
+1199198703936622592,941.HK,OrderSide.Buy,500,78.95,OrderStatus.NotReported,2026-01-23T11:47:31.094048,,,,,ensemble|941.HK_BUY_20260123114730480715
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T11:47:31.797468,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123114731266108
+,700.HK,OrderSide.Buy,8,596.5,OrderStatus.Rejected,2026-01-23T11:51:28.399136,,,,成本效益不佳: 预期收益不足: 3.12% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123115127942192
+,1299.HK,OrderSide.Buy,6,82.55,OrderStatus.Rejected,2026-01-23T11:51:29.050606,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123115128555262
+,941.HK,OrderSide.Buy,8,78.95,OrderStatus.Rejected,2026-01-23T11:51:29.697291,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123115129207667
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T11:51:30.358187,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123115129858155
+,700.HK,OrderSide.Buy,9,597.0,OrderStatus.Rejected,2026-01-23T11:57:32.513255,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123115732095604
+,1299.HK,OrderSide.Buy,7,82.65,OrderStatus.Rejected,2026-01-23T11:57:33.083816,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123115732653473
+,941.HK,OrderSide.Buy,8,79.0,OrderStatus.Rejected,2026-01-23T11:57:33.655545,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123115733229729
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T11:57:34.223823,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123115733803212
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:01:31.443600,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123120131015160
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:01:32.032671,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123120131597506
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:01:32.660575,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123120132185183
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:01:33.292173,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123120132821281
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:07:34.949350,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123120734513615
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:07:35.527862,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123120735109250
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:07:36.120538,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123120735683201
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:07:36.714751,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123120736278936
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:11:34.038955,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123121133599126
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:11:34.638083,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123121134200768
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:11:35.235123,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123121134802966
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:11:35.877414,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123121135373484
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:17:37.474481,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123121737037757
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:17:38.122208,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123121737633396
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:17:38.695762,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123121738277014
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:17:39.284514,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123121738852682
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:21:37.667247,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123122137239567
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:21:38.268928,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123122137837553
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:21:38.863185,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123122138435124
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:21:39.466761,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123122139033619
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:27:40.085604,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123122739656991
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:27:40.658672,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123122740242459
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:27:41.234129,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123122740808325
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:27:41.793956,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123122741366553
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:31:40.242687,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123123139812113
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:31:40.832446,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123123140407727
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:31:41.444292,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123123140999643
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:31:42.027946,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123123141611890
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:37:42.521597,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123123742087737
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:37:43.118030,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123123742680411
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:37:43.713792,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123123743270649
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:37:44.308906,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123123743871560
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:41:42.786082,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123124142340567
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:41:43.391691,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123124142958097
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:41:43.986941,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123124143555036
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:41:44.606928,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123124144152738
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:47:45.060184,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123124744627475
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:47:45.624052,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123124745200923
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:47:46.177413,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123124745753492
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:47:46.838216,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123124746333173
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:51:45.386371,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123125144961065
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:51:45.992239,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123125145550544
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:51:46.602132,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123125146157835
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:51:47.205061,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123125146769186
+,700.HK,OrderSide.Buy,8,597.0,OrderStatus.Rejected,2026-01-23T12:57:47.599992,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123125747150576
+,1299.HK,OrderSide.Buy,7,82.6,OrderStatus.Rejected,2026-01-23T12:57:48.209846,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123125747754549
+,941.HK,OrderSide.Buy,8,79.05,OrderStatus.Rejected,2026-01-23T12:57:48.792477,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123125748364629
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T12:57:49.378721,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123125748948873
+,700.HK,OrderSide.Buy,1,598.0,OrderStatus.Rejected,2026-01-23T13:18:19.872125,,,,可用资金不足，需要60398.00，实际40990.66,ensemble|700.HK_BUY_20260123131819406010
+,1299.HK,OrderSide.Buy,6,82.85,OrderStatus.Rejected,2026-01-23T13:18:20.501218,,,,可用资金不足，需要41839.25，实际40990.66,ensemble|1299.HK_BUY_20260123131820046894
+1199221563853926400,941.HK,OrderSide.Buy,500,79.05,OrderStatus.NotReported,2026-01-23T13:18:21.338097,,,,,ensemble|941.HK_BUY_20260123131820672841
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:18:22.076135,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123131821511414
+,700.HK,OrderSide.Buy,9,597.0,OrderStatus.Rejected,2026-01-23T13:24:22.953721,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123132422517657
+,1299.HK,OrderSide.Buy,7,82.8,OrderStatus.Rejected,2026-01-23T13:24:23.549100,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123132423130515
+,941.HK,OrderSide.Buy,7,79.0,OrderStatus.Rejected,2026-01-23T13:24:24.129283,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123132423705477
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:24:24.712509,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123132424288571
+,700.HK,OrderSide.Buy,1,597.5,OrderStatus.Rejected,2026-01-23T13:28:25.107716,,,,可用资金不足，需要60347.50，实际40771.92,ensemble|700.HK_BUY_20260123132824584213
+,1299.HK,OrderSide.Buy,6,82.75,OrderStatus.Rejected,2026-01-23T13:28:25.775546,,,,可用资金不足，需要41788.75，实际40771.92,ensemble|1299.HK_BUY_20260123132825273495
+1199224102741622784,941.HK,OrderSide.Buy,500,78.9,OrderStatus.NotReported,2026-01-23T13:28:26.648219,,,,,ensemble|941.HK_BUY_20260123132825949743
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:28:27.418432,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123132826826848
+,700.HK,OrderSide.Buy,1,598.0,OrderStatus.Rejected,2026-01-23T13:34:25.471522,,,,可用资金不足，需要60398.00，实际40628.20,ensemble|700.HK_BUY_20260123133425018302
+,1299.HK,OrderSide.Buy,6,82.75,OrderStatus.Rejected,2026-01-23T13:34:26.079428,,,,可用资金不足，需要41788.75，实际40628.20,ensemble|1299.HK_BUY_20260123133425638799
+1199225614070976512,941.HK,OrderSide.Buy,500,79.05,OrderStatus.NotReported,2026-01-23T13:34:26.985133,,,,,ensemble|941.HK_BUY_20260123133426236254
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:34:27.643081,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123133427144169
+,700.HK,OrderSide.Buy,9,597.5,OrderStatus.Rejected,2026-01-23T13:38:28.199187,,,,单笔交易限制2.0%：无可用资金,ensemble|700.HK_BUY_20260123133827779879
+,1299.HK,OrderSide.Buy,6,82.7,OrderStatus.Rejected,2026-01-23T13:38:28.819567,,,,单笔交易限制2.0%：无可用资金,ensemble|1299.HK_BUY_20260123133828373910
+,941.HK,OrderSide.Buy,7,79.15,OrderStatus.Rejected,2026-01-23T13:38:29.426905,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123133829000672
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:38:30.043199,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123133829599604
+,700.HK,OrderSide.Buy,7,597.0,OrderStatus.Rejected,2026-01-23T13:44:28.292456,,,,成本效益不佳: 预期收益不足: 2.77% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123134427963134
+,1299.HK,OrderSide.Buy,5,82.55,OrderStatus.Rejected,2026-01-23T13:44:28.786130,,,,成本效益不佳: 预期收益不足: 2.53% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123134428455299
+1199228141881552896,941.HK,OrderSide.Buy,500,79.15,OrderStatus.NotReported,2026-01-23T13:44:29.662577,,,,,ensemble|941.HK_BUY_20260123134428969054
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:44:30.320793,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123134429826598
+,700.HK,OrderSide.Buy,6,597.0,OrderStatus.Rejected,2026-01-23T13:48:30.723655,,,,成本效益不佳: 预期收益不足: 2.38% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123134830393990
+,1299.HK,OrderSide.Buy,4,82.5,OrderStatus.Rejected,2026-01-23T13:48:31.216537,,,,成本效益不佳: 预期收益不足: 2.09% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123134830900926
+1199229158509527040,941.HK,OrderSide.Buy,500,79.25,OrderStatus.NotReported,2026-01-23T13:48:32.041569,,,,,ensemble|941.HK_BUY_20260123134831394271
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:48:32.744102,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123134832215725
+,1299.HK,OrderSide.Buy,4,82.55,OrderStatus.Rejected,2026-01-23T13:54:31.185151,,,,成本效益不佳: 预期收益不足: 2.15% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123135430867011
+,941.HK,OrderSide.Buy,8,79.3,OrderStatus.Rejected,2026-01-23T13:54:31.812188,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123135431366032
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:54:32.403555,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123135431972812
+,388.HK,OrderSide.Buy,100,422.6,OrderStatus.Rejected,2026-01-23T13:58:34.555642,,,,单笔交易限制2.0%：无可用资金,ensemble|388.HK_BUY_20260123135834123969
+,941.HK,OrderSide.Buy,8,79.25,OrderStatus.Rejected,2026-01-23T13:58:35.131346,,,,单笔交易限制2.0%：无可用资金,ensemble|941.HK_BUY_20260123135834649303
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T13:58:35.735979,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123135835306719
+,700.HK,OrderSide.Buy,6,596.5,OrderStatus.Rejected,2026-01-23T14:04:34.167221,,,,成本效益不佳: 预期收益不足: 2.17% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123140433858629
+,388.HK,OrderSide.Buy,1,423.0,OrderStatus.Rejected,2026-01-23T14:04:34.847839,,,,可用资金不足，需要42723.00，实际40196.80,ensemble|388.HK_BUY_20260123140434392233
+1199233199880826880,941.HK,OrderSide.Buy,500,79.4,OrderStatus.NotReported,2026-01-23T14:04:35.584962,,,,,ensemble|941.HK_BUY_20260123140434937942
+,GOOGL.US,OrderSide.Buy,22,330.54,OrderStatus.Rejected,2026-01-23T14:04:36.288713,,,,单笔交易限制2.0%：无可用资金,ensemble|GOOGL.US_BUY_20260123140435744241
+,388.HK,OrderSide.Buy,1,423.0,OrderStatus.Rejected,2026-01-23T14:08:36.920058,,,,可用资金不足，需要42723.00，实际40052.90,ensemble|388.HK_BUY_20260123140836310352
+,941.HK,OrderSide.Buy,8,79.4,OrderStatus.Rejected,2026-01-23T14:08:37.424742,,,,可用资金不足，需要40097.00，实际40052.90,ensemble|941.HK_BUY_20260123140836998191
+1199234217540587520,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:08:38.215927,,,,,ensemble|GOOGL.US_BUY_20260123140837596884
+,700.HK,OrderSide.Buy,6,596.0,OrderStatus.Rejected,2026-01-23T14:14:36.969191,,,,成本效益不佳: 预期收益不足: 2.12% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123141436642015
+,388.HK,OrderSide.Buy,1,422.6,OrderStatus.Rejected,2026-01-23T14:14:37.646706,,,,可用资金不足，需要42682.60，实际40037.22,ensemble|388.HK_BUY_20260123141437199608
+,941.HK,OrderSide.Buy,7,79.3,OrderStatus.Rejected,2026-01-23T14:14:38.156120,,,,可用资金不足，需要40046.50，实际40037.22,ensemble|941.HK_BUY_20260123141437735305
+1199235730694488064,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:14:38.976489,,,,,ensemble|GOOGL.US_BUY_20260123141438319030
+,700.HK,OrderSide.Buy,6,596.0,OrderStatus.Rejected,2026-01-23T14:18:38.983336,,,,成本效益不佳: 预期收益不足: 2.17% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123141838552461
+,388.HK,OrderSide.Buy,1,423.0,OrderStatus.Rejected,2026-01-23T14:18:39.761636,,,,可用资金不足，需要42723.00，实际40037.22,ensemble|388.HK_BUY_20260123141839221811
+,941.HK,OrderSide.Buy,7,79.4,OrderStatus.Rejected,2026-01-23T14:18:40.372680,,,,可用资金不足，需要40097.00，实际40037.22,ensemble|941.HK_BUY_20260123141839855638
+1199236746898849792,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:18:41.255362,,,,,ensemble|GOOGL.US_BUY_20260123141840562281
+,700.HK,OrderSide.Buy,7,596.5,OrderStatus.Rejected,2026-01-23T14:24:39.711058,,,,成本效益不佳: 预期收益不足: 2.85% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123142439286527
+,388.HK,OrderSide.Buy,1,423.4,OrderStatus.Rejected,2026-01-23T14:24:40.471441,,,,可用资金不足，需要42763.40，实际40037.22,ensemble|388.HK_BUY_20260123142439960745
+,941.HK,OrderSide.Buy,7,79.5,OrderStatus.Rejected,2026-01-23T14:24:41.046392,,,,可用资金不足，需要40147.50，实际40037.22,ensemble|941.HK_BUY_20260123142440552372
+1199238259469717504,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:24:41.883172,,,,,ensemble|GOOGL.US_BUY_20260123142441206521
+,700.HK,OrderSide.Buy,1,596.0,OrderStatus.Rejected,2026-01-23T14:28:42.159194,,,,可用资金不足，需要60196.00，实际40037.22,ensemble|700.HK_BUY_20260123142841600017
+,388.HK,OrderSide.Buy,1,423.8,OrderStatus.Rejected,2026-01-23T14:28:42.915010,,,,可用资金不足，需要42803.80，实际40037.22,ensemble|388.HK_BUY_20260123142842389579
+,941.HK,OrderSide.Buy,8,79.5,OrderStatus.Rejected,2026-01-23T14:28:43.505079,,,,可用资金不足，需要40147.50，实际40037.22,ensemble|941.HK_BUY_20260123142843002537
+1199239276454219776,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:28:44.370921,,,,,ensemble|GOOGL.US_BUY_20260123142843663903
+,700.HK,OrderSide.Buy,7,596.0,OrderStatus.Rejected,2026-01-23T14:34:43.821340,,,,成本效益不佳: 预期收益不足: 2.85% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123143443400266
+,388.HK,OrderSide.Buy,1,424.6,OrderStatus.Rejected,2026-01-23T14:34:44.601558,,,,可用资金不足，需要42884.60，实际40037.22,ensemble|388.HK_BUY_20260123143444069287
+,941.HK,OrderSide.Buy,7,79.45,OrderStatus.Rejected,2026-01-23T14:34:45.232851,,,,可用资金不足，需要40122.25，实际40037.22,ensemble|941.HK_BUY_20260123143444721505
+1199240793664016384,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:34:46.088976,,,,,ensemble|GOOGL.US_BUY_20260123143445394117
+,700.HK,OrderSide.Buy,7,596.5,OrderStatus.Rejected,2026-01-23T14:38:46.113883,,,,成本效益不佳: 预期收益不足: 2.85% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123143845678595
+,388.HK,OrderSide.Buy,1,424.0,OrderStatus.Rejected,2026-01-23T14:38:47.037833,,,,可用资金不足，需要42824.00，实际40037.22,ensemble|388.HK_BUY_20260123143846486805
+,941.HK,OrderSide.Buy,7,79.4,OrderStatus.Rejected,2026-01-23T14:38:47.589838,,,,可用资金不足，需要40097.00，实际40037.22,ensemble|941.HK_BUY_20260123143847159161
+1199241810136809472,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:38:48.429843,,,,,ensemble|GOOGL.US_BUY_20260123143847760744
+,700.HK,OrderSide.Buy,8,596.5,OrderStatus.Rejected,2026-01-23T14:44:46.833395,,,,成本效益不佳: 预期收益不足: 3.19% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123144446399471
+,1299.HK,OrderSide.Buy,4,82.6,OrderStatus.Rejected,2026-01-23T14:44:47.407386,,,,成本效益不佳: 预期收益不足: 2.38% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123144447005266
+,388.HK,OrderSide.Buy,1,423.4,OrderStatus.Rejected,2026-01-23T14:44:48.009194,,,,可用资金不足，需要42763.40，实际40037.22,ensemble|388.HK_BUY_20260123144447498934
+,941.HK,OrderSide.Buy,8,79.5,OrderStatus.Rejected,2026-01-23T14:44:48.612631,,,,可用资金不足，需要40147.50，实际40037.22,ensemble|941.HK_BUY_20260123144448100796
+1199243325337518080,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:44:49.680546,,,,,ensemble|GOOGL.US_BUY_20260123144448940712
+,700.HK,OrderSide.Buy,7,596.0,OrderStatus.Rejected,2026-01-23T14:48:49.178718,,,,成本效益不佳: 预期收益不足: 2.88% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123144848748855
+,1299.HK,OrderSide.Buy,4,82.5,OrderStatus.Rejected,2026-01-23T14:48:49.735498,,,,成本效益不佳: 预期收益不足: 2.04% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123144849352759
+,388.HK,OrderSide.Buy,1,423.4,OrderStatus.Rejected,2026-01-23T14:48:50.328752,,,,可用资金不足，需要42763.40，实际40037.22,ensemble|388.HK_BUY_20260123144849823852
+,941.HK,OrderSide.Buy,8,79.5,OrderStatus.Rejected,2026-01-23T14:48:50.952479,,,,可用资金不足，需要40147.50，实际40037.22,ensemble|941.HK_BUY_20260123144850422715
+1199244340971442176,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:48:51.824482,,,,,ensemble|GOOGL.US_BUY_20260123144851125590
+,700.HK,OrderSide.Buy,7,596.0,OrderStatus.Rejected,2026-01-23T14:54:50.423272,,,,成本效益不佳: 预期收益不足: 2.72% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123145449989413
+,1299.HK,OrderSide.Buy,4,82.55,OrderStatus.Rejected,2026-01-23T14:54:51.006112,,,,成本效益不佳: 预期收益不足: 2.16% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123145450584525
+,388.HK,OrderSide.Buy,1,422.6,OrderStatus.Rejected,2026-01-23T14:54:51.599491,,,,可用资金不足，需要42682.60，实际40037.22,ensemble|388.HK_BUY_20260123145451094196
+,941.HK,OrderSide.Buy,7,79.55,OrderStatus.Rejected,2026-01-23T14:54:52.192795,,,,可用资金不足，需要40172.75，实际40037.22,ensemble|941.HK_BUY_20260123145451684521
+1199245856105054208,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:54:53.067448,,,,,ensemble|GOOGL.US_BUY_20260123145452332916
+,700.HK,OrderSide.Buy,7,596.0,OrderStatus.Rejected,2026-01-23T14:58:52.635580,,,,成本效益不佳: 预期收益不足: 2.77% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|700.HK_BUY_20260123145852212451
+,1299.HK,OrderSide.Buy,4,82.55,OrderStatus.Rejected,2026-01-23T14:58:53.196150,,,,成本效益不佳: 预期收益不足: 2.18% < 需求3.21% (成本0.71% + 利润2.5%),ensemble|1299.HK_BUY_20260123145852813948
+,941.HK,OrderSide.Buy,7,79.55,OrderStatus.Rejected,2026-01-23T14:58:53.887718,,,,可用资金不足，需要40172.75，实际40037.22,ensemble|941.HK_BUY_20260123145853381267
+1199246869843165184,GOOGL.US,OrderSide.Buy,2,330.54,OrderStatus.NotReported,2026-01-23T14:58:54.757223,,,,,ensemble|GOOGL.US_BUY_20260123145854062129

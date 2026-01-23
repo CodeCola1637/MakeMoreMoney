@@ -17,6 +17,8 @@ alembic>=1.10.0
 pymongo>=4.3.0
 redis>=4.5.0
 ta-lib>=0.4.0
+# 系统监控
+psutil>=5.9.0
 # web 接口 (可选)
 fastapi>=0.95.0
-uvicorn>=0.21.0 
+uvicorn>=0.21.0

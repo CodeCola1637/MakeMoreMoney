@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from strategy.signals import Signal, SignalType
+from strategy.signal_filter import SignalFilter
 from utils import setup_logger
 
 
@@ -79,6 +80,9 @@ class StrategyEnsemble:
         self.reweight_frequency = config.get("ensemble.reweight_frequency", 100)  # 每100个信号重新计算权重
         self.signal_count = 0
         
+        # 🔧 新增：信号过滤器 - 防止重复信号和过度交易
+        self.signal_filter = SignalFilter(config, self.logger)
+        
         self.logger.info(f"策略组合器初始化完成 - 方法: {ensemble_method.value}, 策略数: {len(strategies)}")
         
     def initialize_weights(self):
@@ -133,6 +137,18 @@ class StrategyEnsemble:
             # 生成组合信号
             ensemble_signal = self._combine_signals(valid_signals, symbol, data)
             
+            if ensemble_signal is None:
+                return None
+            
+            # 🔧 新增：信号过滤检查 - 防止重复信号和过度交易
+            should_emit, filter_reason = self.signal_filter.should_emit_signal(ensemble_signal)
+            if not should_emit:
+                self.logger.info(f"信号被过滤: {symbol} - {filter_reason}")
+                return None
+            
+            # 记录信号到过滤器（用于冷却期和统计）
+            self.signal_filter.record_signal(ensemble_signal)
+            
             # 记录信号历史
             self._record_signal_history(strategy_signals, ensemble_signal)
             
@@ -142,6 +158,8 @@ class StrategyEnsemble:
             # 定期重新计算权重
             if self.signal_count % self.reweight_frequency == 0:
                 await self._reweight_strategies()
+            
+            self.logger.info(f"✅ 信号通过过滤: {symbol} {ensemble_signal.signal_type.value} (今日第{self.signal_filter.get_signal_count_today(symbol)}次)")
                 
             return ensemble_signal
             
@@ -244,11 +262,12 @@ class StrategyEnsemble:
         valid_signals = {}
         
         for strategy_name, signal in strategy_signals.items():
-            # 检查信号有效性
-            if (signal.confidence >= self.confidence_threshold and 
-                signal.signal_type != SignalType.HOLD and
-                signal.price > 0):
+            # 检查信号有效性 - 修改逻辑：允许所有置信度达标的信号（包括HOLD）
+            if (signal.confidence >= self.confidence_threshold and signal.price > 0):
                 valid_signals[strategy_name] = signal
+                self.logger.debug(f"策略 {strategy_name} 有效信号: {signal.signal_type.value}, 置信度: {signal.confidence:.3f}")
+            else:
+                self.logger.debug(f"策略 {strategy_name} 信号被过滤: 置信度 {signal.confidence:.3f} < {self.confidence_threshold}")
                 
         return valid_signals
         
@@ -258,6 +277,7 @@ class StrategyEnsemble:
             # 收集信号信息
             buy_signals = []
             sell_signals = []
+            hold_signals = []
             confidences = []
             prices = []
             
@@ -269,6 +289,8 @@ class StrategyEnsemble:
                     buy_signals.append(weighted_confidence)
                 elif signal.signal_type == SignalType.SELL:
                     sell_signals.append(weighted_confidence)
+                elif signal.signal_type == SignalType.HOLD:
+                    hold_signals.append(weighted_confidence)
                     
                 confidences.append(weighted_confidence)
                 prices.append(signal.price)
@@ -276,18 +298,19 @@ class StrategyEnsemble:
             # 计算组合信号
             buy_strength = sum(buy_signals)
             sell_strength = sum(sell_signals)
+            hold_strength = sum(hold_signals)
             total_confidence = sum(confidences)
             
-            # 确定最终信号类型
-            if buy_strength > sell_strength and buy_strength > 0:
+            # 确定最终信号类型 - 考虑HOLD信号
+            if buy_strength > sell_strength and buy_strength > hold_strength and buy_strength > 0:
                 signal_type = SignalType.BUY
                 final_confidence = buy_strength
-            elif sell_strength > buy_strength and sell_strength > 0:
+            elif sell_strength > buy_strength and sell_strength > hold_strength and sell_strength > 0:
                 signal_type = SignalType.SELL
                 final_confidence = sell_strength
             else:
                 signal_type = SignalType.HOLD
-                final_confidence = 0.0
+                final_confidence = max(hold_strength, 0.05)  # HOLD信号也保持一定置信度
                 
             # 计算平均价格
             avg_price = np.mean(prices) if prices else data.get('last_done', 0)
@@ -308,6 +331,7 @@ class StrategyEnsemble:
                 extra_data={
                     'buy_strength': buy_strength,
                     'sell_strength': sell_strength,
+                    'hold_strength': hold_strength,
                     'total_confidence': total_confidence,
                     'contributing_strategies': list(valid_signals.keys()),
                     'strategy_weights': {k: self.strategy_weights[k] for k in valid_signals.keys()}
@@ -315,7 +339,7 @@ class StrategyEnsemble:
             )
             
             self.logger.info(f"组合信号生成: {symbol} - {signal_type.value}, 置信度: {final_confidence:.3f}, "
-                           f"买入强度: {buy_strength:.3f}, 卖出强度: {sell_strength:.3f}, "
+                           f"买入: {buy_strength:.3f}, 卖出: {sell_strength:.3f}, 持有: {hold_strength:.3f}, "
                            f"参与策略: {list(valid_signals.keys())}")
             
             return ensemble_signal
@@ -477,7 +501,139 @@ class StrategyEnsemble:
         return summary
         
     def update_strategy_performance_from_trades(self, trade_results: List[Dict]):
-        """基于实际交易结果更新策略性能"""
-        # 这个方法可以在有实际交易结果时调用
-        # 用于更准确地评估策略性能
-        pass 
+        """
+        基于实际交易结果更新策略性能
+        
+        Args:
+            trade_results: 交易结果列表，每个元素包含:
+                - strategy_name: 策略名称
+                - symbol: 股票代码
+                - signal_type: 信号类型 (BUY/SELL)
+                - entry_price: 入场价格
+                - exit_price: 出场价格 (可选)
+                - quantity: 数量
+                - realized_pnl: 已实现盈亏 (可选)
+                - investment: 投资金额
+                - timestamp: 交易时间
+        """
+        try:
+            if not trade_results:
+                self.logger.debug("没有交易结果可用于更新策略性能")
+                return
+            
+            self.logger.info(f"开始基于 {len(trade_results)} 笔交易更新策略性能...")
+            
+            # 按策略分组交易结果
+            from collections import defaultdict
+            strategy_trades = defaultdict(list)
+            
+            for trade in trade_results:
+                strategy_name = trade.get('strategy_name', 'unknown')
+                # 处理组合策略的名称
+                if strategy_name.startswith('ensemble_'):
+                    strategy_name = strategy_name.replace('ensemble_', '')
+                elif strategy_name == 'ensemble':
+                    # 从extra_data中获取贡献策略
+                    contributing = trade.get('contributing_strategies', [])
+                    for s in contributing:
+                        strategy_trades[s].append(trade)
+                    continue
+                    
+                strategy_trades[strategy_name].append(trade)
+            
+            # 更新每个策略的性能指标
+            for strategy_name, trades in strategy_trades.items():
+                if strategy_name not in self.performance_tracker:
+                    continue
+                    
+                perf = self.performance_tracker[strategy_name]
+                
+                # 计算盈亏和收益率
+                returns = []
+                wins = 0
+                total_trades = len(trades)
+                
+                for trade in trades:
+                    pnl = trade.get('realized_pnl', 0)
+                    investment = trade.get('investment', 1)
+                    
+                    if investment > 0:
+                        return_rate = pnl / investment
+                        returns.append(return_rate)
+                        
+                        if pnl > 0:
+                            wins += 1
+                
+                if total_trades > 0 and returns:
+                    # 更新胜率
+                    perf.win_rate = wins / total_trades
+                    
+                    # 更新总收益
+                    perf.total_return = sum(returns)
+                    
+                    # 更新夏普比率 (简化版)
+                    avg_return = np.mean(returns)
+                    std_return = np.std(returns) if len(returns) > 1 else 0.0001
+                    perf.sharpe_ratio = avg_return / (std_return + 0.0001)
+                    
+                    # 更新最大回撤 (简化版)
+                    cumulative = np.cumsum(returns)
+                    running_max = np.maximum.accumulate(cumulative)
+                    drawdowns = running_max - cumulative
+                    perf.max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0
+                    
+                    # 更新信号数量
+                    perf.signal_count = total_trades
+                    perf.last_update = datetime.now()
+                    
+                    self.logger.info(f"策略 {strategy_name} 性能更新: "
+                                   f"胜率={perf.win_rate:.2%}, "
+                                   f"夏普={perf.sharpe_ratio:.2f}, "
+                                   f"最大回撤={perf.max_drawdown:.2%}, "
+                                   f"交易数={total_trades}")
+            
+            # 重新计算权重
+            if self.ensemble_method != EnsembleMethod.EQUAL_WEIGHT:
+                self._reweight_by_performance()
+                self._normalize_weights()
+                self.logger.info(f"策略权重已更新: {self.strategy_weights}")
+                
+        except Exception as e:
+            self.logger.error(f"更新策略性能失败: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+    
+    async def update_weights_from_order_history(self, order_manager):
+        """
+        从订单历史自动更新策略权重
+        
+        Args:
+            order_manager: 订单管理器实例
+        """
+        try:
+            # 获取已成交订单
+            filled_orders = await order_manager.get_filled_orders()
+            
+            if not filled_orders:
+                self.logger.debug("没有已成交订单可用于更新权重")
+                return
+            
+            # 转换订单为交易结果格式
+            trade_results = []
+            for order in filled_orders:
+                trade_result = {
+                    'strategy_name': getattr(order, 'strategy_name', 'unknown'),
+                    'symbol': order.symbol,
+                    'signal_type': str(order.side),
+                    'entry_price': float(order.price),
+                    'quantity': int(order.quantity),
+                    'investment': float(order.price) * int(order.quantity),
+                    'realized_pnl': getattr(order, 'realized_pnl', 0),
+                    'timestamp': getattr(order, 'created_at', datetime.now())
+                }
+                trade_results.append(trade_result)
+            
+            self.update_strategy_performance_from_trades(trade_results)
+            
+        except Exception as e:
+            self.logger.error(f"从订单历史更新权重失败: {e}")

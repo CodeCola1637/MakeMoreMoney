@@ -19,6 +19,8 @@ import decimal
 
 from utils import ConfigLoader, setup_logger, setup_longport_env
 from strategy.signals import Signal, SignalType
+from execution.order_validator import OrderValidator
+from execution.fund_guard import FundGuard
 from longport.openapi import (
     Config, TradeContext, 
     OrderSide, OrderType, TimeInForceType,
@@ -356,6 +358,14 @@ class OrderManager:
             "SZ": 100   # 深圳A股最小交易单位为100股
         }
         
+        # 🔧 初始化订单验证器
+        self.validator = OrderValidator(self, config_loader, self.logger)
+        self.logger.info("✅ 订单验证器初始化完成")
+        
+        # 🔧 初始化资金守卫
+        self.fund_guard = FundGuard(self, config_loader, self.logger)
+        self.logger.info("✅ 资金守卫初始化完成")
+        
     async def initialize(self):
         """初始化订单管理器"""
         # 初始化状态
@@ -599,9 +609,9 @@ class OrderManager:
             return False
 
     # 处理信号的方法
-    async def process_signal(self, signal: Signal) -> Optional[OrderResult]:
+    async def process_signal(self, signal: Signal, realtime_mgr=None) -> Optional[OrderResult]:
         """处理信号并执行交易"""
-        return await self.execute_signal(signal)
+        return await self.execute_signal(signal, realtime_mgr=realtime_mgr)
         
     def register_order_callback(self, callback: Callable[[OrderResult], None]):
         """
@@ -613,7 +623,7 @@ class OrderManager:
         self.order_callbacks.append(callback)
         self.logger.debug(f"已注册订单回调函数: {callback.__name__}")
     
-    async def execute_signal(self, signal: Signal):
+    async def execute_signal(self, signal: Signal, realtime_mgr=None):
         """执行交易信号"""
         if not self._validate_risk_control(signal):
             self.logger.warning(f"风控检查不通过，拒绝执行信号: {signal}")
@@ -622,10 +632,49 @@ class OrderManager:
         try:
             self.logger.info(f"执行交易信号: {signal}")
             
+            symbol = signal.symbol
+            signal_type = signal.signal_type
+            
+            # 🔧 关键修复：明确记录信号类型，确保后续逻辑正确
+            signal_type_str = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
+            
+            # 🔧 新增：订单预验证 - 降低拒单率
+            side_str = "Buy" if signal_type == SignalType.BUY else ("Sell" if signal_type == SignalType.SELL else "Hold")
+            if signal_type != SignalType.HOLD:
+                is_valid, validation_msg, details = await self.validator.validate_order(
+                    symbol=symbol,
+                    side=side_str,
+                    quantity=signal.quantity,
+                    price=signal.price,
+                    realtime_mgr=realtime_mgr
+                )
+                
+                if not is_valid:
+                    self.logger.warning(f"❌ 订单预验证失败: {validation_msg}")
+                    self.logger.debug(self.validator.get_validation_summary(details))
+                    return None
+                else:
+                    self.logger.info(f"✅ 订单预验证通过: {validation_msg}")
+                
+                # 🔧 新增：资金守卫检查
+                from decimal import Decimal
+                trade_amount = Decimal(str(signal.price)) * Decimal(str(signal.quantity))
+                fund_ok, fund_msg = self.fund_guard.can_trade(
+                    symbol=symbol,
+                    side=side_str,
+                    amount=trade_amount,
+                    quantity=signal.quantity
+                )
+                
+                if not fund_ok:
+                    self.logger.warning(f"❌ 资金守卫拒绝交易: {fund_msg}")
+                    return None
+                else:
+                    self.logger.info(f"✅ 资金守卫检查通过: {fund_msg}")
+            
             # 🚀 新增：全面智能分析和优化
             await self._intelligent_portfolio_optimization(signal)
-            
-            symbol = signal.symbol
+            self.logger.info(f"📊 信号详情: 股票={symbol}, 信号类型={signal_type_str}, 价格={signal.price}, 数量={signal.quantity}")
             
             # 获取股票的市场信息，包括最小交易单位（批量）
             lot_size = self.get_lot_size(symbol)
@@ -641,22 +690,40 @@ class OrderManager:
             if adjusted_quantity != signal.quantity:
                 self.logger.info(f"调整交易数量从 {signal.quantity} 到 {adjusted_quantity} 以符合最小交易单位 {lot_size}")
             
-            # 创建订单
-            if signal.signal_type == SignalType.BUY:
+            # 创建订单 - 根据信号类型执行对应操作
+            result = None
+            if signal_type == SignalType.BUY:
+                self.logger.info(f"🔵 执行买入操作: {symbol}")
                 result = await self._create_buy_order(signal)
-            elif signal.signal_type == SignalType.SELL:
+                # 🔧 验证订单方向与信号类型匹配
+                if result and result.side != OrderSide.Buy:
+                    self.logger.error(f"❌ 严重错误: BUY信号生成了非Buy订单! 信号={signal_type_str}, 订单方向={result.side}")
+                    return None
+            elif signal_type == SignalType.SELL:
+                self.logger.info(f"🔴 执行卖出操作: {symbol}")
                 result = await self._create_sell_order(signal)
+                # 🔧 验证订单方向与信号类型匹配
+                if result and result.side != OrderSide.Sell:
+                    self.logger.error(f"❌ 严重错误: SELL信号生成了非Sell订单! 信号={signal_type_str}, 订单方向={result.side}")
+                    return None
             else:  # HOLD 信号，不执行任何交易
-                self.logger.info(f"收到HOLD信号，不执行交易: {symbol}")
+                self.logger.info(f"⚪ 收到HOLD信号，不执行交易: {symbol}")
                 return None
             
             if result:
-                self.logger.info(f"订单已提交: {result}")
-                # 保存订单
-                self._save_order(result, signal)
+                # 🔧 修复：记录订单详情
+                actual_side_str = result.side.name if hasattr(result.side, 'name') else str(result.side)
+                status_str = result.status.name if hasattr(result.status, 'name') else str(result.status)
+                self.logger.info(f"✅ 订单已提交: {result.order_id}, 方向={actual_side_str}, 状态={status_str}")
+                
+                # 🔧 修复：传入策略名称字符串而非整个signal对象
+                strategy_name = getattr(signal, 'strategy_name', 'unknown')
+                if hasattr(signal, 'id'):
+                    strategy_name = f"{strategy_name}|{signal.id}"
+                self._save_order(result, strategy_name)
                 return result
             else:
-                self.logger.error(f"订单提交失败: {symbol}, {signal.signal_type}, {adjusted_quantity}")
+                self.logger.error(f"订单提交失败: {symbol}, {signal_type_str}, {adjusted_quantity}")
                 return None
         except Exception as e:
             self.logger.error(f"执行信号失败: {str(e)}")

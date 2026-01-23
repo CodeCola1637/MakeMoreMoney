@@ -21,6 +21,11 @@ from longport.openapi import (
 
 from utils import ConfigLoader, setup_logger, setup_longport_env
 
+# 延迟导入以避免循环依赖
+def _get_normalizer():
+    from strategy.data_normalizer import get_default_normalizer
+    return get_default_normalizer()
+
 class HistoricalDataLoader:
     """历史行情数据加载器，负责获取和处理长桥API的历史K线数据"""
     
@@ -261,7 +266,8 @@ class HistoricalDataLoader:
             self.logger.error(f"获取历史日线行情失败: {symbol}, {date}, {e}")
             return None
     
-    def prepare_feature_data(self, df: pd.DataFrame, lookback_period: int = 30, target_col: str = "close"):
+    def prepare_feature_data(self, df: pd.DataFrame, lookback_period: int = 30, 
+                              target_col: str = "close", fit_normalizer: bool = True):
         """
         准备特征数据，用于模型训练
         
@@ -269,6 +275,7 @@ class HistoricalDataLoader:
             df: K线数据的DataFrame
             lookback_period: 回看周期
             target_col: 目标列名
+            fit_normalizer: 是否拟合归一化器（训练时True，预测时False）
             
         Returns:
             X: 特征数据，shape=(样本数, 回看周期, 特征数)
@@ -289,18 +296,32 @@ class HistoricalDataLoader:
         # 提取特征数据
         data = df[feature_cols].values
         
-        # 标准化/归一化
-        data_norm = np.zeros_like(data, dtype=np.float32)
-        for i in range(data.shape[1]):
-            # 使用滑动窗口进行归一化，避免未来数据泄露
-            for j in range(lookback_period, len(data)):
-                window = data[j-lookback_period:j, i]
-                min_val = window.min()
-                max_val = window.max()
-                if max_val > min_val:
-                    data_norm[j, i] = (data[j, i] - min_val) / (max_val - min_val)
-                else:
-                    data_norm[j, i] = 0.5
+        # 🔧 使用统一的归一化器（延迟导入避免循环依赖）
+        normalizer = _get_normalizer()
+        
+        if fit_normalizer:
+            # 训练时：拟合归一化器并保存参数
+            self.logger.info("拟合归一化器参数...")
+            normalizer.fit(data, feature_cols)
+        
+        # 使用归一化器进行归一化
+        if normalizer.is_fitted:
+            # 使用保存的全局参数进行归一化
+            data_norm = normalizer.transform(data, feature_cols)
+            self.logger.debug(f"使用全局归一化参数，数据范围: [{data_norm.min():.3f}, {data_norm.max():.3f}]")
+        else:
+            # 后备方案：使用滑动窗口归一化
+            self.logger.warning("归一化器未拟合，使用滑动窗口归一化")
+            data_norm = np.zeros_like(data, dtype=np.float32)
+            for i in range(data.shape[1]):
+                for j in range(lookback_period, len(data)):
+                    window = data[j-lookback_period:j, i]
+                    min_val = window.min()
+                    max_val = window.max()
+                    if max_val > min_val:
+                        data_norm[j, i] = (data[j, i] - min_val) / (max_val - min_val)
+                    else:
+                        data_norm[j, i] = 0.5
         
         # 创建时间序列数据
         X, y = [], []

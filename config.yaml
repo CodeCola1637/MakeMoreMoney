@@ -1,7 +1,7 @@
 api:
-  access_token: ${LONGPORT_ACCESS_TOKEN}
-  app_key: ${LONGPORT_APP_KEY}
-  app_secret: ${LONGPORT_APP_SECRET}
+  access_token: m_eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJsb25nYnJpZGdlIiwic3ViIjoiYWNjZXNzX3Rva2VuIiwiZXhwIjoxNzcwMjc2MDk1LCJpYXQiOjE3NjI1MDAwOTUsImFrIjoiY2ZiZGM4ZDhiM2I2NzNiYjczM2MyNjg1MTUwODc3OTMiLCJhYWlkIjoyMDY1MDQ2MCwiYWMiOiJsYl9wYXBlcnRyYWRpbmciLCJtaWQiOjg3NjU0NDMsInNpZCI6Ii9NbmszWURKZ1VrTnhpa0hqSWljeXc9PSIsImJsIjozLCJ1bCI6MCwiaWsiOiJsYl9wYXBlcnRyYWRpbmdfMjA2NTA0NjAifQ.F1a2URbLnDVyf3rHuBnkYl5_VBVpXk0Y8fbxARF3iL1IrqPOVzS3lTjtNqXtVWeoBMYjlhL2OMekklg5Kk6C6BRwxPMAzUSsdhvPTMqd-uVhNHqvVOKRQ05tpD4Xp_tj_Gm757Yh6SQ9oSZlVvmBtbFKBKp9l7g4a0Sr8Pnat19eyZlvxKV-FrglasyrIf8b5mnm6yy9dmSYH8t7sbmmsYu59OoEbtmf542uoN_k8Eb8Je7M_jan1j-mAESKALYjZ8qlnWucugIlrfWf25DLrM29Sfxf-U0gKf5o1w69Kn8YcJvkffUKGZd2gK2lV2zfiIjwA0oiWEg_qOJlF0xJR41wWoqMKtzsgM7vgOGqluHoK6k5Pz00A3tXHS3r88jv8NuEdAKnnMT3CbVoWRLiSxTihoM2GGO3_8tFTBAGxjcQLbpDuFOqlRwGN957KhBdMpYo6gF52KlduxyEePUpIR0zc1E0EfZ-_zd4skre2_G4WMrC7FVl5Vh3U-BmfrK_ma7XeouMWIfQoahdbntBTcpstf1EqlUkM1d6FrFXtBIAjNk_7BFzyvMWEqCMMmrHQ4OA3jIbKcAsR5Hrpe9h_ffmkc7UmbEltOZaL5izOlse8K2WKZV_Yhxt6_dRkLP8VtYhEsUd2NwsiiQm1Xji-_C_QtOMS9R5jnBuBZzaYHg
+  app_key: cfbdc8d8b3b673bb733c268515087793
+  app_secret: f555bf3ce53149bdffec9f3c882bc47684bf04d1857b14751237405427d1e963
   base_url: ${API_BASE_URL}
   quote_ws_url: ${API_WS_URL}
 execution:
@@ -39,6 +39,10 @@ execution:
     max_correlation: 0.7
     position_pct: 2.0
     volatility_threshold: 0.25
+    max_daily_loss_pct: 3.0        # 日亏损限制（占总权益百分比）
+    max_total_position_pct: 80.0   # 总仓位限制（占总权益百分比）
+  # 资金守卫配置
+  min_reserve: 1000                # 最小储备金（保留不交易的金额）
   small_trade_max_cost_ratio: 2.5
   small_trade_threshold: 800
   stop_loss:
@@ -96,6 +100,30 @@ strategy:
     signal_decay_factor: 0.95
     trend_confirmation: true
     volume_confirmation: true
+  # 信号过滤器配置 - 防止重复信号和过度交易
+  signal_cooldown: 600           # 同一股票相同信号冷却期（秒）
+  max_signals_per_day: 10        # 每个股票每日最大信号数量
+  price_change_threshold: 0.01   # 价格变化阈值（1%）才生成新信号
+  # 相关性过滤器配置 - 风险分散
+  correlation_lookback_days: 60  # 相关性计算回看天数
+  correlation_update_interval: 24 # 相关性矩阵更新间隔（小时）
+  # Attention-LSTM 模型配置
+  model:
+    lstm_units: 64               # LSTM隐藏单元数
+    attention_units: 32          # 注意力机制单元数
+    dropout_rate: 0.3            # Dropout率
+    learning_rate: 0.001         # 学习率
+    l1_reg: 0.0001               # L1正则化系数
+    l2_reg: 0.0001               # L2正则化系数
+ensemble:
+  enable: true
+  method: confidence_weight  # equal_weight, confidence_weight, performance_weight, dynamic_weight
+  min_strategies_agreement: 1  # 降低到1，让单个强信号也能触发
+  confidence_threshold: 0.02   # 进一步降低置信度阈值，让更多信号通过
+  reweight_frequency: 100
+  strategies:
+    - lstm
+    - technical  # 可以添加更多策略
   training:
     batch_size: 64
     early_stopping_patience: 15

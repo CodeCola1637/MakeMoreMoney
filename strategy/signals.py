@@ -18,6 +18,7 @@ from utils import ConfigLoader, setup_logger
 from data_loader.realtime import RealtimeDataManager
 from data_loader.historical import HistoricalDataLoader
 from strategy.train import LSTMModelTrainer
+from strategy.data_normalizer import get_default_normalizer
 from longport.openapi import SubType
 
 class SignalType(Enum):
@@ -282,21 +283,38 @@ class SignalGenerator:
             # 转换为numpy数组
             features = np.array(features, dtype=np.float64)
             
-            # 🔧 修复: 使用与训练时一致的Min-Max归一化方法
-            # 而不是Z-score标准化
-            data_norm = np.zeros_like(features, dtype=np.float32)
+            # 🔧 修复: 使用统一的归一化器，确保与训练时一致
+            normalizer = get_default_normalizer()
             
-            for i in range(features.shape[1]):  # 对每个特征列
-                # 计算当前窗口的最小值和最大值
-                min_val = features[:, i].min()
-                max_val = features[:, i].max()
-                
-                if max_val > min_val:
-                    # Min-Max归一化到[0,1]范围，与训练时一致
-                    data_norm[:, i] = (features[:, i] - min_val) / (max_val - min_val)
-                else:
-                    # 如果最大值等于最小值，设为0.5（与训练时一致）
-                    data_norm[:, i] = 0.5
+            # 特征列名（与训练时保持一致的顺序）
+            feature_names = self.config.get("strategy.training.features", 
+                                           ["close", "volume", "high", "low"])
+            # 注意：实时数据的特征顺序是 [last_done, open, high, low, volume]
+            # 需要映射到训练时的顺序 [close, volume, high, low]
+            # last_done -> close, 然后重新排列
+            
+            if normalizer.is_fitted:
+                # 使用保存的全局参数进行归一化
+                # 重新映射特征顺序：[last_done, open, high, low, volume] -> [close, volume, high, low]
+                mapped_features = np.column_stack([
+                    features[:, 0],  # last_done -> close
+                    features[:, 4],  # volume
+                    features[:, 2],  # high
+                    features[:, 3],  # low
+                ])
+                data_norm = normalizer.transform_window(mapped_features, feature_names, use_global_params=True)
+                self.logger.debug(f"使用全局归一化参数: {symbol}")
+            else:
+                # 后备方案：使用窗口内参数（与之前逻辑一致）
+                self.logger.warning(f"归一化器未拟合，使用窗口内参数: {symbol}")
+                data_norm = np.zeros_like(features, dtype=np.float32)
+                for i in range(features.shape[1]):
+                    min_val = features[:, i].min()
+                    max_val = features[:, i].max()
+                    if max_val > min_val:
+                        data_norm[:, i] = (features[:, i] - min_val) / (max_val - min_val)
+                    else:
+                        data_norm[:, i] = 0.5
             
             # 添加批次维度
             data_norm = np.expand_dims(data_norm, axis=0)
@@ -491,3 +509,100 @@ class SignalGenerator:
             import traceback
             self.logger.error(traceback.format_exc())
             raise
+            
+    async def predict(self, symbol: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        为策略组合器提供预测接口
+        
+        Args:
+            symbol: 股票代码
+            data: 市场数据
+            
+        Returns:
+            预测结果字典
+        """
+        try:
+            # 确保模型已加载
+            if self.model is None:
+                await self.start()
+                
+            # 检查数据缓存是否足够
+            if symbol not in self.data_cache or len(self.data_cache[symbol]) < self.lookback_period:
+                self.logger.warning(f"LSTM策略数据不足: {symbol}, 需要{self.lookback_period}条，"
+                                  f"实际{len(self.data_cache.get(symbol, []))}条")
+                return {
+                    'prediction': 0.0,
+                    'confidence': 0.0,
+                    'signal': 'HOLD',
+                    'price': data.get('last_done', 0),
+                    'strategy': 'lstm'
+                }
+                
+            # 将当前数据临时添加到缓存进行预测
+            temp_data = {
+                'timestamp': data.get('timestamp', datetime.now().isoformat()),
+                'last_done': data.get('last_done', 0),
+                'volume': data.get('volume', 1000),
+                'high': data.get('high', data.get('last_done', 0)),
+                'low': data.get('low', data.get('last_done', 0)),
+                'open': data.get('open', data.get('last_done', 0)),
+                'close': data.get('last_done', 0)
+            }
+            
+            # 临时添加到缓存
+            original_cache = self.data_cache[symbol][:]
+            self.data_cache[symbol].append(temp_data)
+            
+            try:
+                # 准备模型输入
+                input_data = self._prepare_model_input(symbol)
+                
+                # 进行预测
+                raw_prediction = self.model.predict(input_data, verbose=0)
+                prediction_value = float(raw_prediction[0][0])
+                
+                # 计算置信度
+                confidence = abs(prediction_value)
+                
+                # 确定信号类型
+                buy_threshold = self.config.get("strategy.signal_processing.buy_threshold", 0.04)
+                sell_threshold = self.config.get("strategy.signal_processing.sell_threshold", -0.04)
+                
+                if prediction_value > buy_threshold:
+                    signal_type = 'BUY'
+                elif prediction_value < sell_threshold:
+                    signal_type = 'SELL'
+                else:
+                    signal_type = 'HOLD'
+                    
+                result = {
+                    'prediction': prediction_value,
+                    'confidence': confidence,
+                    'signal': signal_type,
+                    'price': data.get('last_done', 0),
+                    'strategy': 'lstm',
+                    'extra_data': {
+                        'buy_threshold': buy_threshold,
+                        'sell_threshold': sell_threshold,
+                        'data_points': len(self.data_cache[symbol])
+                    }
+                }
+                
+                self.logger.debug(f"LSTM策略预测: {symbol}, 预测值: {prediction_value:.4f}, "
+                                f"置信度: {confidence:.3f}, 信号: {signal_type}")
+                
+                return result
+                
+            finally:
+                # 恢复原始缓存
+                self.data_cache[symbol] = original_cache
+                
+        except Exception as e:
+            self.logger.error(f"LSTM策略预测失败: {symbol}, 错误: {e}")
+            return {
+                'prediction': 0.0,
+                'confidence': 0.0,
+                'signal': 'HOLD',
+                'price': data.get('last_done', 0),
+                'strategy': 'lstm'
+            }

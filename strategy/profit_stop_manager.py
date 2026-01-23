@@ -70,6 +70,55 @@ class ProfitStopManager:
         self.daily_pnl_reset_time = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         
         self.logger.info(f"止盈止损管理器初始化完成 - 止盈启用: {self.profit_enabled}, 止损启用: {self.stop_enabled}")
+    
+    def get_real_cost_price(self, symbol: str) -> Optional[float]:
+        """
+        从持仓信息获取真实成本价
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            真实成本价，如果获取失败则返回None
+        """
+        try:
+            # 从order_manager获取持仓列表
+            positions = self.order_manager.get_positions(symbol)
+            
+            if not positions:
+                self.logger.debug(f"未找到 {symbol} 的持仓信息")
+                return None
+            
+            # 查找匹配的持仓
+            for pos in positions:
+                pos_symbol = getattr(pos, 'symbol', '').upper()
+                if pos_symbol == symbol.upper():
+                    # 长桥API的持仓对象有cost_price属性
+                    cost_price = getattr(pos, 'cost_price', None)
+                    if cost_price is not None:
+                        cost_price_float = float(cost_price)
+                        self.logger.debug(f"获取到 {symbol} 真实成本价: {cost_price_float}")
+                        return cost_price_float
+                    else:
+                        self.logger.warning(f"{symbol} 持仓信息中无成本价属性")
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"获取 {symbol} 成本价失败: {e}")
+            return None
+    
+    async def get_real_cost_price_async(self, symbol: str) -> Optional[float]:
+        """
+        异步版本：从持仓信息获取真实成本价
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            真实成本价，如果获取失败则返回None
+        """
+        return self.get_real_cost_price(symbol)
         
     async def update_position_status(self, symbol: str, quantity: int, cost_price: float, current_price: float):
         """更新持仓状态"""
