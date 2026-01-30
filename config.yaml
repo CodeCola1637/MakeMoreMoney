@@ -8,6 +8,20 @@ execution:
   default_commission_rate: 0.0025
   enable_hk_trading: true
   enable_us_trading: true
+  # 美股扩展交易时段配置
+  us_extended_hours:
+    enable_pre_market: true       # 启用盘前交易 (4:00-9:30 ET)
+    enable_after_hours: true      # 启用盘后交易 (16:00-20:00 ET)
+    enable_overnight: false       # 隔夜交易（暂不支持）
+    pre_market_start: "04:00"     # 盘前开始时间
+    pre_market_end: "09:30"       # 盘前结束时间
+    after_hours_start: "16:00"    # 盘后开始时间
+    after_hours_end: "20:00"      # 盘后结束时间
+  # 做空交易配置（仅美股支持）
+  enable_short_selling: true      # 启用做空交易
+  max_short_position: 200         # 单只股票最大空头持仓
+  max_total_short_exposure: 50000 # 总空头敞口限制（美元）
+  short_margin_requirement: 1.5   # 做空保证金要求（150%）
   hk_commission_rate: 0.0025
   initial_capital: 15000.0
   max_cost_ratio: 1.8
@@ -115,6 +129,25 @@ strategy:
     learning_rate: 0.001         # 学习率
     l1_reg: 0.0001               # L1正则化系数
     l2_reg: 0.0001               # L2正则化系数
+# 股票发现模块配置
+discovery:
+  enable: true                    # 是否启用股票发现
+  scan_interval: 3600             # 扫描间隔（秒），默认1小时
+  min_volume: 1000000             # 最小成交量
+  rsi_oversold: 30                # RSI超卖阈值
+  rsi_overbought: 70              # RSI超买阈值
+  min_confidence: 0.6             # 最小置信度
+  watch_expiry_hours: 48          # 观察过期时间（小时）
+  max_watch_list: 20              # 最大观察列表大小
+  auto_trade: false               # 是否自动交易（建议先观察）
+  # 自定义股票池（可选，不配置则使用默认池）
+  # hk_pool:
+  #   - "700.HK"
+  #   - "9988.HK"
+  # us_pool:
+  #   - "AAPL.US"
+  #   - "NVDA.US"
+
 ensemble:
   enable: true
   method: confidence_weight  # equal_weight, confidence_weight, performance_weight, dynamic_weight

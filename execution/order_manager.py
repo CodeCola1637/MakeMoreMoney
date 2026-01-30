@@ -639,8 +639,14 @@ class OrderManager:
             signal_type_str = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
             
             # 🔧 新增：订单预验证 - 降低拒单率
-            side_str = "Buy" if signal_type == SignalType.BUY else ("Sell" if signal_type == SignalType.SELL else "Hold")
-            if signal_type != SignalType.HOLD:
+            if signal_type in [SignalType.BUY, SignalType.COVER]:
+                side_str = "Buy"
+            elif signal_type in [SignalType.SELL, SignalType.SHORT]:
+                side_str = "Sell"
+            else:
+                side_str = "Hold"
+            
+            if signal_type not in [SignalType.HOLD, SignalType.UNKNOWN]:
                 is_valid, validation_msg, details = await self.validator.validate_order(
                     symbol=symbol,
                     side=side_str,
@@ -706,8 +712,25 @@ class OrderManager:
                 if result and result.side != OrderSide.Sell:
                     self.logger.error(f"❌ 严重错误: SELL信号生成了非Sell订单! 信号={signal_type_str}, 订单方向={result.side}")
                     return None
-            else:  # HOLD 信号，不执行任何交易
+            elif signal_type == SignalType.SHORT:
+                # 做空信号 - 直接调用卖出创建空头
+                self.logger.info(f"📉 执行做空操作: {symbol}")
+                result = await self._create_sell_order(signal)
+                if result and result.side != OrderSide.Sell:
+                    self.logger.error(f"❌ 严重错误: SHORT信号生成了非Sell订单!")
+                    return None
+            elif signal_type == SignalType.COVER:
+                # 平空信号 - 买入平仓空头
+                self.logger.info(f"📈 执行平空操作: {symbol}")
+                result = await self._create_buy_order(signal)
+                if result and result.side != OrderSide.Buy:
+                    self.logger.error(f"❌ 严重错误: COVER信号生成了非Buy订单!")
+                    return None
+            elif signal_type == SignalType.HOLD:
                 self.logger.info(f"⚪ 收到HOLD信号，不执行交易: {symbol}")
+                return None
+            else:
+                self.logger.warning(f"⚠️ 未知信号类型: {signal_type_str}")
                 return None
             
             if result:
@@ -994,7 +1017,7 @@ class OrderManager:
                 current_price = await self._get_current_price(symbol)
                 
                 # 创建卖出信号
-                from strategy.signal_types import Signal, SignalType
+                from strategy.signals import Signal, SignalType
                 sell_signal = Signal(
                     symbol=symbol,
                     signal_type=SignalType.SELL,
@@ -1081,6 +1104,24 @@ class OrderManager:
                 msg="达到日内最大订单数量限制",
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
+        
+        # 🔧 检查是否是平空仓操作（当前有空头持仓）
+        positions = self.get_positions()
+        position = next((p for p in positions if p.symbol.lower() == symbol.lower()), None)
+        current_quantity = position.quantity if position else 0
+        
+        if current_quantity < 0:
+            # 当前有空头持仓，买入是平空操作
+            short_quantity = abs(current_quantity)
+            cover_quantity = min(quantity, short_quantity)
+            
+            self.logger.info(f"📈 平仓空头: {symbol}, 空头持仓: {short_quantity}, 平仓数量: {cover_quantity}")
+            
+            # 直接提交平空订单
+            strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+            if hasattr(signal, 'confidence'):
+                strategy_info += f" confidence={signal.confidence:.3f} (COVER)"
+            return await self._submit_order(symbol, price, cover_quantity, "buy", strategy_info)
         
         # 获取可用资金和总权益
         available_cash = self.get_account_balance()
@@ -1274,7 +1315,7 @@ class OrderManager:
 
     async def _create_sell_order(self, signal):
         """
-        创建卖出订单
+        创建卖出订单（支持平多仓和做空）
 
         Args:
             signal: 交易信号
@@ -1301,23 +1342,61 @@ class OrderManager:
                 strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             )
         
+        # 判断是否是美股（美股支持做空）
+        is_us_stock = '.US' in symbol.upper()
+        
         # 检查持仓
         positions = self.get_positions()
         position = next((p for p in positions if p.symbol.lower() == symbol.lower()), None)
+        current_quantity = position.quantity if position else 0
         
-        if not position or position.quantity <= 0:
-            self.logger.warning(f"无持仓可卖出: {symbol}, 实际持仓: {position.quantity if position else 0}")
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Sell,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg=f"无持仓可卖出，实际持仓: {position.quantity if position else 0}",
-                strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
-            )
+        # 🔧 美股做空支持
+        if not position or current_quantity <= 0:
+            if is_us_stock and self.config.get("execution.enable_short_selling", True):
+                # 美股允许做空（开空仓）
+                self.logger.info(f"📉 美股做空: {symbol}, 数量: {quantity}, 当前持仓: {current_quantity}")
+                
+                # 做空风控检查
+                short_limit = self.config.get("execution.max_short_position", 100)
+                current_short = abs(current_quantity) if current_quantity < 0 else 0
+                
+                if current_short + quantity > short_limit:
+                    adjusted_qty = max(0, short_limit - current_short)
+                    if adjusted_qty <= 0:
+                        self.logger.warning(f"做空限制: {symbol} 已达最大空头持仓 {short_limit}")
+                        return OrderResult(
+                            order_id="",
+                            symbol=symbol,
+                            side=OrderSide.Sell,
+                            quantity=quantity,
+                            price=price,
+                            status=OrderStatus.Rejected,
+                            submitted_at=datetime.now(),
+                            msg=f"做空限制: 已达最大空头持仓 {short_limit}",
+                            strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                        )
+                    quantity = adjusted_qty
+                    self.logger.info(f"调整做空数量: {symbol} -> {quantity}")
+                
+                # 直接提交做空订单
+                strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                if hasattr(signal, 'confidence'):
+                    strategy_info += f" confidence={signal.confidence:.3f}"
+                return await self._submit_order(symbol, price, quantity, "sell", strategy_info)
+            else:
+                # 港股或禁用做空时，必须有持仓才能卖出
+                self.logger.warning(f"无持仓可卖出: {symbol}, 实际持仓: {current_quantity}")
+                return OrderResult(
+                    order_id="",
+                    symbol=symbol,
+                    side=OrderSide.Sell,
+                    quantity=quantity,
+                    price=price,
+                    status=OrderStatus.Rejected,
+                    submitted_at=datetime.now(),
+                    msg=f"无持仓可卖出，实际持仓: {current_quantity}" + (" (港股不支持做空)" if not is_us_stock else ""),
+                    strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                )
         
         # 🔧 修复：使用可用数量而不是总持仓数量来判断卖出限制
         available_quantity = getattr(position, 'available_quantity', position.quantity)
@@ -2544,7 +2623,7 @@ class OrderManager:
                 return False
                 
             # 检查信号类型
-            if signal.signal_type not in [SignalType.BUY, SignalType.SELL]:
+            if signal.signal_type not in [SignalType.BUY, SignalType.SELL, SignalType.SHORT, SignalType.COVER]:
                 self.logger.warning(f"不支持的信号类型: {signal.signal_type}")
                 return False
                 

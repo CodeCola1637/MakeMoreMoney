@@ -1,220 +1,253 @@
-# 智能量化交易系统
+# 智能量化交易系统 v3.0
 
-基于 LongBridge API 的模块化量化交易系统，集成了 LSTM 模型进行价格预测、智能投资组合优化和全面风险控制，支持实时行情订阅、交易信号生成和自动化交易执行。
+基于 LongBridge API 的模块化量化交易系统，集成了 LSTM 深度学习模型、多策略组合、智能投资组合优化、股票发现和全面风险控制。支持港股和美股（含做空、盘前盘后交易）的实时行情订阅和自动化交易执行。
 
 ## 🚀 系统特点
 
-- **模块化设计**：系统分为多个功能独立的模块，便于维护和扩展
-- **智能投资组合优化**：每次信号生成后自动分析和优化当前持仓配置
-- **多策略融合**：LSTM深度学习 + 技术指标 + 投资组合管理
-- **实时行情订阅**：通过 LongBridge API 订阅港股、美股等市场的实时行情
-- **AI驱动决策**：使用深度学习模型对未来价格走势进行预测
-- **智能风险控制**：多层次风险控制机制，包括单笔限制、日亏损限制、止盈止损
-- **订单自动执行**：根据交易信号自动下单并跟踪订单状态
+- **模块化架构**：TaskManager 统一管理异步任务，便于维护和扩展
+- **多策略融合**：LSTM深度学习 + 技术指标策略，置信度加权组合
+- **股票发现**：自动扫描市场发现潜在买入机会（RSI超卖、MACD金叉等）
+- **做空支持**：美股完整做空交易支持（开空、平空）
+- **扩展交易时段**：美股盘前(4:00-9:30)和盘后(16:00-20:00)交易
+- **智能风险控制**：多层次风控（资金守卫、信号过滤、相关性控制）
+- **实时行情订阅**：通过 LongBridge API 订阅港股、美股实时行情
 - **成本效益优化**：内置交易成本分析，确保每笔交易具有盈利潜力
 
 ## 🏗️ 系统架构
 
-系统采用解耦合设计，各模块通过清晰的接口交互：
-
 ```
-├── data_loader/       # 🔄 数据管理模块
-│   ├── realtime.py    # 实时行情订阅与处理
-│   └── historical.py  # 历史K线数据获取与缓存
-├── strategy/          # 🧠 策略引擎
-│   ├── train.py       # LSTM模型训练与预测
-│   ├── signals.py     # 交易信号生成
-│   ├── portfolio_manager.py    # 投资组合管理
-│   └── profit_stop_manager.py  # 止盈止损管理
-├── execution/         # ⚡ 交易执行
-│   └── order_manager.py # 订单管理、智能优化与执行
-├── databases/         # 💾 数据存储
-├── logs/             # 📊 日志记录
-├── models/           # 🤖 AI模型存储
-├── utils.py          # 🛠️ 工具类
-├── config.yaml       # ⚙️ 配置文件
-└── main.py           # 🎯 主程序入口
+├── data_loader/              # 🔄 数据管理模块
+│   ├── realtime.py           # 实时行情订阅与处理
+│   └── historical.py         # 历史K线数据获取与缓存
+├── strategy/                 # 🧠 策略引擎
+│   ├── signals.py            # 信号类型定义与LSTM信号生成
+│   ├── technical_strategy.py # 技术指标策略
+│   ├── strategy_ensemble.py  # 多策略组合器
+│   ├── stock_discovery.py    # 股票发现模块 [NEW]
+│   ├── signal_filter.py      # 信号过滤器
+│   ├── correlation_filter.py # 相关性过滤器
+│   ├── data_normalizer.py    # 数据归一化器
+│   ├── feature_engineer.py   # 特征工程
+│   ├── attention_lstm.py     # Attention-LSTM模型
+│   ├── portfolio_manager.py  # 投资组合管理
+│   ├── profit_stop_manager.py# 止盈止损管理
+│   └── train.py              # 模型训练
+├── execution/                # ⚡ 交易执行
+│   ├── order_manager.py      # 订单管理（支持做空）
+│   ├── order_validator.py    # 订单预验证器
+│   ├── fund_guard.py         # 资金守卫
+│   ├── task_manager.py       # 异步任务管理器
+│   └── pending_order_manager.py # 挂单管理
+├── monitoring/               # 📊 系统监控
+│   ├── health_check.py       # 健康检查
+│   ├── memory_manager.py     # 内存管理
+│   ├── cache_manager.py      # 缓存管理
+│   └── data_quality.py       # 数据质量监控
+├── databases/                # 💾 数据存储
+├── logs/                     # 📊 日志记录
+├── models/                   # 🤖 AI模型存储
+├── data_cache/               # 📁 数据缓存
+├── utils.py                  # 🛠️ 工具类（ConfigLoader单例、统一日志）
+├── config.yaml               # ⚙️ 配置文件
+└── main.py                   # 🎯 主程序入口（TaskManager集成）
 ```
 
 ## 🎯 核心功能
 
-### 1. 智能投资组合优化
-每次收到交易信号后，系统会自动执行全面的投资组合分析：
+### 1. 信号类型系统
+支持完整的多空交易信号：
 
-- **挂单智能清理**：6维度分析不合理挂单（价格偏离、订单年龄、资金占用等）
-- **持仓动态优化**：清理小仓位、减少过度集中持仓
-- **资金配置优化**：根据信号强度和风险控制动态调整仓位
-- **成本效益分析**：确保每笔交易具有盈利潜力
+| 信号类型 | 说明 | 适用市场 |
+|---------|------|----------|
+| BUY | 买入（开多仓或平空仓） | 全部 |
+| SELL | 卖出（平多仓） | 全部 |
+| SHORT | 做空（开空仓） | 美股 |
+| COVER | 平空（买入平仓空头） | 美股 |
+| HOLD | 持有观望 | 全部 |
 
-### 2. 多层风险控制
-- **Position Sizing**：单笔交易不超过账户资金的2%
-- **日亏损控制**：日亏损达到3%时自动停止交易
-- **止盈止损**：支持固定止盈(15%)、部分止盈(8%)、追踪止损(3%)
-- **相关性控制**：避免高度相关股票过度集中
-- **波动率过滤**：过滤高波动率股票降低风险
+### 2. 股票发现模块
+自动扫描市场寻找买入机会：
 
-### 3. AI驱动策略
-- **LSTM深度学习**：使用90天历史数据训练，预测价格变动
-- **技术指标融合**：RSI、MACD、布林带、SMA、EMA多指标确认
-- **信号强度评估**：置信度阈值15%，确保信号质量
-- **趋势确认**：多重技术指标确认避免假信号
+- **技术筛选条件**：
+  - RSI 超卖（< 30）
+  - MACD 金叉
+  - 均线突破
+  - 放量突破
+  - 价格反转
+  - 支撑位反弹
 
-### 4. 成本效益优化
-- **交易成本分析**：精确计算各市场手续费（美股0.5%+$0.99，港股0.25%+印花税）
-- **最小交易金额**：设置$200最小交易额，避免过小交易
-- **成本占比控制**：交易成本不超过2%(常规)或3%(小额)
-- **预期收益评估**：基于信号置信度评估预期收益
+- **股票池**：港股20只 + 美股20只热门标的
+- **观察列表**：最多20只，48小时过期
+- **入场时机**：自动检测最佳入场点
 
-## 📊 策略配置
-
-当前优化后的策略参数：
-
+### 3. 多策略组合器
 ```yaml
-strategy:
-  lookback_period: 90        # 回溯周期延长到90天
-  signal_interval: 600       # 信号生成间隔10分钟
-  signal_processing:
-    buy_threshold: 0.04      # 买入阈值4%
-    sell_threshold: -0.04    # 卖出阈值-4%
-    confidence_threshold: 0.15 # 最低置信度15%
-  risk_management:
-    max_positions: 8         # 最大持仓数8个
-    correlation_limit: 0.7   # 相关性限制70%
-    volatility_filter: 0.25  # 波动率过滤25%
+ensemble:
+  method: confidence_weight  # 置信度加权
+  strategies:
+    - lstm                   # LSTM深度学习
+    - technical              # 技术指标策略
+  min_strategies_agreement: 1
+  confidence_threshold: 0.02
 ```
 
-## 🔧 安装与配置
+### 4. 风险控制体系
 
-### 1. 环境要求
+#### 资金守卫 (FundGuard)
+- 账户余额检查（禁止负余额交易）
+- 最小储备金保护（$1000）
+- 单笔交易限制（2%总权益）
+- 日亏损限制（3%）
+- 总仓位限制（80%）
+
+#### 信号过滤器 (SignalFilter)
+- 同股票信号冷却期（600秒）
+- 每日信号上限（10个/股票）
+- 价格变化阈值（1%）
+- 最低置信度过滤（0.1）
+
+#### 相关性过滤器 (CorrelationFilter)
+- 资产相关性检查（限制 0.7）
+- 防止过度集中
+
+### 5. 美股扩展交易
+```yaml
+us_extended_hours:
+  enable_pre_market: true     # 盘前 4:00-9:30 ET
+  enable_after_hours: true    # 盘后 16:00-20:00 ET
+
+# 做空配置
+enable_short_selling: true
+max_short_position: 200       # 单只最大空头
+```
+
+### 6. 任务管理器 (TaskManager)
+统一管理所有异步任务：
+
+| 任务 | 间隔 | 说明 |
+|------|------|------|
+| signal_generation | 600s | 策略信号生成 |
+| portfolio_update | 300s | 投资组合更新 |
+| profit_stop_monitor | 30s | 止盈止损监控 |
+| health_check | 300s | 系统健康检查 |
+| stock_discovery | 3600s | 股票发现扫描 |
+
+## 📊 配置说明
+
+### 策略配置
+```yaml
+strategy:
+  lookback_period: 90           # LSTM回溯周期
+  signal_interval: 600          # 信号间隔（秒）
+  signal_processing:
+    buy_threshold: 0.04         # 买入阈值
+    sell_threshold: -0.04       # 卖出阈值
+    confidence_threshold: 0.1   # 最低置信度
+  risk_management:
+    max_positions: 8            # 最大持仓数
+    correlation_limit: 0.7      # 相关性限制
+    volatility_filter: 0.3      # 波动率过滤
+```
+
+### 执行配置
+```yaml
+execution:
+  min_trade_value: 200          # 最小交易金额
+  max_position_size: 2000       # 最大持仓
+  min_profit_threshold: 2.5     # 最小利润阈值(%)
+  risk_control:
+    daily_loss_pct: 3.0         # 日亏损限制
+    position_pct: 2.0           # 单笔限制
+    max_total_position_pct: 80  # 总仓位限制
+```
+
+## 🔧 安装与使用
+
+### 环境要求
 - Python 3.8+
-- LongBridge SDK
 - TensorFlow 2.10+
+- LongBridge SDK
 
-### 2. 快速启动
+### 快速启动
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd MakeMoreMoney
-
 # 安装依赖
 pip install -r requirements.txt
 
-# 配置API密钥
-cp .env.example .env
-# 编辑.env文件填入API密钥
+# 配置API（编辑config.yaml）
+vi config.yaml
 
-# 启动系统
-python main.py --train  # 首次启动训练模型
-```
+# 首次启动（训练模型）
+python main.py --train --symbols "700.HK 9988.HK AAPL.US"
 
-### 3. 便捷启动脚本
-```bash
-# 使用启动脚本
-chmod +x start.sh
-./start.sh --symbols "700.HK 9988.HK AAPL.US" --train
-```
-
-## 📈 性能表现
-
-### 历史回测结果
-- **总体胜率**：从16.3%优化到预期35%+
-- **风险控制**：最大回撤控制在10%以内
-- **夏普比率**：从-0.42优化到预期1.2+
-- **交易效率**：大幅减少无效交易，提高资金使用效率
-
-### 实时监控指标
-- 实时盈亏跟踪
-- 持仓风险评估
-- 交易成本分析
-- 信号质量监控
-
-## 🛡️ 风险管理
-
-### 多层次风险控制
-1. **事前风控**：信号质量过滤、成本效益分析
-2. **事中风控**：Position Sizing、相关性控制
-3. **事后风控**：止盈止损、日亏损限制
-
-### 异常处理
-- API连接异常自动重连
-- 订单执行失败自动重试
-- 数据异常智能过滤
-- 系统异常优雅降级
-
-## 📝 使用说明
-
-### 基本命令
-```bash
-# 启动交易系统
-python main.py
-
-# 重新训练模型
-python main.py --train
-
-# 指定交易标的
-python main.py --symbols "AAPL.US TSLA.US"
-
-# 自定义配置
-python main.py --config custom_config.yaml
+# 正常启动
+python main.py --symbols "700.HK 9988.HK 1299.HK 388.HK 941.HK AAPL.US GOOGL.US MSFT.US NVDA.US TSLA.US"
 ```
 
 ### 监控命令
 ```bash
-# 查看实时日志
-tail -f logs/trading.log
+# 实时日志
+tail -f trading_output.log
 
-# 分析交易记录
-python analyze_trading_performance.py
+# 查看信号
+grep "组合信号\|BUY\|SELL\|SHORT" trading_output.log
 
-# 系统诊断
-python diagnose_system.py
+# 查看订单
+tail -20 logs/orders.csv
+
+# 查看任务状态
+grep "TaskManager" trading_output.log
 ```
 
-## 🔄 系统升级历程
+## 📈 版本历史
 
-### 最新版本特性
-- ✅ **智能投资组合优化**：全自动分析和优化持仓配置
-- ✅ **策略参数优化**：基于历史表现优化买卖阈值
-- ✅ **成本效益分析**：精确的交易成本计算和效益评估
-- ✅ **多技术指标融合**：RSI、MACD、布林带等多指标确认
-- ✅ **风险控制增强**：相关性控制、波动率过滤、止盈止损
+### v3.0 (2026-01-30) - 当前版本
+- ✅ **股票发现模块**：自动扫描市场发现买入机会
+- ✅ **做空交易支持**：完整的美股做空功能（SHORT/COVER）
+- ✅ **扩展交易时段**：美股盘前盘后交易
+- ✅ **TaskManager**：统一异步任务管理
+- ✅ **ConfigLoader单例**：避免配置重复加载
+- ✅ **统一日志系统**：防止日志丢失
+- ✅ **资金守卫**：集中式财务风控
+- ✅ **信号过滤器**：防止过度交易
+- ✅ **相关性过滤器**：投资组合风险分散
+- ✅ **订单预验证器**：降低拒单率
+- ✅ **LSTM模型修复**：5特征正确输入
 
-### 历史版本
-- v2.0: 添加投资组合管理和止盈止损
-- v1.5: 优化LSTM模型和信号生成
-- v1.0: 基础交易系统和风险控制
+### v2.0
+- 添加投资组合管理和止盈止损
+- 多策略组合器
+- 技术指标策略
 
-## 🚀 扩展开发
+### v1.0
+- 基础交易系统
+- LSTM预测模型
+- 风险控制框架
 
-### 添加新策略
-```python
-class CustomStrategy:
-    def predict(self, symbol, data):
-        # 实现自定义策略逻辑
-        return prediction_result
-```
+## 🛡️ 风险管理
 
-### 自定义风控规则
-```python
-def custom_risk_check(signal, positions, balance):
-    # 实现自定义风控逻辑
-    return is_allowed, reason
-```
+### 三层风控体系
+1. **事前风控**
+   - 订单预验证（市场时间、资金、持仓）
+   - 信号过滤（冷却期、置信度）
+   - 成本效益分析
+
+2. **事中风控**
+   - Position Sizing（单笔2%限制）
+   - 相关性控制（0.7上限）
+   - 资金守卫检查
+
+3. **事后风控**
+   - 止盈止损（固定15%/追踪5%）
+   - 日亏损限制（3%停止交易）
+   - 挂单清理
 
 ## ⚠️ 重要提醒
 
-- **仅供学习研究**：本系统仅用于学习和研究，实盘交易需谨慎评估风险
-- **API密钥安全**：请妥善保管API密钥，避免泄露
-- **资金安全**：建议先用少量资金测试，确认系统稳定后再增加投入
-- **合规交易**：请遵守相关市场的交易规则和法规
-
-## 📞 技术支持
-
-- 查看详细日志：`logs/trading.log`
-- 系统诊断工具：`diagnose_system.py`
-- 性能分析工具：`analyze_trading_performance.py`
-- 配置优化工具：`strategy_optimization.py`
+- **仅供学习研究**：实盘交易需谨慎评估风险
+- **API密钥安全**：妥善保管，避免泄露
+- **资金安全**：建议先用模拟账户测试
+- **合规交易**：遵守相关市场交易规则
 
 ## 📄 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件 
+MIT License

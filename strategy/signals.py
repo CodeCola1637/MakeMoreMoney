@@ -23,8 +23,10 @@ from longport.openapi import SubType
 
 class SignalType(Enum):
     """交易信号类型"""
-    BUY = "BUY"
-    SELL = "SELL"
+    BUY = "BUY"           # 买入（开多仓或平空仓）
+    SELL = "SELL"         # 卖出（平多仓）
+    SHORT = "SHORT"       # 做空（开空仓）
+    COVER = "COVER"       # 平空（买入平仓空头）
     HOLD = "HOLD"
     UNKNOWN = "UNKNOWN"
 
@@ -167,12 +169,15 @@ class SignalGenerator:
                     recent_data = hist_data.tail(self.lookback_period)
                     
                     for _, row in recent_data.iterrows():
+                        # 获取turnover，如果没有则估算
+                        turnover = float(row['turnover']) if 'turnover' in row else float(row['volume']) * float(row['close'])
                         data_point = {
                             "last_done": float(row['close']),
                             "open": float(row['open']),
                             "high": float(row['high']),
                             "low": float(row['low']),
                             "volume": float(row['volume']),
+                            "turnover": turnover,
                             "timestamp": row['datetime'] if 'datetime' in row else datetime.now()
                         }
                         self.data_cache[symbol].append(data_point)
@@ -216,6 +221,7 @@ class SignalGenerator:
                 "high": quote.high,
                 "low": quote.low,
                 "volume": quote.volume,
+                "turnover": getattr(quote, 'turnover', quote.volume * quote.last_done),  # 如果没有turnover，估算
                 "timestamp": current_time
             }
             
@@ -277,7 +283,8 @@ class SignalGenerator:
                     data["open"],
                     data["high"],
                     data["low"],
-                    data["volume"]
+                    data["volume"],
+                    data.get("turnover", data["volume"] * data["last_done"])  # turnover，如果没有则估算
                 ])
                 
             # 转换为numpy数组
@@ -287,32 +294,42 @@ class SignalGenerator:
             normalizer = get_default_normalizer()
             
             # 特征列名（与训练时保持一致的顺序）
+            # 模型期望 5 个特征：close, volume, high, low, turnover
             feature_names = self.config.get("strategy.training.features", 
-                                           ["close", "volume", "high", "low"])
-            # 注意：实时数据的特征顺序是 [last_done, open, high, low, volume]
-            # 需要映射到训练时的顺序 [close, volume, high, low]
+                                           ["close", "volume", "high", "low", "turnover"])
+            # 注意：实时数据的特征顺序是 [last_done, open, high, low, volume, turnover]
+            # 需要映射到训练时的顺序 [close, volume, high, low, turnover]
             # last_done -> close, 然后重新排列
             
             if normalizer.is_fitted:
                 # 使用保存的全局参数进行归一化
-                # 重新映射特征顺序：[last_done, open, high, low, volume] -> [close, volume, high, low]
+                # 重新映射特征顺序：[last_done, open, high, low, volume, turnover] -> [close, volume, high, low, turnover]
                 mapped_features = np.column_stack([
                     features[:, 0],  # last_done -> close
                     features[:, 4],  # volume
                     features[:, 2],  # high
                     features[:, 3],  # low
+                    features[:, 5],  # turnover
                 ])
                 data_norm = normalizer.transform_window(mapped_features, feature_names, use_global_params=True)
                 self.logger.debug(f"使用全局归一化参数: {symbol}")
             else:
                 # 后备方案：使用窗口内参数（与之前逻辑一致）
                 self.logger.warning(f"归一化器未拟合，使用窗口内参数: {symbol}")
-                data_norm = np.zeros_like(features, dtype=np.float32)
-                for i in range(features.shape[1]):
-                    min_val = features[:, i].min()
-                    max_val = features[:, i].max()
+                # 先映射到正确的特征顺序
+                mapped_features = np.column_stack([
+                    features[:, 0],  # last_done -> close
+                    features[:, 4],  # volume
+                    features[:, 2],  # high
+                    features[:, 3],  # low
+                    features[:, 5],  # turnover
+                ])
+                data_norm = np.zeros_like(mapped_features, dtype=np.float32)
+                for i in range(mapped_features.shape[1]):
+                    min_val = mapped_features[:, i].min()
+                    max_val = mapped_features[:, i].max()
                     if max_val > min_val:
-                        data_norm[:, i] = (features[:, i] - min_val) / (max_val - min_val)
+                        data_norm[:, i] = (mapped_features[:, i] - min_val) / (max_val - min_val)
                     else:
                         data_norm[:, i] = 0.5
             

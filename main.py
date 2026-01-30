@@ -26,6 +26,7 @@ from strategy.technical_strategy import TechnicalStrategy
 from strategy.strategy_ensemble import StrategyEnsemble, EnsembleMethod
 from strategy.portfolio_manager import PortfolioManager
 from strategy.profit_stop_manager import ProfitStopManager
+from strategy.stock_discovery import StockDiscovery
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
 
@@ -306,6 +307,32 @@ async def main():
         
         logger.info("所有股票行情数据订阅完成！")
         
+        # 🔍 初始化股票发现模块
+        discovery_enabled = config.get("discovery.enable", False)
+        stock_discovery = None
+        
+        if discovery_enabled:
+            try:
+                from longport.openapi import QuoteContext, Config as LPConfig
+                import yaml
+                
+                # 创建独立的行情上下文用于股票发现
+                with open('config.yaml', 'r') as f:
+                    api_cfg = yaml.safe_load(f)
+                
+                lp_config = LPConfig(
+                    app_key=api_cfg['api']['app_key'],
+                    app_secret=api_cfg['api']['app_secret'],
+                    access_token=api_cfg['api']['access_token']
+                )
+                discovery_quote_ctx = QuoteContext(lp_config)
+                
+                stock_discovery = StockDiscovery(discovery_quote_ctx, config, logger)
+                logger.info("🔍 股票发现模块初始化完成")
+            except Exception as e:
+                logger.warning(f"股票发现模块初始化失败: {e}")
+                discovery_enabled = False
+        
         # 🚀 使用 TaskManager 创建和管理所有任务
         logger.info("准备使用 TaskManager 启动所有后台任务...")
         signal_interval = config.get("strategy.signal_interval", 30)
@@ -417,6 +444,47 @@ async def main():
                           f"盈利{summary.get('profitable_positions', 0)}, "
                           f"亏损{summary.get('losing_positions', 0)}")
         
+        # 6. 股票发现任务
+        async def stock_discovery_task():
+            """股票发现任务（单次执行）"""
+            if not stock_discovery:
+                return
+            
+            try:
+                # 运行发现周期
+                ready_stocks = await stock_discovery.run_discovery_cycle()
+                
+                # 输出观察列表摘要
+                logger.info(stock_discovery.get_watch_list_summary())
+                
+                # 如果有准备入场的股票，生成信号
+                auto_trade = config.get("discovery.auto_trade", False)
+                if ready_stocks and auto_trade:
+                    for candidate in ready_stocks:
+                        try:
+                            # 生成买入信号
+                            signal = Signal(
+                                symbol=candidate.symbol,
+                                signal_type=Signal.SignalType.BUY,
+                                price=candidate.entry_price,
+                                quantity=1,  # 最小数量，实际由订单管理器计算
+                                confidence=candidate.confidence,
+                                source="discovery"
+                            )
+                            await on_signal(signal)
+                            logger.info(f"🎯 发现模块生成买入信号: {candidate.symbol}")
+                        except Exception as e:
+                            logger.error(f"生成发现信号失败: {candidate.symbol}, {e}")
+                elif ready_stocks:
+                    # 仅提醒，不自动交易
+                    for candidate in ready_stocks:
+                        logger.info(f"💡 发现入场机会（未启用自动交易）: {candidate.symbol} "
+                                  f"@ {candidate.current_price:.2f}, "
+                                  f"原因: {candidate.discovery_reason.value}")
+                        
+            except Exception as e:
+                logger.error(f"股票发现任务错误: {e}")
+        
         # ========== 使用 TaskManager 创建任务 ==========
         
         # 信号生成任务
@@ -468,6 +536,18 @@ async def main():
             is_critical=False
         )
         logger.info("💓 系统健康检查任务已创建（周期性，间隔300秒）")
+        
+        # 股票发现任务（每小时）
+        if discovery_enabled and stock_discovery:
+            discovery_interval = config.get("discovery.scan_interval", 3600)
+            task_manager.create_periodic_task(
+                name="stock_discovery",
+                coro_func=stock_discovery_task,
+                interval=discovery_interval,
+                max_restarts=5,
+                is_critical=False
+            )
+            logger.info(f"🔍 股票发现任务已创建（周期性，间隔{discovery_interval}秒）")
         
         logger.info("="*60)
         logger.info("🎉 所有任务已通过 TaskManager 启动！")
