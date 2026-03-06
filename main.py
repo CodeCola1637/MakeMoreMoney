@@ -21,7 +21,7 @@ from databases.db import init_db
 from data_loader.realtime import RealtimeDataManager
 from data_loader.historical import HistoricalDataLoader
 from strategy.train import LSTMModelTrainer
-from strategy.signals import SignalGenerator, Signal
+from strategy.signals import SignalGenerator, Signal, SignalType
 from strategy.technical_strategy import TechnicalStrategy
 from strategy.strategy_ensemble import StrategyEnsemble, EnsembleMethod
 from strategy.portfolio_manager import PortfolioManager
@@ -367,7 +367,7 @@ async def main():
                         
                 except Exception as e:
                     logger.error(f"处理组合信号失败: {symbol}, 错误: {e}")
-            
+                    
             duration = (datetime.now() - start_time).total_seconds()
             logger.info(f"✅ 信号生成完成，耗时: {duration:.2f}秒, 生成信号: {signals_generated}个")
         
@@ -465,11 +465,11 @@ async def main():
                             # 生成买入信号
                             signal = Signal(
                                 symbol=candidate.symbol,
-                                signal_type=Signal.SignalType.BUY,
+                                signal_type=SignalType.BUY,
                                 price=candidate.entry_price,
                                 quantity=1,  # 最小数量，实际由订单管理器计算
                                 confidence=candidate.confidence,
-                                source="discovery"
+                                strategy_name="discovery"
                             )
                             await on_signal(signal)
                             logger.info(f"🎯 发现模块生成买入信号: {candidate.symbol}")

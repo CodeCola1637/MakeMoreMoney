@@ -123,9 +123,19 @@ class ProfitStopManager:
     async def update_position_status(self, symbol: str, quantity: int, cost_price: float, current_price: float):
         """更新持仓状态"""
         try:
-            # 计算盈亏
+            # 计算盈亏（自动处理多空方向）
+            # 多头：价格上涨盈利
+            # 空头：价格下跌盈利（quantity为负数时自动反转）
             unrealized_pnl = (current_price - cost_price) * quantity
-            unrealized_pnl_pct = ((current_price - cost_price) / cost_price) * 100
+            
+            # 计算盈亏百分比（空头仓位需要反转符号）
+            is_short = quantity < 0
+            if is_short:
+                # 空头：价格下跌是盈利，百分比需要取反
+                unrealized_pnl_pct = -((current_price - cost_price) / cost_price) * 100
+            else:
+                # 多头：价格上涨是盈利
+                unrealized_pnl_pct = ((current_price - cost_price) / cost_price) * 100
             
             # 更新或创建持仓状态
             if symbol not in self.position_status:
@@ -149,14 +159,26 @@ class ProfitStopManager:
                 status.unrealized_pnl_pct = float(unrealized_pnl_pct)
                 status.last_update = datetime.now()
                 
-                # 更新最高价和追踪止损价格
-                if float(current_price) > status.highest_price:
-                    status.highest_price = float(current_price)
-                    # 更新追踪止损价格
-                    new_trailing_stop = float(current_price) * (1 - self.trailing_stop_pct / 100)
-                    if new_trailing_stop > status.trailing_stop_price:
-                        status.trailing_stop_price = new_trailing_stop
-                        self.logger.debug(f"更新追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
+                # 更新追踪止损逻辑（区分多空仓位）
+                is_short = quantity < 0
+                if is_short:
+                    # 空头仓位：追踪最低价，止损在上方
+                    if float(current_price) < status.highest_price:
+                        status.highest_price = float(current_price)  # 对于空头，这里存储的是最低价
+                        # 更新追踪止损价格（在最低价上方）
+                        new_trailing_stop = float(current_price) * (1 + self.trailing_stop_pct / 100)
+                        if new_trailing_stop < status.trailing_stop_price:
+                            status.trailing_stop_price = new_trailing_stop
+                            self.logger.debug(f"更新空头追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
+                else:
+                    # 多头仓位：追踪最高价，止损在下方
+                    if float(current_price) > status.highest_price:
+                        status.highest_price = float(current_price)
+                        # 更新追踪止损价格
+                        new_trailing_stop = float(current_price) * (1 - self.trailing_stop_pct / 100)
+                        if new_trailing_stop > status.trailing_stop_price:
+                            status.trailing_stop_price = new_trailing_stop
+                            self.logger.debug(f"更新多头追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
                 
                 self.logger.debug(f"更新持仓状态: {symbol}, 盈亏: {unrealized_pnl_pct:.2f}%, 最高价: {status.highest_price:.2f}")
                 
@@ -207,13 +229,17 @@ class ProfitStopManager:
             
             # 部分止盈
             elif status.unrealized_pnl_pct >= self.partial_profit_pct:
-                partial_quantity = max(1, status.quantity // 2)  # 卖出一半
+                # 使用绝对值计算部分数量，保持原符号
+                is_short = status.quantity < 0
+                abs_quantity = abs(status.quantity)
+                partial_abs = max(1, abs_quantity // 2)  # 平仓一半
+                partial_quantity = -partial_abs if is_short else partial_abs
                 return ExitSignal(
                     symbol=status.symbol,
                     signal_type="PARTIAL_PROFIT",
                     quantity=partial_quantity,
                     price=status.current_price,
-                    reason=f"达到部分止盈点{self.partial_profit_pct}%，卖出50%仓位",
+                    reason=f"达到部分止盈点{self.partial_profit_pct}%，平仓50%仓位",
                     urgency=5
                 )
             
@@ -261,16 +287,30 @@ class ProfitStopManager:
                     urgency=8
                 )
             
-            # 追踪止损
-            elif status.current_price <= status.trailing_stop_price:
-                return ExitSignal(
-                    symbol=status.symbol,
-                    signal_type="TRAILING_STOP",
-                    quantity=status.quantity,
-                    price=status.current_price,
-                    reason=f"触发追踪止损，当前价{status.current_price:.2f} <= 止损价{status.trailing_stop_price:.2f}",
-                    urgency=9
-                )
+            # 追踪止损（区分多空仓位）
+            is_short = status.quantity < 0
+            if is_short:
+                # 空头仓位：价格上涨到止损价以上时触发
+                if status.current_price >= status.trailing_stop_price:
+                    return ExitSignal(
+                        symbol=status.symbol,
+                        signal_type="TRAILING_STOP",
+                        quantity=status.quantity,
+                        price=status.current_price,
+                        reason=f"触发空头追踪止损，当前价{status.current_price:.2f} >= 止损价{status.trailing_stop_price:.2f}",
+                        urgency=9
+                    )
+            else:
+                # 多头仓位：价格下跌到止损价以下时触发
+                if status.current_price <= status.trailing_stop_price:
+                    return ExitSignal(
+                        symbol=status.symbol,
+                        signal_type="TRAILING_STOP",
+                        quantity=status.quantity,
+                        price=status.current_price,
+                        reason=f"触发多头追踪止损，当前价{status.current_price:.2f} <= 止损价{status.trailing_stop_price:.2f}",
+                        urgency=9
+                    )
             
             return None
             
@@ -331,23 +371,64 @@ class ProfitStopManager:
     async def execute_exit_signal(self, signal: ExitSignal) -> bool:
         """执行退出信号"""
         try:
-            self.logger.info(f"执行退出信号: {signal.symbol} {signal.signal_type} {signal.quantity}股, 原因: {signal.reason}")
+            # 判断是多头还是空头仓位
+            is_short = signal.quantity < 0
+            exit_quantity = abs(signal.quantity)  # 使用绝对值
             
-            # 调用订单管理器执行卖出
-            result = await self.order_manager.submit_sell_order(
-                symbol=signal.symbol,
-                price=signal.price,
-                quantity=signal.quantity,
-                strategy_name=f"profit_stop_{signal.signal_type.lower()}"
-            )
+                        # 检查账户资金状况（对于空头平仓需要买入）
+            if is_short:
+                # 估算平仓所需资金
+                estimated_cost = signal.price * exit_quantity
+                
+                # 获取账户资金信息
+                try:
+                    account_info = self.order_manager.get_account_info()
+                    if hasattr(account_info, "total_cash") and account_info.total_cash is not None:
+                        total_cash = account_info.total_cash
+                        
+                        # 如果总现金为负，无法进行买入交易
+                        if total_cash < 0:
+                            self.logger.warning(f"账户总现金为负({total_cash:.2f})，无法平仓空头仓位: {signal.symbol}")
+                            return False
+                        
+                        # 检查是否有足够资金
+                        if total_cash < estimated_cost:
+                            self.logger.warning(f"账户资金不足({total_cash:.2f} < {estimated_cost:.2f})，无法平仓空头仓位: {signal.symbol}")
+                            return False
+                except Exception as e:
+                    self.logger.warning(f"获取账户信息失败，继续尝试平仓: {e}")
+            
+                self.logger.info(f"执行空头平仓信号: {signal.symbol} {signal.signal_type} 买入{exit_quantity}股, 原因: {signal.reason}")
+                result = await self.order_manager.submit_buy_order(
+                    symbol=signal.symbol,
+                    price=signal.price,
+                    quantity=exit_quantity,
+                    strategy_name=f"profit_stop_{signal.signal_type.lower()}_cover"
+                )
+            else:
+                # 多头仓位：使用卖出订单平仓
+                self.logger.info(f"执行多头平仓信号: {signal.symbol} {signal.signal_type} 卖出{exit_quantity}股, 原因: {signal.reason}")
+                result = await self.order_manager.submit_sell_order(
+                    symbol=signal.symbol,
+                    price=signal.price,
+                    quantity=exit_quantity,
+                    strategy_name=f"profit_stop_{signal.signal_type.lower()}"
+                )
             
             if result and not result.is_rejected():
                 self.logger.info(f"止盈止损订单提交成功: {signal.symbol}, 订单ID: {result.order_id}")
                 
                 # 更新持仓状态
                 if signal.symbol in self.position_status:
-                    self.position_status[signal.symbol].quantity -= signal.quantity
-                    if self.position_status[signal.symbol].quantity <= 0:
+                    if is_short:
+                        # 空头平仓：数量增加（从负数向0）
+                        self.position_status[signal.symbol].quantity += exit_quantity
+                    else:
+                        # 多头平仓：数量减少
+                        self.position_status[signal.symbol].quantity -= exit_quantity
+                    
+                    # 仓位清零后删除状态跟踪
+                    if self.position_status[signal.symbol].quantity == 0:
                         del self.position_status[signal.symbol]
                         self.logger.info(f"清空持仓状态跟踪: {signal.symbol}")
                 

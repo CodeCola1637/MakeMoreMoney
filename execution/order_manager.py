@@ -2306,9 +2306,9 @@ class OrderManager:
             except:
                 return 0.0
 
-    def _validate_order_parameters(self, symbol: str, price, quantity: int) -> Tuple[bool, str]:
+    def _validate_order_parameters(self, symbol: str, price, quantity: int) -> Tuple[bool, str, float, int]:
         """
-        验证订单参数是否符合交易所规则
+        验证并自动修正订单参数，使其符合交易所规则
         
         Args:
             symbol: 股票代码
@@ -2316,10 +2316,9 @@ class OrderManager:
             quantity: 数量
             
         Returns:
-            (是否有效, 错误信息)
+            (是否有效, 错误信息或空字符串, 修正后价格, 修正后数量)
         """
         try:
-            # 统一转换价格类型
             if isinstance(price, Decimal):
                 price_float = float(price)
             elif isinstance(price, (int, float)):
@@ -2327,45 +2326,53 @@ class OrderManager:
             else:
                 price_float = float(str(price))
             
-            # 检查基本参数
+            corrected_price = price_float
+            corrected_quantity = quantity
+            
             if price_float <= 0:
-                return False, "价格必须大于0"
+                return False, "价格必须大于0", price_float, quantity
             
             if quantity <= 0:
-                return False, "数量必须大于0"
+                return False, "数量必须大于0", price_float, quantity
             
-            # 港股特殊验证
             if ".HK" in symbol:
-                # 获取港股价格精度
                 tick = self._get_hk_price_tick(price_float)
                 
-                # 检查价格精度
-                remainder = price_float % tick
-                if remainder > 0.0001:  # 考虑浮点数精度误差
-                    # 尝试调整价格
-                    adjusted_price = round(price_float / tick) * tick
-                    adjusted_price = round(adjusted_price, 3)
-                    self.logger.warning(f"价格{price_float}不符合最小价格变动单位{tick}，建议使用{adjusted_price}")
-                    return False, f"价格{price_float}不符合最小价格变动单位{tick}，建议使用{adjusted_price}"
+                try:
+                    from decimal import Decimal as D, ROUND_HALF_UP
+                    price_decimal = D(str(price_float))
+                    tick_decimal = D(str(tick))
+                    remainder = price_decimal % tick_decimal
+                    
+                    if remainder != D('0'):
+                        adjusted = (price_decimal / tick_decimal).quantize(D('1'), rounding=ROUND_HALF_UP) * tick_decimal
+                        corrected_price = float(adjusted)
+                        self.logger.info(f"自动修正港股价格: {price_float} -> {corrected_price} (tick={tick})")
+                except Exception as e:
+                    self.logger.warning(f"Decimal计算失败，使用浮点数逻辑: {e}")
+                    remainder = price_float % tick
+                    if abs(remainder) > 0.0001 and abs(remainder - tick) > 0.0001:
+                        corrected_price = round(round(price_float / tick) * tick, 3)
+                        self.logger.info(f"自动修正港股价格: {price_float} -> {corrected_price} (tick={tick})")
                 
-                # 检查手数
                 lot_size = self.get_lot_size(symbol)
-                if quantity % lot_size != 0:
-                    return False, f"数量{quantity}不符合最小交易手数{lot_size}的倍数"
+                if corrected_quantity % lot_size != 0:
+                    corrected_quantity = max(lot_size, (corrected_quantity // lot_size) * lot_size)
+                    self.logger.info(f"自动修正港股数量: {quantity} -> {corrected_quantity} (lot_size={lot_size})")
+                    if corrected_quantity <= 0:
+                        return False, f"数量{quantity}调整后为0，最小交易手数{lot_size}", price_float, quantity
             
-            # 美股验证
             elif ".US" in symbol:
-                # 美股价格精度为0.01
                 if round(price_float, 2) != price_float:
-                    adjusted_price = round(price_float, 2)
-                    return False, f"价格{price_float}精度过高，建议使用{adjusted_price}"
+                    corrected_price = round(price_float, 2)
+                    self.logger.info(f"自动修正美股价格精度: {price_float} -> {corrected_price}")
             
-            return True, ""
+            return True, "", corrected_price, corrected_quantity
             
         except Exception as e:
             error_msg = f"验证订单参数时发生错误: {e}"
             self.logger.error(error_msg)
-            return False, error_msg
+            return False, error_msg, float(price) if price else 0.0, quantity
 
     async def submit_buy_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default") -> OrderResult:
         """
@@ -2382,8 +2389,7 @@ class OrderManager:
         """
         self.logger.info(f"提交买入订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
         
-        # 验证订单参数
-        is_valid, error_msg = self._validate_order_parameters(symbol, price, quantity)
+        is_valid, error_msg, corrected_price, corrected_quantity = self._validate_order_parameters(symbol, price, quantity)
         if not is_valid:
             self.logger.error(f"订单参数验证失败: {error_msg}")
             return OrderResult(
@@ -2398,7 +2404,9 @@ class OrderManager:
                 strategy_name=strategy_name
             )
         
-        # 执行风险控制检查
+        price = corrected_price
+        quantity = corrected_quantity
+        
         if not await self.risk_control_check(symbol, quantity, price, is_buy=True):
             self.logger.warning(f"买入订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
             return OrderResult(
@@ -2413,7 +2421,6 @@ class OrderManager:
                 strategy_name=strategy_name
             )
             
-        # 提交订单
         return await self._submit_order(
             symbol=symbol,
             price=price,
@@ -2437,8 +2444,7 @@ class OrderManager:
         """
         self.logger.info(f"提交卖出订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
         
-        # 验证订单参数
-        is_valid, error_msg = self._validate_order_parameters(symbol, price, quantity)
+        is_valid, error_msg, corrected_price, corrected_quantity = self._validate_order_parameters(symbol, price, quantity)
         if not is_valid:
             self.logger.error(f"订单参数验证失败: {error_msg}")
             return OrderResult(
@@ -2453,7 +2459,9 @@ class OrderManager:
                 strategy_name=strategy_name
             )
         
-        # 执行风险控制检查
+        price = corrected_price
+        quantity = corrected_quantity
+        
         if not await self.risk_control_check(symbol, quantity, price, is_buy=False):
             self.logger.warning(f"卖出订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
             return OrderResult(
@@ -2468,7 +2476,6 @@ class OrderManager:
                 strategy_name=strategy_name
             )
             
-        # 提交订单
         return await self._submit_order(
             symbol=symbol,
             price=price,
@@ -3219,3 +3226,78 @@ class OrderManager:
         检查交易的盈利能力（保留原有方法兼容性）
         """
         return self._is_trade_cost_effective(symbol, quantity, price, confidence)
+
+    def get_account_info(self):
+        """
+        获取账户信息
+        
+        Returns:
+            dict: 账户信息字典
+        """
+        try:
+            # 确保account_balance是可调用的方法
+            if hasattr(self, 'account_balance') and callable(self.account_balance):
+                balance_data = self.account_balance()
+            else:
+                # 如果account_balance不是方法，尝试直接访问余额数据
+                if hasattr(self, 'balance'):
+                    balance_data = self.balance
+                else:
+                    self.logger.error("无法获取账户余额: account_balance不可调用且没有balance属性")
+                    return self._create_default_account_info()
+            
+            # 确保stock_positions是可调用的方法
+            if hasattr(self, 'stock_positions') and callable(self.stock_positions):
+                positions = self.stock_positions()
+            else:
+                # 如果stock_positions不是方法，尝试直接访问持仓数据
+                if hasattr(self, 'positions'):
+                    positions = list(self.positions.values()) if isinstance(self.positions, dict) else self.positions
+                else:
+                    self.logger.error("无法获取持仓: stock_positions不可调用且没有positions属性")
+                    return self._create_default_account_info()
+            
+            # 计算总市值和可用资金
+            total_market_value = 0.0
+            total_cash = 0.0
+            
+            # 解析余额数据
+            if isinstance(balance_data, list) and len(balance_data) > 0:
+                for balance in balance_data:
+                    if hasattr(balance, 'currency') and hasattr(balance, 'available'):
+                        if balance.currency == 'USD':
+                            total_cash += float(balance.available)
+                        elif balance.currency == 'HKD':
+                            # 简单汇率转换（实际应该使用实时汇率）
+                            total_cash += float(balance.available) * 0.128  # HKD to USD
+            elif isinstance(balance_data, dict):
+                # 处理字典格式的余额数据
+                if 'USD' in balance_data:
+                    total_cash += float(balance_data['USD'])
+                if 'HKD' in balance_data:
+                    total_cash += float(balance_data['HKD']) * 0.128
+            
+            # 返回字典格式的账户信息（更兼容）
+            return {
+                'total_cash': total_cash,
+                'total_market_value': total_market_value,
+                'positions_count': len(positions),
+                'currency': 'USD',
+                'balances': balance_data,
+                'positions': positions
+            }
+            
+        except Exception as e:
+            self.logger.error(f"获取账户信息失败: {e}")
+            return self._create_default_account_info()
+    
+    def _create_default_account_info(self):
+        """创建默认账户信息"""
+        return {
+            'total_cash': 0.0,
+            'total_market_value': 0.0,
+            'positions_count': 0,
+            'currency': 'USD',
+            'balances': [],
+            'positions': []
+        }

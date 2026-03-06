@@ -241,3 +241,17 @@ models/*.keras
 
 # 忽略订单数据
 logs/orders.csv
+
+# 忽略备份文件
+*.backup
+*.backup.*
+*.bak
+*.tmp
+
+# 忽略临时脚本
+fix_*.py
+test_*.py
+check_account_enhanced.py
+
+# 忽略交易输出日志
+trading_output.log
