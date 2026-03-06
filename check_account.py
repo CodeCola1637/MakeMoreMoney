@@ -47,7 +47,26 @@ async def check_account():
             positions = order_mgr.get_positions()  # 不使用await
             if positions and len(positions) > 0:
                 for p in positions:
-                    print(f'股票: {p.symbol}, 持仓数量: {p.quantity}, 成本价: {p.avg_price}, 市值: {p.market_value}')
+                    # 安全地获取属性，避免avg_price不存在
+                    symbol = getattr(p, 'symbol', '未知')
+                    quantity = getattr(p, 'quantity', 0)
+                    
+                    # 尝试获取成本价，如果不存在则显示N/A
+                    avg_price = getattr(p, 'avg_price', None)
+                    if avg_price is None:
+                        avg_price = getattr(p, 'cost_price', 'N/A')
+                    
+                    # 尝试获取市值，如果不存在则计算或显示N/A
+                    market_value = getattr(p, 'market_value', None)
+                    if market_value is None:
+                        # 如果有当前价格，可以计算市值
+                        current_price = getattr(p, 'current_price', None)
+                        if current_price is not None:
+                            market_value = abs(float(quantity)) * float(current_price)
+                        else:
+                            market_value = 'N/A'
+                    
+                    print(f'股票: {symbol}, 持仓数量: {quantity}, 成本价: {avg_price}, 市值: {market_value}')
             else:
                 print('当前无持仓')
         except Exception as e:
