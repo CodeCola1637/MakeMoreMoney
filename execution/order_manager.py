@@ -2960,15 +2960,18 @@ class OrderManager:
                     ])
                 
                 # 写入订单数据
+                side_str = str(result.side.value) if hasattr(result.side, 'value') else str(result.side)
+                status_str = str(result.status.value) if hasattr(result.status, 'value') else str(result.status)
+                executed_qty = getattr(result, 'executed_quantity', getattr(result, 'filled_quantity', 0))
                 writer.writerow([
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     result.order_id,
                     result.symbol,
-                    result.side.value,
+                    side_str,
                     result.quantity,
                     result.price,
-                    result.status.value,
-                    result.executed_quantity
+                    status_str,
+                    executed_qty
                 ])
                 
             self.logger.info(f"订单信息已保存到 {csv_file}")
@@ -3235,56 +3238,15 @@ class OrderManager:
             dict: 账户信息字典
         """
         try:
-            # 确保account_balance是可调用的方法
-            if hasattr(self, 'account_balance') and callable(self.account_balance):
-                balance_data = self.account_balance()
-            else:
-                # 如果account_balance不是方法，尝试直接访问余额数据
-                if hasattr(self, 'balance'):
-                    balance_data = self.balance
-                else:
-                    self.logger.error("无法获取账户余额: account_balance不可调用且没有balance属性")
-                    return self._create_default_account_info()
+            total_cash = self.get_account_balance()
+            positions = self.get_positions()
             
-            # 确保stock_positions是可调用的方法
-            if hasattr(self, 'stock_positions') and callable(self.stock_positions):
-                positions = self.stock_positions()
-            else:
-                # 如果stock_positions不是方法，尝试直接访问持仓数据
-                if hasattr(self, 'positions'):
-                    positions = list(self.positions.values()) if isinstance(self.positions, dict) else self.positions
-                else:
-                    self.logger.error("无法获取持仓: stock_positions不可调用且没有positions属性")
-                    return self._create_default_account_info()
-            
-            # 计算总市值和可用资金
-            total_market_value = 0.0
-            total_cash = 0.0
-            
-            # 解析余额数据
-            if isinstance(balance_data, list) and len(balance_data) > 0:
-                for balance in balance_data:
-                    if hasattr(balance, 'currency') and hasattr(balance, 'available'):
-                        if balance.currency == 'USD':
-                            total_cash += float(balance.available)
-                        elif balance.currency == 'HKD':
-                            # 简单汇率转换（实际应该使用实时汇率）
-                            total_cash += float(balance.available) * 0.128  # HKD to USD
-            elif isinstance(balance_data, dict):
-                # 处理字典格式的余额数据
-                if 'USD' in balance_data:
-                    total_cash += float(balance_data['USD'])
-                if 'HKD' in balance_data:
-                    total_cash += float(balance_data['HKD']) * 0.128
-            
-            # 返回字典格式的账户信息（更兼容）
             return {
                 'total_cash': total_cash,
-                'total_market_value': total_market_value,
-                'positions_count': len(positions),
+                'total_market_value': 0.0,
+                'positions_count': len(positions) if positions else 0,
                 'currency': 'USD',
-                'balances': balance_data,
-                'positions': positions
+                'positions': positions or []
             }
             
         except Exception as e:

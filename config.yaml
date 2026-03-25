@@ -148,6 +148,31 @@ discovery:
   #   - "AAPL.US"
   #   - "NVDA.US"
 
+# 机构交易跟踪配置
+institutional:
+  enable: true                       # 是否启用机构跟踪
+  scan_interval: 7200                # 扫描间隔（秒），默认2小时
+  user_email: "research@example.com" # SEC EDGAR 要求的联系邮箱
+  insider_days: 30                   # 内部人交易回看天数
+  min_transaction_value: 100000      # 最小交易金额过滤（美元）
+  insider_buy_confidence_boost: 0.15 # 内部人买入信号置信度加成
+  min_institutions_buying: 2         # 触发信号的最少机构数
+  auto_trade: true                   # 是否自动执行机构跟踪信号
+  # 跟踪的机构（默认全部跟踪，也可指定子集）
+  tracked_institutions:
+    - berkshire_hathaway    # 巴菲特 - Berkshire Hathaway
+    - bridgewater           # 达里奥 - Bridgewater Associates
+    - renaissance           # 文艺复兴科技
+    - citadel               # 城堡投资
+    - two_sigma             # Two Sigma
+    - point72               # 科恩 - Point72
+    - blackrock             # 贝莱德
+    - jpmorgan              # 摩根大通
+    - goldman_sachs         # 高盛
+    - morgan_stanley        # 摩根士丹利
+    - soros                 # 索罗斯基金
+    - appaloosa             # 泰珀 - Appaloosa
+
 ensemble:
   enable: true
   method: confidence_weight  # equal_weight, confidence_weight, performance_weight, dynamic_weight

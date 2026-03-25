@@ -27,6 +27,7 @@ from strategy.strategy_ensemble import StrategyEnsemble, EnsembleMethod
 from strategy.portfolio_manager import PortfolioManager
 from strategy.profit_stop_manager import ProfitStopManager
 from strategy.stock_discovery import StockDiscovery
+from strategy.institutional_tracker import InstitutionalTracker
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
 
@@ -333,6 +334,18 @@ async def main():
                 logger.warning(f"股票发现模块初始化失败: {e}")
                 discovery_enabled = False
         
+        # 🏦 初始化机构交易跟踪模块
+        institutional_enabled = config.get("institutional.enable", False)
+        institutional_tracker = None
+        
+        if institutional_enabled:
+            try:
+                institutional_tracker = InstitutionalTracker(config, logger)
+                logger.info("🏦 机构交易跟踪模块初始化完成")
+            except Exception as e:
+                logger.warning(f"机构交易跟踪模块初始化失败: {e}")
+                institutional_enabled = False
+        
         # 🚀 使用 TaskManager 创建和管理所有任务
         logger.info("准备使用 TaskManager 启动所有后台任务...")
         signal_interval = config.get("strategy.signal_interval", 30)
@@ -485,6 +498,57 @@ async def main():
             except Exception as e:
                 logger.error(f"股票发现任务错误: {e}")
         
+        # 7. 机构交易跟踪任务
+        async def institutional_tracking_task():
+            """机构交易跟踪任务（单次执行）"""
+            if not institutional_tracker:
+                return
+            
+            try:
+                signals = await institutional_tracker.run_scan_cycle(watch_symbols=args.symbols)
+                
+                logger.info(institutional_tracker.get_summary())
+                
+                auto_trade = config.get("institutional.auto_trade", False)
+                if signals and auto_trade:
+                    for inst_sig in signals:
+                        try:
+                            sig_type = SignalType.BUY if inst_sig.signal_type == 'BUY' else SignalType.SELL
+                            
+                            quotes = await realtime_mgr.get_quote([inst_sig.symbol])
+                            if quotes and inst_sig.symbol in quotes:
+                                price = float(quotes[inst_sig.symbol].last_done)
+                            else:
+                                logger.warning(f"无法获取 {inst_sig.symbol} 价格，跳过")
+                                continue
+                            
+                            signal = Signal(
+                                symbol=inst_sig.symbol,
+                                signal_type=sig_type,
+                                price=price,
+                                quantity=1,
+                                confidence=inst_sig.confidence,
+                                strategy_name="institutional",
+                                extra_data={
+                                    'reason': inst_sig.reason,
+                                    'sources': inst_sig.sources[:3],
+                                    'institutional_score': inst_sig.institutional_score,
+                                }
+                            )
+                            await on_signal(signal)
+                            logger.info(f"🏦 机构跟踪信号: {inst_sig.symbol} {inst_sig.signal_type}, "
+                                      f"置信度={inst_sig.confidence:.2f}, {inst_sig.reason}")
+                        except Exception as e:
+                            logger.error(f"执行机构信号失败: {inst_sig.symbol}, {e}")
+                elif signals:
+                    for inst_sig in signals:
+                        logger.info(f"🏦 机构信号（未启用自动交易）: {inst_sig.symbol} "
+                                  f"{inst_sig.signal_type}, 置信度={inst_sig.confidence:.2f}, "
+                                  f"{inst_sig.reason}")
+                        
+            except Exception as e:
+                logger.error(f"机构交易跟踪任务错误: {e}")
+        
         # ========== 使用 TaskManager 创建任务 ==========
         
         # 信号生成任务
@@ -548,6 +612,18 @@ async def main():
                 is_critical=False
             )
             logger.info(f"🔍 股票发现任务已创建（周期性，间隔{discovery_interval}秒）")
+        
+        # 机构交易跟踪任务（每2小时）
+        if institutional_enabled and institutional_tracker:
+            inst_interval = config.get("institutional.scan_interval", 7200)
+            task_manager.create_periodic_task(
+                name="institutional_tracking",
+                coro_func=institutional_tracking_task,
+                interval=inst_interval,
+                max_restarts=5,
+                is_critical=False
+            )
+            logger.info(f"🏦 机构交易跟踪任务已创建（周期性，间隔{inst_interval}秒）")
         
         logger.info("="*60)
         logger.info("🎉 所有任务已通过 TaskManager 启动！")

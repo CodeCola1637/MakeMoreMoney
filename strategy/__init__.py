@@ -13,6 +13,7 @@ from strategy.strategy_ensemble import StrategyEnsemble, EnsembleMethod
 from strategy.technical_strategy import TechnicalStrategy
 from strategy.portfolio_manager import PortfolioManager
 from strategy.profit_stop_manager import ProfitStopManager
+from strategy.institutional_tracker import InstitutionalTracker
 
 __all__ = [
     'Signal',
@@ -30,5 +31,6 @@ __all__ = [
     'EnsembleMethod',
     'TechnicalStrategy',
     'PortfolioManager',
-    'ProfitStopManager'
+    'ProfitStopManager',
+    'InstitutionalTracker',
 ]
