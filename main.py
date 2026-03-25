@@ -28,6 +28,7 @@ from strategy.portfolio_manager import PortfolioManager
 from strategy.profit_stop_manager import ProfitStopManager
 from strategy.stock_discovery import StockDiscovery
 from strategy.institutional_tracker import InstitutionalTracker
+from strategy.volume_anomaly_detector import VolumeAnomalyDetector
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
 
@@ -346,6 +347,19 @@ async def main():
                 logger.warning(f"机构交易跟踪模块初始化失败: {e}")
                 institutional_enabled = False
         
+        # 📊 初始化异常成交量检测模块
+        volume_anomaly_enabled = config.get("volume_anomaly.enable", False)
+        volume_detector = None
+        
+        if volume_anomaly_enabled:
+            try:
+                volume_detector = VolumeAnomalyDetector(config, realtime_mgr, hist_loader, logger)
+                await volume_detector.start(args.symbols)
+                logger.info("📊 异常成交量检测模块初始化完成")
+            except Exception as e:
+                logger.warning(f"异常成交量检测模块初始化失败: {e}")
+                volume_anomaly_enabled = False
+        
         # 🚀 使用 TaskManager 创建和管理所有任务
         logger.info("准备使用 TaskManager 启动所有后台任务...")
         signal_interval = config.get("strategy.signal_interval", 30)
@@ -549,6 +563,50 @@ async def main():
             except Exception as e:
                 logger.error(f"机构交易跟踪任务错误: {e}")
         
+        # 8. 异常成交量检测任务
+        async def volume_anomaly_task():
+            """异常成交量检测信号生成任务（单次执行）"""
+            if not volume_detector:
+                return
+            
+            try:
+                vol_signals = await volume_detector.check_and_generate_signals()
+                
+                if vol_signals:
+                    logger.info(volume_detector.get_summary())
+                
+                auto_trade = config.get("volume_anomaly.auto_trade", False)
+                if vol_signals and auto_trade:
+                    for vs in vol_signals:
+                        try:
+                            sig_type = SignalType.BUY if vs.signal_type == 'BUY' else SignalType.SELL
+                            
+                            signal = Signal(
+                                symbol=vs.symbol,
+                                signal_type=sig_type,
+                                price=vs.price,
+                                quantity=1,
+                                confidence=vs.confidence,
+                                strategy_name="volume_anomaly",
+                                extra_data={
+                                    'reason': vs.reason,
+                                    'anomaly_count': len(vs.anomalies),
+                                }
+                            )
+                            await on_signal(signal)
+                            logger.info(f"📊 异常成交量信号: {vs.symbol} {vs.signal_type}, "
+                                      f"置信度={vs.confidence:.2f}, {vs.reason}")
+                        except Exception as e:
+                            logger.error(f"执行成交量信号失败: {vs.symbol}, {e}")
+                elif vol_signals:
+                    for vs in vol_signals:
+                        logger.info(f"📊 成交量异常（未启用自动交易）: {vs.symbol} "
+                                  f"{vs.signal_type}, 置信度={vs.confidence:.2f}, "
+                                  f"{vs.reason}")
+                        
+            except Exception as e:
+                logger.error(f"异常成交量检测任务错误: {e}")
+        
         # ========== 使用 TaskManager 创建任务 ==========
         
         # 信号生成任务
@@ -624,6 +682,18 @@ async def main():
                 is_critical=False
             )
             logger.info(f"🏦 机构交易跟踪任务已创建（周期性，间隔{inst_interval}秒）")
+        
+        # 异常成交量检测任务
+        if volume_anomaly_enabled and volume_detector:
+            vol_interval = config.get("volume_anomaly.check_interval", 60)
+            task_manager.create_periodic_task(
+                name="volume_anomaly",
+                coro_func=volume_anomaly_task,
+                interval=vol_interval,
+                max_restarts=5,
+                is_critical=False
+            )
+            logger.info(f"📊 异常成交量检测任务已创建（周期性，间隔{vol_interval}秒）")
         
         logger.info("="*60)
         logger.info("🎉 所有任务已通过 TaskManager 启动！")

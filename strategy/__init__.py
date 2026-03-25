@@ -14,6 +14,7 @@ from strategy.technical_strategy import TechnicalStrategy
 from strategy.portfolio_manager import PortfolioManager
 from strategy.profit_stop_manager import ProfitStopManager
 from strategy.institutional_tracker import InstitutionalTracker
+from strategy.volume_anomaly_detector import VolumeAnomalyDetector
 
 __all__ = [
     'Signal',
@@ -33,4 +34,5 @@ __all__ = [
     'PortfolioManager',
     'ProfitStopManager',
     'InstitutionalTracker',
+    'VolumeAnomalyDetector',
 ]

@@ -148,6 +148,19 @@ discovery:
   #   - "AAPL.US"
   #   - "NVDA.US"
 
+# 异常成交量检测配置
+volume_anomaly:
+  enable: true
+  check_interval: 60              # 信号生成间隔（秒）
+  surge_multiplier: 3.0           # 成交量激增阈值（3x日均量）
+  spike_std_threshold: 2.5        # 成交量突刺标准差阈值
+  block_trade_pct: 0.5            # 大宗交易阈值（日均量的0.5%在单次推送内）
+  divergence_volume_ratio: 2.0    # 量价背离：成交速率需超过均值的倍数
+  divergence_price_threshold: 0.003  # 量价背离：价格变动上限（0.3%算作"平"）
+  lookback_days: 30               # 历史基线计算天数
+  min_anomaly_confidence: 0.5     # 最小信号置信度
+  auto_trade: true                # 是否自动执行异常成交量信号
+
 # 机构交易跟踪配置
 institutional:
   enable: true                       # 是否启用机构跟踪
