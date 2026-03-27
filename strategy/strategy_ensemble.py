@@ -335,10 +335,34 @@ class StrategyEnsemble:
             # 计算平均价格
             avg_price = np.mean(prices) if prices else data.get('last_done', 0)
             
-            # 计算建议数量（基于总置信度）
-            base_quantity = 100
-            quantity_multiplier = min(total_confidence * 2, 3.0)  # 最多3倍基础数量
-            suggested_quantity = int(base_quantity * quantity_multiplier)
+            # Lot-aware quantity calculation
+            target_value = self.config.get("execution.risk_control.position_pct", 5.0) / 100.0
+            total_equity = self.config.get("execution.initial_capital", 15000.0)
+            try:
+                max_trade_value = total_equity * target_value
+            except Exception:
+                max_trade_value = 750.0
+            
+            if avg_price > 0:
+                raw_quantity = int(max_trade_value / avg_price)
+            else:
+                raw_quantity = 100
+            
+            lot_size = 1
+            if '.HK' in symbol:
+                hk_lots = {
+                    '700.HK': 100, '9988.HK': 100, '388.HK': 100,
+                    '1299.HK': 500, '941.HK': 500, '9992.HK': 200,
+                }
+                lot_size = hk_lots.get(symbol, 100)
+            
+            suggested_quantity = max(lot_size, (raw_quantity // lot_size) * lot_size)
+            
+            confidence_scale = min(total_confidence * 2, 2.0)
+            suggested_quantity = max(lot_size, int(suggested_quantity * confidence_scale))
+            suggested_quantity = (suggested_quantity // lot_size) * lot_size
+            if suggested_quantity <= 0:
+                suggested_quantity = lot_size
             
             # 创建组合信号
             ensemble_signal = Signal(

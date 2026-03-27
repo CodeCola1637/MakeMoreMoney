@@ -510,22 +510,39 @@ async def main():
                 # 输出观察列表摘要
                 logger.info(stock_discovery.get_watch_list_summary())
                 
-                # 如果有准备入场的股票，生成信号
                 auto_trade = config.get("discovery.auto_trade", False)
                 if ready_stocks and auto_trade:
+                    existing_symbols = set()
+                    try:
+                        positions = order_mgr.get_positions()
+                        existing_symbols = {
+                            getattr(p, 'symbol', '').upper() for p in positions
+                        }
+                    except Exception:
+                        pass
+                    
                     for candidate in ready_stocks:
+                        if candidate.symbol.upper() in existing_symbols:
+                            logger.debug(f"发现模块跳过已持仓: {candidate.symbol}")
+                            continue
                         try:
-                            # 生成买入信号
+                            lot_size = order_mgr.get_lot_size(candidate.symbol)
+                            min_trade_val = config.get("execution.min_trade_value", 200)
+                            quantity = max(lot_size, int(min_trade_val / candidate.entry_price) if candidate.entry_price > 0 else lot_size)
+                            quantity = (quantity // lot_size) * lot_size
+                            if quantity <= 0:
+                                quantity = lot_size
+                            
                             signal = Signal(
                                 symbol=candidate.symbol,
                                 signal_type=SignalType.BUY,
                                 price=candidate.entry_price,
-                                quantity=1,  # 最小数量，实际由订单管理器计算
+                                quantity=quantity,
                                 confidence=candidate.confidence,
                                 strategy_name="discovery"
                             )
                             await on_signal(signal)
-                            logger.info(f"🎯 发现模块生成买入信号: {candidate.symbol}")
+                            logger.info(f"🎯 发现模块生成买入信号: {candidate.symbol}, 数量: {quantity}")
                         except Exception as e:
                             logger.error(f"生成发现信号失败: {candidate.symbol}, {e}")
                 elif ready_stocks:

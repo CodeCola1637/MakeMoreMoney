@@ -19,7 +19,7 @@ execution:
     after_hours_end: "20:00"      # 盘后结束时间
   # 做空交易配置（仅美股支持）
   enable_short_selling: true      # 启用做空交易
-  max_short_position: 200         # 单只股票最大空头持仓
+  max_short_position: 100         # 单只股票最大空头持仓
   max_total_short_exposure: 50000 # 总空头敞口限制（美元）
   short_margin_requirement: 1.5   # 做空保证金要求（150%）
   hk_commission_rate: 0.0025
@@ -60,10 +60,10 @@ execution:
   small_trade_max_cost_ratio: 2.5
   small_trade_threshold: 800
   stop_loss:
-    emergency_stop_pct: 15.0
+    emergency_stop_pct: 10.0
     enable: true
-    fixed_stop_pct: 8.0
-    max_loss_per_day: 5.0
+    fixed_stop_pct: 5.0
+    max_loss_per_day: 3.0
     trailing_stop_pct: 3.0
   trailing_stop_pct: 2.0
   us_commission_rate: 0.005
@@ -116,7 +116,7 @@ strategy:
     trend_confirmation: true
     volume_confirmation: true
   # 信号过滤器配置 - 防止重复信号和过度交易
-  signal_cooldown: 600           # 同一股票相同信号冷却期（秒）
+  signal_cooldown: 1800          # 同一股票相同信号冷却期（秒）30分钟
   max_signals_per_day: 10        # 每个股票每日最大信号数量
   price_change_threshold: 0.01   # 价格变化阈值（1%）才生成新信号
   # 相关性过滤器配置 - 风险分散
@@ -140,7 +140,7 @@ discovery:
   min_confidence: 0.6             # 最小置信度
   watch_expiry_hours: 48          # 观察过期时间（小时）
   max_watch_list: 20              # 最大观察列表大小
-  auto_trade: true                # 是否自动交易（已启用）
+  auto_trade: false               # 已集成到 ensemble，发现模块仅做提醒
   # 自定义股票池（可选，不配置则使用默认池）
   # hk_pool:
   #   - "700.HK"

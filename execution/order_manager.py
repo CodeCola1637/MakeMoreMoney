@@ -366,6 +366,13 @@ class OrderManager:
         self.fund_guard = FundGuard(self, config_loader, self.logger)
         self.logger.info("✅ 资金守卫初始化完成")
         
+        # Pending order dedup: {symbol: {"side": str, "order_id": str, "submitted_at": datetime}}
+        self._pending_signal_orders: Dict[str, dict] = {}
+        self._pending_order_ttl = timedelta(minutes=30)
+        
+        # Symbols that the exchange rejected for short selling (e.g. 603301 error)
+        self._short_blacklist: set = set()
+        
     async def initialize(self):
         """初始化订单管理器"""
         # 初始化状态
@@ -623,6 +630,25 @@ class OrderManager:
         self.order_callbacks.append(callback)
         self.logger.debug(f"已注册订单回调函数: {callback.__name__}")
     
+    def _check_pending_dedup(self, symbol: str, side: str) -> bool:
+        """Return True if a duplicate pending order exists for this symbol+side."""
+        now = datetime.now()
+        expired = [s for s, v in self._pending_signal_orders.items()
+                   if now - v["submitted_at"] > self._pending_order_ttl]
+        for s in expired:
+            del self._pending_signal_orders[s]
+        
+        if symbol in self._pending_signal_orders:
+            pending = self._pending_signal_orders[symbol]
+            if pending["side"] == side:
+                self.logger.info(
+                    f"跳过重复订单: {symbol} {side} 已有待处理订单 "
+                    f"(order_id={pending.get('order_id')}, "
+                    f"提交于 {pending['submitted_at'].strftime('%H:%M:%S')})"
+                )
+                return True
+        return False
+    
     async def execute_signal(self, signal: Signal, realtime_mgr=None):
         """执行交易信号"""
         if not self._validate_risk_control(signal):
@@ -662,6 +688,10 @@ class OrderManager:
                 side_str = "Short"
             else:
                 side_str = "Hold"
+            
+            if signal_type not in [SignalType.HOLD, SignalType.UNKNOWN] and \
+               self._check_pending_dedup(symbol, side_str):
+                return None
             
             if signal_type not in [SignalType.HOLD, SignalType.UNKNOWN]:
                 is_valid, validation_msg, details = await self.validator.validate_order(
@@ -751,12 +781,16 @@ class OrderManager:
                 return None
             
             if result:
-                # 🔧 修复：记录订单详情
                 actual_side_str = result.side.name if hasattr(result.side, 'name') else str(result.side)
                 status_str = result.status.name if hasattr(result.status, 'name') else str(result.status)
                 self.logger.info(f"✅ 订单已提交: {result.order_id}, 方向={actual_side_str}, 状态={status_str}")
                 
-                # 🔧 修复：传入策略名称字符串而非整个signal对象
+                self._pending_signal_orders[symbol] = {
+                    "side": side_str,
+                    "order_id": getattr(result, 'order_id', None),
+                    "submitted_at": datetime.now()
+                }
+                
                 strategy_name = getattr(signal, 'strategy_name', 'unknown')
                 if hasattr(signal, 'id'):
                     strategy_name = f"{strategy_name}|{signal.id}"
@@ -1368,6 +1402,16 @@ class OrderManager:
         current_quantity = position.quantity if position else 0
         
         if not position or current_quantity <= 0:
+            if symbol.upper() in self._short_blacklist:
+                self.logger.warning(f"做空黑名单: {symbol} 交易所不支持做空")
+                return OrderResult(
+                    order_id="", symbol=symbol, side=OrderSide.Sell,
+                    quantity=quantity, price=price,
+                    status=OrderStatus.Rejected, submitted_at=datetime.now(),
+                    msg=f"做空黑名单: {symbol} 不支持做空",
+                    strategy_name=signal.strategy_name if hasattr(signal, 'strategy_name') else ""
+                )
+            
             if self.config.get("execution.enable_short_selling", True):
                 market_label = "美股" if is_us_stock else "港股"
                 self.logger.info(f"📉 {market_label}做空: {symbol}, 数量: {quantity}, 当前持仓: {current_quantity}")
@@ -1606,9 +1650,13 @@ class OrderManager:
             return result
             
         except Exception as e:
-            self.logger.error(f"提交订单到交易所失败: {symbol}, 错误: {e}")
+            error_str = str(e)
+            self.logger.error(f"提交订单到交易所失败: {symbol}, 错误: {error_str}")
             
-            # 创建失败的订单结果（移除id参数）
+            if "603301" in error_str or "not support short selling" in error_str.lower():
+                self._short_blacklist.add(symbol.upper())
+                self.logger.warning(f"已将 {symbol} 加入做空黑名单 (603301)")
+            
             return OrderResult(
                 order_id="",
                 symbol=symbol,
@@ -1617,75 +1665,66 @@ class OrderManager:
                 price=adjusted_price,
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
-                msg=f"提交失败: {str(e)}",
+                msg=f"提交失败: {error_str}",
                 strategy_name=strategy_name
             )
     
+    # Cached lot sizes queried from the exchange API
+    _lot_size_cache: Dict[str, int] = {}
+    
+    def _query_lot_size_from_api(self, symbol: str) -> Optional[int]:
+        """Query lot size from LongPort QuoteContext.static_info API."""
+        try:
+            from longport.openapi import QuoteContext as QCtx
+            quote_ctx = QCtx(self.longport_config)
+            infos = quote_ctx.static_info([symbol])
+            if infos:
+                info = infos[0] if isinstance(infos, list) else infos
+                lot = int(getattr(info, 'lot_size', 0))
+                if lot > 0:
+                    self.logger.info(f"从API获取 {symbol} 手数: {lot}")
+                    return lot
+        except Exception as e:
+            self.logger.warning(f"API查询 {symbol} 手数失败: {e}")
+        return None
+
     def _get_real_lot_size(self, symbol: str) -> int:
-        """
-        获取真实的港股手数信息（如果可用）
+        """获取真实的港股手数信息（缓存 + API查询 + 硬编码兜底）"""
+        if symbol in self._lot_size_cache:
+            return self._lot_size_cache[symbol]
         
-        Args:
-            symbol: 股票代码
-            
-        Returns:
-            真实手数，如果无法获取则返回默认值
-        """
-        # 已知的港股手数映射
-        known_lot_sizes = {
-            '700.HK': 100,      # 腾讯控股
-            '9988.HK': 100,     # 阿里巴巴
-            '388.HK': 100,      # 港交易所
-            '1299.HK': 500,     # 友邦保险 - 500股为1手
-            '941.HK': 500,      # 中国移动 - 500股为1手
+        lot = self._query_lot_size_from_api(symbol)
+        if lot:
+            self._lot_size_cache[symbol] = lot
+            return lot
+        
+        fallback = {
+            '700.HK': 100, '9988.HK': 100, '388.HK': 100,
+            '1299.HK': 500, '941.HK': 500, '9992.HK': 200,
         }
-        
-        if symbol in known_lot_sizes:
-            self.logger.info(f"使用已知手数配置 {symbol}: {known_lot_sizes[symbol]}")
-            return known_lot_sizes[symbol]
-        
-        # 如果没有已知配置，返回默认100股
-        self.logger.warning(f"未找到 {symbol} 的确切手数信息，使用默认100股")
-        return 100
+        lot = fallback.get(symbol, 100)
+        self._lot_size_cache[symbol] = lot
+        self.logger.warning(f"使用兜底手数 {symbol}: {lot}")
+        return lot
 
     def get_lot_size(self, symbol: str) -> int:
-        """
-        获取股票的最小交易单位
-        
-        Args:
-            symbol: 股票代码
-            
-        Returns:
-            最小交易单位
-        """
+        """获取股票的最小交易单位"""
         try:
-            # 根据股票代码判断市场
             if '.HK' in symbol:
-                # 港股使用真实手数信息
                 lot_size = self._get_real_lot_size(symbol)
-                self.logger.debug(f"{symbol} 使用港股手数: {lot_size}")
             elif '.US' in symbol:
-                # 美股最小手数为1（支持碎股交易）
                 lot_size = 1
-                self.logger.debug(f"{symbol} 美股支持碎股交易，最小手数: {lot_size}")
             elif '.SH' in symbol or '.SZ' in symbol:
-                # A股默认最小手数为100
                 lot_size = 100
-                self.logger.debug(f"{symbol} 默认使用A股手数: {lot_size}")
             else:
-                # 默认手数为100
                 lot_size = 100
-                self.logger.debug(f"{symbol} 未知市场，使用默认手数: {lot_size}")
                 
-            # 确保最小交易单位也更新到 min_quantity_unit 字典中
             if symbol not in self.min_quantity_unit:
                 self.min_quantity_unit[symbol] = lot_size
-                self.logger.info(f"更新 {symbol} 的最小交易单位为 {lot_size} 股")
                 
             return lot_size
         except Exception as e:
             self.logger.error(f"获取股票手数出错: {e}")
-            # 返回默认值
             return 100
     
     async def cancel_order(self, order_id: str) -> bool:
@@ -2777,33 +2816,6 @@ class OrderManager:
         except Exception as e:
             self.logger.warning(f"调整交易数量出错: {e}，使用原始数量: {quantity}")
             return quantity
-
-    def _get_real_lot_size(self, symbol: str) -> int:
-        """
-        获取真实的港股手数信息（如果可用）
-        
-        Args:
-            symbol: 股票代码
-            
-        Returns:
-            真实手数，如果无法获取则返回默认值
-        """
-        # 已知的港股手数映射
-        known_lot_sizes = {
-            '700.HK': 100,      # 腾讯控股
-            '9988.HK': 100,     # 阿里巴巴
-            '388.HK': 100,      # 港交易所
-            '1299.HK': 500,     # 友邦保险 - 500股为1手
-            '941.HK': 500,      # 中国移动 - 500股为1手
-        }
-        
-        if symbol in known_lot_sizes:
-            self.logger.info(f"使用已知手数配置 {symbol}: {known_lot_sizes[symbol]}")
-            return known_lot_sizes[symbol]
-        
-        # 如果没有已知配置，返回默认100股
-        self.logger.warning(f"未找到 {symbol} 的确切手数信息，使用默认100股")
-        return 100
 
     async def _risk_control_check(self, symbol: str, quantity: int, price: float, is_buy: bool) -> bool:
         """

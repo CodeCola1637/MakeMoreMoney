@@ -5,8 +5,9 @@
 
 import asyncio
 import logging
+import pytz
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
 
@@ -68,6 +69,12 @@ class ProfitStopManager:
         self.position_status: Dict[str, PositionStatus] = {}
         self.daily_pnl = 0.0
         self.daily_pnl_reset_time = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # exit_pending tracks symbols with active exit attempts to prevent infinite retries
+        # {symbol: {"last_attempt": datetime, "retry_count": int, "signal_type": str}}
+        self._exit_pending: Dict[str, dict] = {}
+        self._exit_retry_cooldown = timedelta(minutes=5)
+        self._exit_max_retries = 5
         
         self.logger.info(f"止盈止损管理器初始化完成 - 止盈启用: {self.profit_enabled}, 止损启用: {self.stop_enabled}")
     
@@ -185,23 +192,67 @@ class ProfitStopManager:
         except Exception as e:
             self.logger.error(f"更新持仓状态失败: {symbol}, 错误: {e}")
     
+    def _is_market_open(self, symbol: str) -> bool:
+        """Check if the market for the given symbol is currently open."""
+        try:
+            if symbol.endswith('.HK'):
+                hk_tz = pytz.timezone('Asia/Hong_Kong')
+                now = datetime.now(hk_tz)
+                if now.weekday() >= 5:
+                    return False
+                t = now.hour * 60 + now.minute
+                return (9 * 60 + 30 <= t <= 12 * 60) or (13 * 60 <= t <= 16 * 60)
+            else:
+                us_tz = pytz.timezone('US/Eastern')
+                now = datetime.now(us_tz)
+                if now.weekday() >= 5:
+                    return False
+                t = now.hour * 60 + now.minute
+                return 4 * 60 <= t <= 20 * 60
+        except Exception:
+            return True
+    
+    def _is_exit_pending_cooldown(self, symbol: str) -> bool:
+        """Check if a symbol is in exit-pending cooldown (recently failed, not yet ready to retry)."""
+        if symbol not in self._exit_pending:
+            return False
+        pending = self._exit_pending[symbol]
+        if pending["retry_count"] >= self._exit_max_retries:
+            return True
+        elapsed = datetime.now() - pending["last_attempt"]
+        return elapsed < self._exit_retry_cooldown
+    
+    def clear_exit_pending(self, symbol: str):
+        """Clear exit-pending state for a symbol (e.g. after manual intervention)."""
+        self._exit_pending.pop(symbol, None)
+    
     async def check_exit_signals(self) -> List[ExitSignal]:
         """检查止盈止损信号"""
         exit_signals = []
         
         try:
             for symbol, status in self.position_status.items():
-                # 检查止盈信号
-                if self.profit_enabled:
-                    profit_signal = self._check_profit_taking(status)
-                    if profit_signal:
-                        exit_signals.append(profit_signal)
+                if self._is_exit_pending_cooldown(symbol):
+                    pending = self._exit_pending[symbol]
+                    if pending["retry_count"] >= self._exit_max_retries:
+                        self.logger.debug(f"跳过 {symbol} 退出信号: 已达最大重试次数 {self._exit_max_retries}")
+                    else:
+                        self.logger.debug(f"跳过 {symbol} 退出信号: 冷却期内")
+                    continue
                 
-                # 检查止损信号
-                if self.stop_enabled:
-                    stop_signal = self._check_stop_loss(status)
-                    if stop_signal:
-                        exit_signals.append(stop_signal)
+                if not self._is_market_open(symbol):
+                    self.logger.debug(f"跳过 {symbol} 退出信号: 当前非交易时段")
+                    continue
+                
+                signal = None
+                if self.profit_enabled:
+                    signal = self._check_profit_taking(status)
+                
+                if signal is None and self.stop_enabled:
+                    signal = self._check_stop_loss(status)
+                
+                if signal:
+                    exit_signals.append(signal)
                         
             # 检查单日亏损限制
             daily_loss_signal = await self._check_daily_loss_limit()
@@ -371,11 +422,21 @@ class ProfitStopManager:
     async def execute_exit_signal(self, signal: ExitSignal) -> bool:
         """执行退出信号"""
         try:
-            # 判断是多头还是空头仓位
             is_short = signal.quantity < 0
-            exit_quantity = abs(signal.quantity)  # 使用绝对值
+            exit_quantity = abs(signal.quantity)
             
-                        # 检查账户资金状况（对于空头平仓需要买入）
+            is_emergency = signal.signal_type in ("EMERGENCY_STOP", "DAILY_LOSS_LIMIT")
+            if is_emergency:
+                slippage = 0.02
+                if is_short:
+                    signal.price = signal.price * (1 + slippage)
+                else:
+                    signal.price = signal.price * (1 - slippage)
+                self.logger.warning(
+                    f"紧急退出 {signal.symbol}: 应用 {slippage:.0%} 滑点容忍, "
+                    f"调整价格至 {signal.price:.2f}"
+                )
+            
             if is_short:
                 # 估算平仓所需资金
                 estimated_cost = signal.price * exit_quantity
@@ -418,23 +479,30 @@ class ProfitStopManager:
             if result and not result.is_rejected():
                 self.logger.info(f"止盈止损订单提交成功: {signal.symbol}, 订单ID: {result.order_id}")
                 
+                self._exit_pending.pop(signal.symbol, None)
+                
                 # 更新持仓状态
                 if signal.symbol in self.position_status:
                     if is_short:
-                        # 空头平仓：数量增加（从负数向0）
                         self.position_status[signal.symbol].quantity += exit_quantity
                     else:
-                        # 多头平仓：数量减少
                         self.position_status[signal.symbol].quantity -= exit_quantity
                     
-                    # 仓位清零后删除状态跟踪
                     if self.position_status[signal.symbol].quantity == 0:
                         del self.position_status[signal.symbol]
                         self.logger.info(f"清空持仓状态跟踪: {signal.symbol}")
                 
                 return True
             else:
-                self.logger.warning(f"止盈止损订单提交失败: {signal.symbol}, 结果: {result}")
+                pending = self._exit_pending.get(signal.symbol, {"retry_count": 0, "signal_type": signal.signal_type})
+                pending["last_attempt"] = datetime.now()
+                pending["retry_count"] = pending.get("retry_count", 0) + 1
+                pending["signal_type"] = signal.signal_type
+                self._exit_pending[signal.symbol] = pending
+                self.logger.warning(
+                    f"止盈止损订单提交失败: {signal.symbol}, 结果: {result}, "
+                    f"重试次数: {pending['retry_count']}/{self._exit_max_retries}"
+                )
                 return False
                 
         except Exception as e:
