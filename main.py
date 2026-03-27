@@ -29,6 +29,8 @@ from strategy.profit_stop_manager import ProfitStopManager
 from strategy.stock_discovery import StockDiscovery
 from strategy.institutional_tracker import InstitutionalTracker
 from strategy.volume_anomaly_detector import VolumeAnomalyDetector
+from strategy.sec_strategy import SECStrategy
+from strategy.volume_strategy import VolumeStrategy
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
 
@@ -101,6 +103,8 @@ async def main():
     parser.add_argument("--train", action="store_true", help="训练模型")
     parser.add_argument("--symbols", nargs="+", default=None, help="要交易的股票代码（如果不指定，使用配置文件中的股票）")
     parser.add_argument("--no-mock", action="store_true", help="禁止使用模拟数据，使用实时行情")
+    parser.add_argument("--dashboard", action="store_true", help="同时启动 Web 仪表盘")
+    parser.add_argument("--dashboard-port", type=int, default=8888, help="仪表盘端口（默认 8888）")
     args = parser.parse_args()
     
     # 加载环境变量
@@ -126,6 +130,19 @@ async def main():
     task_manager = TaskManager(logger)
     await task_manager.start()
     logger.info("✅ TaskManager 初始化完成")
+    
+    # 启动 Web 仪表盘（在后台线程中运行）
+    if args.dashboard:
+        import threading
+        from web.dashboard import start_dashboard
+        dash_port = args.dashboard_port
+        dash_thread = threading.Thread(
+            target=start_dashboard,
+            kwargs={"host": "0.0.0.0", "port": dash_port},
+            daemon=True,
+        )
+        dash_thread.start()
+        logger.info(f"📊 Web 仪表盘已启动: http://localhost:{dash_port}")
     
     # 🔧 优先使用配置文件中的股票列表，如果命令行没有指定的话
     if args.symbols is None:
@@ -192,10 +209,19 @@ async def main():
         technical_strategy = TechnicalStrategy(config, realtime_mgr, hist_loader)
         logger.info("技术指标策略初始化完成")
         
-        # 创建策略字典
+        # 创建策略适配器
+        sec_strategy = SECStrategy(config, logger)
+        logger.info("SEC 披露策略适配器初始化完成")
+        
+        volume_strategy = VolumeStrategy(config, logger)
+        logger.info("异常成交量策略适配器初始化完成")
+        
+        # 创建策略字典（4 策略投票）
         strategies = {
             'lstm': lstm_signal_gen,
-            'technical': technical_strategy
+            'technical': technical_strategy,
+            'sec': sec_strategy,
+            'volume_anomaly': volume_strategy,
         }
         
         # 获取组合方法
@@ -512,9 +538,9 @@ async def main():
             except Exception as e:
                 logger.error(f"股票发现任务错误: {e}")
         
-        # 7. 机构交易跟踪任务
+        # 7. 机构交易跟踪任务（更新 SEC 策略缓存，由 ensemble 统一决策）
         async def institutional_tracking_task():
-            """机构交易跟踪任务（单次执行）"""
+            """机构交易跟踪任务 — 扫描 SEC 数据并更新策略缓存"""
             if not institutional_tracker:
                 return
             
@@ -523,86 +549,66 @@ async def main():
                 
                 logger.info(institutional_tracker.get_summary())
                 
-                auto_trade = config.get("institutional.auto_trade", False)
-                if signals and auto_trade:
+                if signals:
+                    sec_strategy.update_signals(signals)
                     for inst_sig in signals:
-                        try:
-                            sig_type = SignalType.BUY if inst_sig.signal_type == 'BUY' else SignalType.SELL
-                            
-                            quotes = await realtime_mgr.get_quote([inst_sig.symbol])
-                            if quotes and inst_sig.symbol in quotes:
-                                price = float(quotes[inst_sig.symbol].last_done)
-                            else:
-                                logger.warning(f"无法获取 {inst_sig.symbol} 价格，跳过")
-                                continue
-                            
-                            signal = Signal(
-                                symbol=inst_sig.symbol,
-                                signal_type=sig_type,
-                                price=price,
-                                quantity=1,
-                                confidence=inst_sig.confidence,
-                                strategy_name="institutional",
-                                extra_data={
-                                    'reason': inst_sig.reason,
-                                    'sources': inst_sig.sources[:3],
-                                    'institutional_score': inst_sig.institutional_score,
-                                }
-                            )
-                            await on_signal(signal)
-                            logger.info(f"🏦 机构跟踪信号: {inst_sig.symbol} {inst_sig.signal_type}, "
-                                      f"置信度={inst_sig.confidence:.2f}, {inst_sig.reason}")
-                        except Exception as e:
-                            logger.error(f"执行机构信号失败: {inst_sig.symbol}, {e}")
-                elif signals:
-                    for inst_sig in signals:
-                        logger.info(f"🏦 机构信号（未启用自动交易）: {inst_sig.symbol} "
+                        logger.info(f"🏦 SEC 信号已缓存: {inst_sig.symbol} "
                                   f"{inst_sig.signal_type}, 置信度={inst_sig.confidence:.2f}, "
                                   f"{inst_sig.reason}")
                         
             except Exception as e:
                 logger.error(f"机构交易跟踪任务错误: {e}")
         
-        # 8. 异常成交量检测任务
+        # 8. 异常成交量检测任务（更新缓存 + 即时触发 ensemble 评估）
         async def volume_anomaly_task():
-            """异常成交量检测信号生成任务（单次执行）"""
+            """异常成交量检测 — 更新策略缓存并立即触发 ensemble 投票"""
             if not volume_detector:
                 return
             
             try:
                 vol_signals = await volume_detector.check_and_generate_signals()
                 
-                if vol_signals:
-                    logger.info(volume_detector.get_summary())
+                if not vol_signals:
+                    return
                 
-                auto_trade = config.get("volume_anomaly.auto_trade", False)
-                if vol_signals and auto_trade:
-                    for vs in vol_signals:
+                logger.info(volume_detector.get_summary())
+                
+                # 更新 VolumeStrategy 缓存
+                triggered_symbols = volume_strategy.update_signals(vol_signals)
+                
+                # 立即对受影响的股票触发 ensemble 4 策略投票
+                if ensemble_enabled and triggered_symbols:
+                    for symbol in triggered_symbols:
                         try:
-                            sig_type = SignalType.BUY if vs.signal_type == 'BUY' else SignalType.SELL
+                            quotes = await realtime_mgr.get_quote([symbol])
+                            if not (quotes and symbol in quotes):
+                                logger.warning(f"即时评估: 无法获取 {symbol} 行情，跳过")
+                                continue
                             
-                            signal = Signal(
-                                symbol=vs.symbol,
-                                signal_type=sig_type,
-                                price=vs.price,
-                                quantity=1,
-                                confidence=vs.confidence,
-                                strategy_name="volume_anomaly",
-                                extra_data={
-                                    'reason': vs.reason,
-                                    'anomaly_count': len(vs.anomalies),
-                                }
+                            market_data = {
+                                'last_done': float(quotes[symbol].last_done),
+                                'timestamp': datetime.now().isoformat(),
+                            }
+                            
+                            ensemble_signal = await signal_gen.generate_ensemble_signal(
+                                symbol, market_data
                             )
-                            await on_signal(signal)
-                            logger.info(f"📊 异常成交量信号: {vs.symbol} {vs.signal_type}, "
-                                      f"置信度={vs.confidence:.2f}, {vs.reason}")
+                            
+                            if ensemble_signal and ensemble_signal.signal_type.value != 'HOLD':
+                                logger.info(
+                                    f"⚡ 即时 Ensemble 投票结果: {symbol} "
+                                    f"{ensemble_signal.signal_type.value}, "
+                                    f"置信度={ensemble_signal.confidence:.3f}, "
+                                    f"策略={ensemble_signal.extra_data.get('contributing_strategies', [])}"
+                                )
+                                await on_signal(ensemble_signal)
+                            else:
+                                logger.info(
+                                    f"📊 即时 Ensemble: {symbol} 综合判定 HOLD, "
+                                    f"暂不交易"
+                                )
                         except Exception as e:
-                            logger.error(f"执行成交量信号失败: {vs.symbol}, {e}")
-                elif vol_signals:
-                    for vs in vol_signals:
-                        logger.info(f"📊 成交量异常（未启用自动交易）: {vs.symbol} "
-                                  f"{vs.signal_type}, 置信度={vs.confidence:.2f}, "
-                                  f"{vs.reason}")
+                            logger.error(f"即时 ensemble 评估失败 {symbol}: {e}")
                         
             except Exception as e:
                 logger.error(f"异常成交量检测任务错误: {e}")

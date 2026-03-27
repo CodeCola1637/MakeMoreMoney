@@ -86,18 +86,25 @@ class StrategyEnsemble:
         self.logger.info(f"策略组合器初始化完成 - 方法: {ensemble_method.value}, 策略数: {len(strategies)}")
         
     def initialize_weights(self):
-        """初始化策略权重"""
-        if self.ensemble_method == EnsembleMethod.EQUAL_WEIGHT:
-            # 等权重
+        """初始化策略权重（优先使用配置文件中的自定义权重）"""
+        custom_weights = self.config.get("ensemble.strategy_weights", {})
+
+        if custom_weights and isinstance(custom_weights, dict):
+            for strategy_name in self.strategies.keys():
+                self.strategy_weights[strategy_name] = custom_weights.get(
+                    strategy_name, 1.0 / len(self.strategies)
+                )
+            self._normalize_weights()
+            self.logger.info(f"使用配置自定义权重: {self.strategy_weights}")
+        elif self.ensemble_method == EnsembleMethod.EQUAL_WEIGHT:
             weight = 1.0 / len(self.strategies)
             for strategy_name in self.strategies.keys():
                 self.strategy_weights[strategy_name] = weight
         else:
-            # 初始等权重，后续根据表现调整
             weight = 1.0 / len(self.strategies)
             for strategy_name in self.strategies.keys():
                 self.strategy_weights[strategy_name] = weight
-                
+
         self.logger.info(f"初始策略权重: {self.strategy_weights}")
         
     def initialize_performance_tracker(self):
@@ -168,10 +175,10 @@ class StrategyEnsemble:
             return None
             
     async def _collect_strategy_signals(self, symbol: str, data: Dict[str, Any]) -> Dict[str, Signal]:
-        """收集各策略的信号"""
+        """收集各策略的信号（None 表示弃权，不参与投票）"""
         strategy_signals = {}
+        abstained = []
         
-        # 并行收集信号
         tasks = []
         for strategy_name, strategy in self.strategies.items():
             task = asyncio.create_task(
@@ -181,14 +188,20 @@ class StrategyEnsemble:
             
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        # 处理结果
         for i, (strategy_name, strategy) in enumerate(self.strategies.items()):
             result = results[i]
             if isinstance(result, Exception):
                 self.logger.error(f"策略 {strategy_name} 信号生成失败: {result}")
-            elif result is not None:
+                abstained.append(strategy_name)
+            elif result is None:
+                abstained.append(strategy_name)
+                self.logger.debug(f"策略 {strategy_name} 弃权（无 {symbol} 数据）")
+            else:
                 strategy_signals[strategy_name] = result
                 self.logger.debug(f"策略 {strategy_name} 信号: {result.signal_type.value}, 置信度: {result.confidence:.3f}")
+        
+        if abstained:
+            self.logger.info(f"{symbol} 弃权策略: {abstained}, 参与投票: {list(strategy_signals.keys())}")
                 
         return strategy_signals
         
@@ -272,9 +285,17 @@ class StrategyEnsemble:
         return valid_signals
         
     def _combine_signals(self, valid_signals: Dict[str, Signal], symbol: str, data: Dict[str, Any]) -> Signal:
-        """组合多个信号"""
+        """组合多个信号（弃权策略的权重按比例分配给参与者）"""
         try:
-            # 收集信号信息
+            # 计算参与策略的归一化权重
+            participating = list(valid_signals.keys())
+            raw_weights = {s: self.strategy_weights.get(s, 0.0) for s in participating}
+            total_raw = sum(raw_weights.values())
+            if total_raw > 0:
+                norm_weights = {s: w / total_raw for s, w in raw_weights.items()}
+            else:
+                norm_weights = {s: 1.0 / len(participating) for s in participating}
+
             buy_signals = []
             sell_signals = []
             hold_signals = []
@@ -282,7 +303,7 @@ class StrategyEnsemble:
             prices = []
             
             for strategy_name, signal in valid_signals.items():
-                strategy_weight = self.strategy_weights.get(strategy_name, 0.0)
+                strategy_weight = norm_weights[strategy_name]
                 weighted_confidence = signal.confidence * strategy_weight
                 
                 if signal.signal_type == SignalType.BUY:
@@ -295,7 +316,6 @@ class StrategyEnsemble:
                 confidences.append(weighted_confidence)
                 prices.append(signal.price)
                 
-            # 计算组合信号
             buy_strength = sum(buy_signals)
             sell_strength = sum(sell_signals)
             hold_strength = sum(hold_signals)
@@ -334,7 +354,7 @@ class StrategyEnsemble:
                     'hold_strength': hold_strength,
                     'total_confidence': total_confidence,
                     'contributing_strategies': list(valid_signals.keys()),
-                    'strategy_weights': {k: self.strategy_weights[k] for k in valid_signals.keys()}
+                    'strategy_weights': {k: round(v, 3) for k, v in norm_weights.items()}
                 }
             )
             

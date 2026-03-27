@@ -98,13 +98,16 @@ class OrderValidator:
             
             # 4. 根据交易方向进行特定检查
             if side.upper() == 'SELL':
-                # 卖出时检查持仓
                 pos_valid, pos_msg = self._check_position_for_sell(symbol, quantity)
                 details['checks']['position'] = {'passed': pos_valid, 'message': pos_msg}
                 if not pos_valid:
                     return False, pos_msg, details
-            else:  # BUY
-                # 买入时检查资金
+            elif side.upper() == 'SHORT':
+                fund_valid, fund_msg = self._check_funds_for_buy(symbol, quantity, price)
+                details['checks']['funds'] = {'passed': fund_valid, 'message': f"做空保证金检查: {fund_msg}"}
+                if not fund_valid:
+                    return False, f"做空资金不足: {fund_msg}", details
+            else:  # BUY / COVER
                 fund_valid, fund_msg = self._check_funds_for_buy(symbol, quantity, price)
                 details['checks']['funds'] = {'passed': fund_valid, 'message': fund_msg}
                 if not fund_valid:
@@ -237,12 +240,16 @@ class OrderValidator:
                 # 美股支持碎股，只需要数量>0
                 return True, f"美股数量有效: {quantity}"
             
-            # 港股等市场需要检查手数
+            # 港股等市场需要检查手数，自动调整到最近的合规手数
             if quantity % lot_size != 0:
-                suggested = (quantity // lot_size) * lot_size
-                if suggested == 0:
-                    suggested = lot_size
-                return False, f"数量{quantity}不符合手数要求(每手{lot_size}股)，建议调整为{suggested}"
+                adjusted = (quantity // lot_size) * lot_size
+                if adjusted == 0:
+                    adjusted = lot_size
+                self.logger.info(
+                    f"自动调整 {symbol} 数量: {quantity} -> {adjusted} "
+                    f"(每手{lot_size}股)"
+                )
+                return True, f"数量已自动调整为{adjusted}(每手{lot_size}股)"
             
             return True, f"数量{quantity}符合手数要求(每手{lot_size}股)"
             
@@ -430,6 +437,10 @@ class OrderValidator:
                 pos_valid, pos_msg = self._check_position_for_sell(symbol, quantity)
                 if not pos_valid:
                     return False, pos_msg
+            elif side.upper() == 'SHORT':
+                fund_valid, fund_msg = self._check_funds_for_buy(symbol, quantity, price)
+                if not fund_valid:
+                    return False, f"做空资金不足: {fund_msg}"
             else:
                 fund_valid, fund_msg = self._check_funds_for_buy(symbol, quantity, price)
                 if not fund_valid:

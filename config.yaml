@@ -51,7 +51,7 @@ execution:
   risk_control:
     daily_loss_pct: 3.0
     max_correlation: 0.7
-    position_pct: 2.0
+    position_pct: 5.0
     volatility_threshold: 0.25
     max_daily_loss_pct: 3.0        # 日亏损限制（占总权益百分比）
     max_total_position_pct: 80.0   # 总仓位限制（占总权益百分比）
@@ -90,6 +90,7 @@ quote:
   - 1299.HK
   - 388.HK
   - 941.HK
+  - 9992.HK
   - AAPL.US
   - GOOGL.US
   - MSFT.US
@@ -107,7 +108,7 @@ strategy:
   signal_interval: 600
   signal_processing:
     buy_threshold: 0.04
-    confidence_threshold: 0.1
+    confidence_threshold: 0.08
     enable_hold: true
     min_signal_strength: 0.02
     sell_threshold: -0.04
@@ -159,7 +160,8 @@ volume_anomaly:
   divergence_price_threshold: 0.003  # 量价背离：价格变动上限（0.3%算作"平"）
   lookback_days: 30               # 历史基线计算天数
   min_anomaly_confidence: 0.5     # 最小信号置信度
-  auto_trade: true                # 是否自动执行异常成交量信号
+  signal_expiry_minutes: 30       # 信号有效期（分钟）
+  auto_trade: false               # 已集成到 ensemble，不再直接下单
 
 # 机构交易跟踪配置
 institutional:
@@ -170,7 +172,8 @@ institutional:
   min_transaction_value: 100000      # 最小交易金额过滤（美元）
   insider_buy_confidence_boost: 0.15 # 内部人买入信号置信度加成
   min_institutions_buying: 2         # 触发信号的最少机构数
-  auto_trade: true                   # 是否自动执行机构跟踪信号
+  signal_expiry_hours: 48              # SEC 信号有效期（小时）
+  auto_trade: false                    # 已集成到 ensemble，不再直接下单
   # 跟踪的机构（默认全部跟踪，也可指定子集）
   tracked_institutions:
     - berkshire_hathaway    # 巴菲特 - Berkshire Hathaway
@@ -188,13 +191,20 @@ institutional:
 
 ensemble:
   enable: true
-  method: confidence_weight  # equal_weight, confidence_weight, performance_weight, dynamic_weight
-  min_strategies_agreement: 1  # 降低到1，让单个强信号也能触发
-  confidence_threshold: 0.02   # 进一步降低置信度阈值，让更多信号通过
+  method: confidence_weight
+  min_strategies_agreement: 1
+  confidence_threshold: 0.02
   reweight_frequency: 100
+  strategy_weights:
+    lstm: 0.2
+    technical: 0.2
+    sec: 0.2
+    volume_anomaly: 0.4
   strategies:
     - lstm
-    - technical  # 可以添加更多策略
+    - technical
+    - sec
+    - volume_anomaly
   training:
     batch_size: 64
     early_stopping_patience: 15

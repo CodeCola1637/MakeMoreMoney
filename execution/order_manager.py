@@ -635,14 +635,31 @@ class OrderManager:
             symbol = signal.symbol
             signal_type = signal.signal_type
             
-            # 🔧 关键修复：明确记录信号类型，确保后续逻辑正确
             signal_type_str = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
             
-            # 🔧 新增：订单预验证 - 降低拒单率
+            # SELL 无持仓时自动转为 SHORT（做空）
+            if signal_type == SignalType.SELL:
+                existing_positions = self.get_positions(symbol)
+                has_long = False
+                if existing_positions:
+                    for pos in existing_positions:
+                        if getattr(pos, 'symbol', '').upper() == symbol.upper():
+                            qty = int(getattr(pos, 'quantity', 0))
+                            if qty > 0:
+                                has_long = True
+                                break
+                if not has_long:
+                    self.logger.info(f"🔄 {symbol} 无多头持仓，SELL 自动转为 SHORT")
+                    signal_type = SignalType.SHORT
+                    signal.signal_type = SignalType.SHORT
+                    signal_type_str = "SHORT"
+            
             if signal_type in [SignalType.BUY, SignalType.COVER]:
                 side_str = "Buy"
-            elif signal_type in [SignalType.SELL, SignalType.SHORT]:
+            elif signal_type == SignalType.SELL:
                 side_str = "Sell"
+            elif signal_type == SignalType.SHORT:
+                side_str = "Short"
             else:
                 side_str = "Hold"
             
@@ -1350,14 +1367,12 @@ class OrderManager:
         position = next((p for p in positions if p.symbol.lower() == symbol.lower()), None)
         current_quantity = position.quantity if position else 0
         
-        # 🔧 美股做空支持
         if not position or current_quantity <= 0:
-            if is_us_stock and self.config.get("execution.enable_short_selling", True):
-                # 美股允许做空（开空仓）
-                self.logger.info(f"📉 美股做空: {symbol}, 数量: {quantity}, 当前持仓: {current_quantity}")
+            if self.config.get("execution.enable_short_selling", True):
+                market_label = "美股" if is_us_stock else "港股"
+                self.logger.info(f"📉 {market_label}做空: {symbol}, 数量: {quantity}, 当前持仓: {current_quantity}")
                 
-                # 做空风控检查
-                short_limit = self.config.get("execution.max_short_position", 100)
+                short_limit = self.config.get("execution.max_short_position", 500)
                 current_short = abs(current_quantity) if current_quantity < 0 else 0
                 
                 if current_short + quantity > short_limit:
@@ -1378,14 +1393,12 @@ class OrderManager:
                     quantity = adjusted_qty
                     self.logger.info(f"调整做空数量: {symbol} -> {quantity}")
                 
-                # 直接提交做空订单
                 strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
                 if hasattr(signal, 'confidence'):
                     strategy_info += f" confidence={signal.confidence:.3f}"
                 return await self._submit_order(symbol, price, quantity, "sell", strategy_info)
             else:
-                # 港股或禁用做空时，必须有持仓才能卖出
-                self.logger.warning(f"无持仓可卖出: {symbol}, 实际持仓: {current_quantity}")
+                self.logger.warning(f"做空已禁用，无持仓可卖出: {symbol}, 实际持仓: {current_quantity}")
                 return OrderResult(
                     order_id="",
                     symbol=symbol,
