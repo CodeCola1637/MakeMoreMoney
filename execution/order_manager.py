@@ -2138,54 +2138,41 @@ class OrderManager:
         return True
 
     def is_enough_balance(self, cost: float, symbol: str = None) -> bool:
-        """检查账户余额是否足够支付交易成本
-        
-        Args:
-            cost: 交易成本
-            symbol: 股票代码，用于判断使用哪种货币
-            
-        Returns:
-            是否有足够余额
-        """
+        """检查账户余额是否足够支付交易成本（优先使用购买力）"""
         try:
-            # 获取账户余额
             balance_response = self.trade_ctx.account_balance()
             
-            # 根据股票类型确定使用的货币
-            is_us_stock = symbol and '.US' in symbol
-            is_hk_stock = symbol and '.HK' in symbol
-            
             if isinstance(balance_response, list):
-                # 查找对应货币账户
-                target_currency = "USD" if is_us_stock else "HKD"
-                available_balance = 0.0
+                for item in balance_response:
+                    buy_power = float(getattr(item, 'buy_power', 0) or 0)
+                    if buy_power > 0:
+                        if buy_power >= cost:
+                            self.logger.info(f"购买力充足: {buy_power:.2f} >= {cost:.2f}")
+                            return True
+                        else:
+                            self.logger.warning(f"购买力不足: {buy_power:.2f} < {cost:.2f}")
+                            return False
                 
+                target_currency = "USD" if (symbol and '.US' in symbol) else "HKD"
                 for item in balance_response:
                     if hasattr(item, 'cash_infos') and item.cash_infos:
                         for cash_info in item.cash_infos:
-                            if hasattr(cash_info, 'currency') and cash_info.currency == target_currency and hasattr(cash_info, 'available_cash'):
-                                available_balance = float(cash_info.available_cash)
-                                self.logger.info(f"检查{target_currency}账户余额: {available_balance}")
-                                break
-                
-                # 检查对应货币账户余额
-                if available_balance >= cost:
-                    self.logger.info(f"{target_currency}账户余额充足: {available_balance} >= {cost}")
-                    return True
-                else:
-                    self.logger.warning(f"{target_currency}账户余额不足: {available_balance} < {cost}")
-            return False
+                            if getattr(cash_info, 'currency', '') == target_currency:
+                                available = float(getattr(cash_info, 'available_cash', 0) or 0)
+                                if available >= cost:
+                                    self.logger.info(f"{target_currency}可用现金充足: {available:.2f} >= {cost:.2f}")
+                                    return True
+                                else:
+                                    self.logger.warning(f"{target_currency}可用现金不足: {available:.2f} < {cost:.2f}")
+                                    return False
             
-            # 如果无法获取具体货币余额，使用总可用资金（兼容性处理）
             total_available = self.get_account_balance()
-            
-            # 检查是否足够
             if total_available >= cost:
-                self.logger.info(f"总账户余额充足: {total_available} >= {cost}")
+                self.logger.info(f"总账户余额充足: {total_available:.2f} >= {cost:.2f}")
                 return True
-            else:
-                self.logger.warning(f"总账户余额不足: {total_available} < {cost}")
-                return False
+            
+            self.logger.warning(f"总账户余额不足: {total_available:.2f} < {cost:.2f}")
+            return False
                 
         except Exception as e:
             self.logger.error(f"检查账户余额时出错: {str(e)}")
@@ -2459,7 +2446,10 @@ class OrderManager:
         price = corrected_price
         quantity = corrected_quantity
         
-        if not await self.risk_control_check(symbol, quantity, price, is_buy=True):
+        is_exit_order = strategy_name and strategy_name.startswith("profit_stop_")
+        if is_exit_order:
+            self.logger.info(f"止盈止损平仓订单，跳过风控现金检查: {symbol}")
+        elif not await self.risk_control_check(symbol, quantity, price, is_buy=True):
             self.logger.warning(f"买入订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
             return OrderResult(
                 order_id="",
