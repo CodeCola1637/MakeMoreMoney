@@ -65,6 +65,12 @@ class ProfitStopManager:
         self.max_loss_per_day = self.stop_config.get('max_loss_per_day', 5.0)
         self.emergency_stop_pct = self.stop_config.get('emergency_stop_pct', 15.0)
         
+        # 杠杆产品特殊阈值
+        self._leveraged_symbols = set(config.get('execution.leveraged_symbols', []))
+        self._leveraged_overrides = config.get('execution.leveraged_overrides', {})
+        if self._leveraged_symbols:
+            self.logger.info(f"杠杆产品特殊阈值已加载: {self._leveraged_symbols}, 覆盖: {self._leveraged_overrides}")
+        
         # 持仓状态追踪
         self.position_status: Dict[str, PositionStatus] = {}
         self.daily_pnl = 0.0
@@ -145,6 +151,9 @@ class ProfitStopManager:
                 unrealized_pnl_pct = ((current_price - cost_price) / cost_price) * 100
             
             # 更新或创建持仓状态
+            t = self._get_thresholds(symbol)
+            trailing_pct = t['trailing_stop_pct']
+
             if symbol not in self.position_status:
                 self.position_status[symbol] = PositionStatus(
                     symbol=symbol,
@@ -154,10 +163,10 @@ class ProfitStopManager:
                     unrealized_pnl=float(unrealized_pnl),
                     unrealized_pnl_pct=float(unrealized_pnl_pct),
                     highest_price=float(current_price),
-                    trailing_stop_price=float(cost_price) * (1 - self.trailing_stop_pct / 100),
+                    trailing_stop_price=float(cost_price) * (1 - trailing_pct / 100),
                     last_update=datetime.now()
                 )
-                self.logger.info(f"创建持仓状态跟踪: {symbol}, 成本价: {cost_price}, 当前价: {current_price}")
+                self.logger.info(f"创建持仓状态跟踪: {symbol}, 成本价: {cost_price}, 当前价: {current_price}, 追踪止损%: {trailing_pct}")
             else:
                 status = self.position_status[symbol]
                 status.quantity = quantity
@@ -166,23 +175,18 @@ class ProfitStopManager:
                 status.unrealized_pnl_pct = float(unrealized_pnl_pct)
                 status.last_update = datetime.now()
                 
-                # 更新追踪止损逻辑（区分多空仓位）
                 is_short = quantity < 0
                 if is_short:
-                    # 空头仓位：追踪最低价，止损在上方
                     if float(current_price) < status.highest_price:
-                        status.highest_price = float(current_price)  # 对于空头，这里存储的是最低价
-                        # 更新追踪止损价格（在最低价上方）
-                        new_trailing_stop = float(current_price) * (1 + self.trailing_stop_pct / 100)
+                        status.highest_price = float(current_price)
+                        new_trailing_stop = float(current_price) * (1 + trailing_pct / 100)
                         if new_trailing_stop < status.trailing_stop_price:
                             status.trailing_stop_price = new_trailing_stop
                             self.logger.debug(f"更新空头追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
                 else:
-                    # 多头仓位：追踪最高价，止损在下方
                     if float(current_price) > status.highest_price:
                         status.highest_price = float(current_price)
-                        # 更新追踪止损价格
-                        new_trailing_stop = float(current_price) * (1 - self.trailing_stop_pct / 100)
+                        new_trailing_stop = float(current_price) * (1 - trailing_pct / 100)
                         if new_trailing_stop > status.trailing_stop_price:
                             status.trailing_stop_price = new_trailing_stop
                             self.logger.debug(f"更新多头追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
@@ -213,10 +217,18 @@ class ProfitStopManager:
             return True
     
     def _is_exit_pending_cooldown(self, symbol: str) -> bool:
-        """Check if a symbol is in exit-pending cooldown (recently failed, not yet ready to retry)."""
+        """Check if a symbol is in exit-pending cooldown (submitted and waiting, or recently failed)."""
         if symbol not in self._exit_pending:
             return False
         pending = self._exit_pending[symbol]
+        if pending.get("submitted"):
+            submitted_at = pending.get("last_attempt", datetime.now())
+            age = (datetime.now() - submitted_at).total_seconds()
+            if age > 300:
+                self.logger.warning(f"{symbol} exit_pending 已超时 {age:.0f}s，清除阻塞状态")
+                self._exit_pending.pop(symbol, None)
+                return False
+            return True
         if pending["retry_count"] >= self._exit_max_retries:
             return True
         elapsed = datetime.now() - pending["last_attempt"]
@@ -225,6 +237,25 @@ class ProfitStopManager:
     def clear_exit_pending(self, symbol: str):
         """Clear exit-pending state for a symbol (e.g. after manual intervention)."""
         self._exit_pending.pop(symbol, None)
+    
+    def on_order_completed(self, order_id: str, symbol: str, is_filled: bool):
+        """Called when a profit-stop order reaches terminal state (filled/rejected/canceled)."""
+        if symbol not in self._exit_pending:
+            return
+        pending = self._exit_pending[symbol]
+        if pending.get("order_id") != order_id:
+            return
+        if is_filled:
+            self.logger.info(f"止盈止损订单已成交，清除 pending: {symbol}, 订单={order_id}")
+            self._exit_pending.pop(symbol, None)
+        else:
+            pending["submitted"] = False
+            pending["retry_count"] = pending.get("retry_count", 0) + 1
+            pending["last_attempt"] = datetime.now()
+            self.logger.warning(
+                f"止盈止损订单未成交(rejected/canceled)，允许重试: {symbol}, "
+                f"订单={order_id}, 重试次数={pending['retry_count']}/{self._exit_max_retries}"
+            )
     
     async def check_exit_signals(self) -> List[ExitSignal]:
         """检查止盈止损信号"""
@@ -264,40 +295,61 @@ class ProfitStopManager:
             
         return exit_signals
     
+    def _get_thresholds(self, symbol: str) -> dict:
+        """返回适用于该标的的止盈止损阈值（杠杆产品使用放宽阈值）"""
+        if symbol in self._leveraged_symbols and self._leveraged_overrides:
+            ov = self._leveraged_overrides
+            return {
+                'fixed_profit_pct': ov.get('fixed_profit_pct', self.fixed_profit_pct),
+                'partial_profit_pct': ov.get('partial_profit_pct', self.partial_profit_pct),
+                'trailing_profit_pct': ov.get('trailing_profit_pct', self.trailing_profit_pct),
+                'trailing_profit_step': ov.get('trailing_profit_step', self.trailing_profit_step),
+                'fixed_stop_pct': ov.get('fixed_stop_pct', self.fixed_stop_pct),
+                'emergency_stop_pct': ov.get('emergency_stop_pct', self.emergency_stop_pct),
+                'trailing_stop_pct': ov.get('trailing_stop_pct', self.trailing_stop_pct),
+            }
+        return {
+            'fixed_profit_pct': self.fixed_profit_pct,
+            'partial_profit_pct': self.partial_profit_pct,
+            'trailing_profit_pct': self.trailing_profit_pct,
+            'trailing_profit_step': self.trailing_profit_step,
+            'fixed_stop_pct': self.fixed_stop_pct,
+            'emergency_stop_pct': self.emergency_stop_pct,
+            'trailing_stop_pct': self.trailing_stop_pct,
+        }
+
     def _check_profit_taking(self, status: PositionStatus) -> Optional[ExitSignal]:
         """检查止盈信号"""
         try:
-            # 固定止盈点
-            if status.unrealized_pnl_pct >= self.fixed_profit_pct:
+            t = self._get_thresholds(status.symbol)
+
+            if status.unrealized_pnl_pct >= t['fixed_profit_pct']:
                 return ExitSignal(
                     symbol=status.symbol,
                     signal_type="TAKE_PROFIT",
-                    quantity=status.quantity,  # 全部卖出
+                    quantity=status.quantity,
                     price=status.current_price,
-                    reason=f"达到固定止盈点{self.fixed_profit_pct}%，当前盈利{status.unrealized_pnl_pct:.2f}%",
+                    reason=f"达到固定止盈点{t['fixed_profit_pct']}%，当前盈利{status.unrealized_pnl_pct:.2f}%",
                     urgency=7
                 )
             
-            # 部分止盈
-            elif status.unrealized_pnl_pct >= self.partial_profit_pct:
-                # 使用绝对值计算部分数量，保持原符号
+            elif status.unrealized_pnl_pct >= t['partial_profit_pct']:
                 is_short = status.quantity < 0
                 abs_quantity = abs(status.quantity)
-                partial_abs = max(1, abs_quantity // 2)  # 平仓一半
+                partial_abs = max(1, abs_quantity // 2)
                 partial_quantity = -partial_abs if is_short else partial_abs
                 return ExitSignal(
                     symbol=status.symbol,
                     signal_type="PARTIAL_PROFIT",
                     quantity=partial_quantity,
                     price=status.current_price,
-                    reason=f"达到部分止盈点{self.partial_profit_pct}%，平仓50%仓位",
+                    reason=f"达到部分止盈点{t['partial_profit_pct']}%，平仓50%仓位",
                     urgency=5
                 )
             
-            # 追踪止盈（从最高点回调）
-            elif status.unrealized_pnl_pct >= self.trailing_profit_pct:
+            elif status.unrealized_pnl_pct >= t['trailing_profit_pct']:
                 drawdown_from_high = ((status.highest_price - status.current_price) / status.highest_price) * 100
-                if drawdown_from_high >= self.trailing_profit_step:
+                if drawdown_from_high >= t['trailing_profit_step']:
                     return ExitSignal(
                         symbol=status.symbol,
                         signal_type="TRAILING_PROFIT",
@@ -316,8 +368,9 @@ class ProfitStopManager:
     def _check_stop_loss(self, status: PositionStatus) -> Optional[ExitSignal]:
         """检查止损信号"""
         try:
-            # 紧急止损
-            if status.unrealized_pnl_pct <= -self.emergency_stop_pct:
+            t = self._get_thresholds(status.symbol)
+
+            if status.unrealized_pnl_pct <= -t['emergency_stop_pct']:
                 return ExitSignal(
                     symbol=status.symbol,
                     signal_type="EMERGENCY_STOP",
@@ -327,14 +380,13 @@ class ProfitStopManager:
                     urgency=10
                 )
             
-            # 固定止损
-            elif status.unrealized_pnl_pct <= -self.fixed_stop_pct:
+            elif status.unrealized_pnl_pct <= -t['fixed_stop_pct']:
                 return ExitSignal(
                     symbol=status.symbol,
                     signal_type="STOP_LOSS",
                     quantity=status.quantity,
                     price=status.current_price,
-                    reason=f"达到固定止损点{self.fixed_stop_pct}%，当前亏损{abs(status.unrealized_pnl_pct):.2f}%",
+                    reason=f"达到固定止损点{t['fixed_stop_pct']}%，当前亏损{abs(status.unrealized_pnl_pct):.2f}%",
                     urgency=8
                 )
             
@@ -386,7 +438,6 @@ class ProfitStopManager:
                 daily_loss_pct = (current_daily_pnl / total_portfolio_value) * 100
                 
                 if daily_loss_pct <= -self.max_loss_per_day:
-                    # 生成所有持仓的卖出信号
                     signals = []
                     for status in self.position_status.values():
                         if status.quantity > 0:
@@ -398,8 +449,17 @@ class ProfitStopManager:
                                 reason=f"达到单日亏损限制{self.max_loss_per_day}%，当前亏损{abs(daily_loss_pct):.2f}%",
                                 urgency=10
                             ))
+                        elif status.quantity < 0:
+                            signals.append(ExitSignal(
+                                symbol=status.symbol,
+                                signal_type="DAILY_LOSS_LIMIT",
+                                quantity=status.quantity,
+                                price=status.current_price,
+                                reason=f"达到单日亏损限制{self.max_loss_per_day}%，当前亏损{abs(daily_loss_pct):.2f}%（空头平仓）",
+                                urgency=10
+                            ))
                     
-                    self.logger.warning(f"触发单日亏损限制，清仓所有持仓")
+                    self.logger.warning(f"触发单日亏损限制，清仓所有持仓（多头{sum(1 for s in signals if s.quantity > 0)}笔, 空头{sum(1 for s in signals if s.quantity < 0)}笔）")
                     return signals
             
             return []
@@ -479,18 +539,13 @@ class ProfitStopManager:
             if result and not result.is_rejected():
                 self.logger.info(f"止盈止损订单提交成功: {signal.symbol}, 订单ID: {result.order_id}")
                 
-                self._exit_pending.pop(signal.symbol, None)
-                
-                # 更新持仓状态
-                if signal.symbol in self.position_status:
-                    if is_short:
-                        self.position_status[signal.symbol].quantity += exit_quantity
-                    else:
-                        self.position_status[signal.symbol].quantity -= exit_quantity
-                    
-                    if self.position_status[signal.symbol].quantity == 0:
-                        del self.position_status[signal.symbol]
-                        self.logger.info(f"清空持仓状态跟踪: {signal.symbol}")
+                self._exit_pending[signal.symbol] = {
+                    "last_attempt": datetime.now(),
+                    "retry_count": 0,
+                    "signal_type": signal.signal_type,
+                    "order_id": result.order_id,
+                    "submitted": True,
+                }
                 
                 return True
             else:

@@ -3,6 +3,7 @@
 防止重复信号和过度交易，降低无效交易次数
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -34,10 +35,17 @@ class SignalFilter:
         self.logger = logger or logging.getLogger(__name__)
         
         # 配置参数
-        self.cooldown_seconds = config.get("strategy.signal_cooldown", 600)  # 10分钟冷却
+        self.cooldown_seconds = config.get("strategy.signal_cooldown", 600)
         self.max_signals_per_day = config.get("strategy.max_signals_per_day", 10)
-        self.price_change_threshold = config.get("strategy.price_change_threshold", 0.01)  # 1%价格变化
+        self.price_change_threshold = config.get("strategy.price_change_threshold", 0.01)
         self.min_confidence = config.get("strategy.signal_processing.confidence_threshold", 0.15)
+        
+        # 止损后再入场冷却期（防止 止损→买入→止损 循环）
+        self._stop_loss_reentry_cooldown = config.get("strategy.stop_loss_reentry_cooldown", 1800)
+        self._stop_loss_exits: Dict[str, datetime] = {}
+        
+        # 并发保护锁
+        self._lock = asyncio.Lock()
         
         # 信号历史记录
         self.signal_history: Dict[str, List[Tuple[datetime, str, float]]] = defaultdict(list)
@@ -55,9 +63,9 @@ class SignalFilter:
                         f"价格阈值: {self.price_change_threshold:.1%}, "
                         f"最低置信度: {self.min_confidence}")
     
-    def should_emit_signal(self, signal: Signal) -> Tuple[bool, str]:
+    async def should_emit_signal(self, signal: Signal) -> Tuple[bool, str]:
         """
-        判断是否应该发出信号
+        判断是否应该发出信号（async，内部加锁防止并发竞态）
         
         Args:
             signal: 交易信号对象
@@ -65,82 +73,92 @@ class SignalFilter:
         Returns:
             Tuple[bool, str]: (是否应该发出, 原因说明)
         """
-        symbol = signal.symbol
-        now = datetime.now()
-        signal_type_str = signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type)
-        
-        # HOLD 信号直接跳过
+        # HOLD 信号无需加锁，直接跳过
         if signal.signal_type == SignalType.HOLD:
             return False, "HOLD信号，不执行交易"
         
-        # 1. 检查置信度
-        confidence = getattr(signal, 'confidence', 1.0)
-        if confidence < self.min_confidence:
-            self._record_filter(symbol, "confidence_too_low")
-            return False, f"置信度不足: {confidence:.3f} < {self.min_confidence}"
-        
-        # 2. 检查冷却时间
-        if symbol in self.signal_history:
-            recent_signals = [
-                (ts, st, price) for ts, st, price in self.signal_history[symbol]
-                if now - ts < timedelta(seconds=self.cooldown_seconds)
-            ]
+        async with self._lock:
+            symbol = signal.symbol
+            now = datetime.now()
+            signal_type_str = signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type)
             
-            if recent_signals:
-                last_ts, last_type, last_price = recent_signals[-1]
-                # 相同类型信号在冷却期内
-                if last_type == signal_type_str:
-                    elapsed = (now - last_ts).seconds
-                    remaining = self.cooldown_seconds - elapsed
-                    self._record_filter(symbol, "cooldown_period")
-                    return False, f"冷却期内: 距上次{last_type}信号仅{elapsed}秒, 还需等待{remaining}秒"
-        
-        # 3. 检查每日信号数量限制
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_signals = [
-            (ts, st, price) for ts, st, price in self.signal_history.get(symbol, [])
-            if ts >= today_start
-        ]
-        if len(today_signals) >= self.max_signals_per_day:
-            self._record_filter(symbol, "daily_limit_reached")
-            return False, f"已达到每日信号上限: {len(today_signals)}/{self.max_signals_per_day}"
-        
-        # 4. 检查价格变化阈值
-        if symbol in self.last_signal_price and self.last_signal_price[symbol] > 0:
-            last_price = self.last_signal_price[symbol]
-            current_price = signal.price
-            if current_price > 0:
-                price_change = abs(current_price - last_price) / last_price
-                if price_change < self.price_change_threshold:
-                    self._record_filter(symbol, "price_change_insufficient")
-                    return False, f"价格变化不足: {price_change:.2%} < {self.price_change_threshold:.2%}"
-        
-        # 5. 检查是否与上一个信号方向相反（允许通过以实现平仓/反向操作）
-        # 这里只做记录，不阻止
-        if symbol in self.signal_history and self.signal_history[symbol]:
-            last_signal_type = self.signal_history[symbol][-1][1]
-            if last_signal_type != signal_type_str:
-                self.logger.info(f"信号方向反转: {symbol} {last_signal_type} -> {signal_type_str}")
-        
-        return True, "通过所有过滤条件"
+            # 1. 检查置信度
+            confidence = getattr(signal, 'confidence', 1.0)
+            if confidence < self.min_confidence:
+                self._record_filter(symbol, "confidence_too_low")
+                return False, f"置信度不足: {confidence:.3f} < {self.min_confidence}"
+            
+            # 2. 止损后再入场冷却
+            if signal.signal_type == SignalType.BUY and symbol in self._stop_loss_exits:
+                last_exit = self._stop_loss_exits[symbol]
+                elapsed = (now - last_exit).total_seconds()
+                if elapsed < self._stop_loss_reentry_cooldown:
+                    remaining = int(self._stop_loss_reentry_cooldown - elapsed)
+                    self._record_filter(symbol, "stop_loss_reentry_cooldown")
+                    return False, f"止损后冷却期: {symbol} 在 {int(elapsed)}秒前止损卖出, 还需等待{remaining}秒才能重新买入"
+            
+            # 3. 检查冷却时间
+            cooldown = self.cooldown_seconds
+            if symbol in self.signal_history:
+                recent_signals = [
+                    (ts, st, price) for ts, st, price in self.signal_history[symbol]
+                    if now - ts < timedelta(seconds=cooldown)
+                ]
+                
+                if recent_signals:
+                    last_ts, last_type, last_price = recent_signals[-1]
+                    if last_type == signal_type_str:
+                        elapsed = (now - last_ts).seconds
+                        remaining = cooldown - elapsed
+                        self._record_filter(symbol, "cooldown_period")
+                        return False, f"冷却期内: 距上次{last_type}信号仅{elapsed}秒, 还需等待{remaining}秒 (冷却期={cooldown}s)"
+            
+            # 4. 检查每日信号数量限制
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_signals = [
+                (ts, st, price) for ts, st, price in self.signal_history.get(symbol, [])
+                if ts >= today_start
+            ]
+            if len(today_signals) >= self.max_signals_per_day:
+                self._record_filter(symbol, "daily_limit_reached")
+                return False, f"已达到每日信号上限: {len(today_signals)}/{self.max_signals_per_day}"
+            
+            # 5. 检查价格变化阈值
+            if symbol in self.last_signal_price and self.last_signal_price[symbol] > 0:
+                last_price = self.last_signal_price[symbol]
+                current_price = signal.price
+                if current_price > 0:
+                    price_change = abs(current_price - last_price) / last_price
+                    if price_change < self.price_change_threshold:
+                        self._record_filter(symbol, "price_change_insufficient")
+                        return False, f"价格变化不足: {price_change:.2%} < {self.price_change_threshold:.2%}"
+            
+            # 6. 记录方向反转（仅日志，不阻止）
+            if symbol in self.signal_history and self.signal_history[symbol]:
+                last_signal_type = self.signal_history[symbol][-1][1]
+                if last_signal_type != signal_type_str:
+                    self.logger.info(f"信号方向反转: {symbol} {last_signal_type} -> {signal_type_str}")
+            
+            return True, "通过所有过滤条件"
     
-    def record_signal(self, signal: Signal):
+    async def record_signal(self, signal: Signal):
         """
-        记录已发出的信号
+        记录已发出的信号（async，内部加锁）
         
         Args:
             signal: 已发出的信号对象
         """
-        symbol = signal.symbol
-        signal_type_str = signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type)
-        
-        self.signal_history[symbol].append((datetime.now(), signal_type_str, signal.price))
-        self.last_signal_price[symbol] = signal.price
-        
-        # 清理过期历史（保留最近24小时）
-        self._cleanup_history(symbol)
-        
-        self.logger.debug(f"记录信号: {symbol} {signal_type_str} @ {signal.price}")
+        async with self._lock:
+            symbol = signal.symbol
+            signal_type_str = signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type)
+            
+            self.signal_history[symbol].append((datetime.now(), signal_type_str, signal.price))
+            self.last_signal_price[symbol] = signal.price
+            
+            # 清理过期历史（保留最近24小时）
+            self._cleanup_history(symbol)
+            
+            self.logger.debug(f"记录信号: {symbol} {signal_type_str} @ {signal.price}")
     
     def _cleanup_history(self, symbol: str):
         """清理过期的信号历史"""
@@ -149,6 +167,12 @@ class SignalFilter:
             (ts, st, price) for ts, st, price in self.signal_history[symbol]
             if ts > cutoff
         ]
+    
+    async def record_stop_loss_exit(self, symbol: str):
+        """记录止损卖出事件，触发再入场冷却期（async，内部加锁）"""
+        async with self._lock:
+            self._stop_loss_exits[symbol] = datetime.now()
+            self.logger.info(f"记录止损退出: {symbol}, 再入场冷却 {self._stop_loss_reentry_cooldown}秒")
     
     def _record_filter(self, symbol: str, reason: str):
         """记录过滤统计"""

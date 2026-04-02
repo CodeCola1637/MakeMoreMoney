@@ -21,6 +21,9 @@ from utils import ConfigLoader, setup_logger, setup_longport_env
 from strategy.signals import Signal, SignalType
 from execution.order_validator import OrderValidator
 from execution.fund_guard import FundGuard
+from execution.position_service import PositionService
+from execution.order_tracker import OrderTracker
+from execution.order_executor import OrderExecutor
 from longport.openapi import (
     Config, TradeContext, 
     OrderSide, OrderType, TimeInForceType,
@@ -344,11 +347,8 @@ class OrderManager:
             "9988.HK": 0.2,  # 阿里巴巴
             "AAPL.US": 0.01  # 苹果
         }
-        self.min_quantity_unit = {
-            "700.HK": 100,  # 腾讯控股
-            "9988.HK": 100,  # 阿里巴巴
-            "AAPL.US": 1  # 美股支持碎股交易，最小单位为1股
-        }
+        configured_lots = config_loader.get("execution.lot_sizes", {})
+        self.min_quantity_unit = {**configured_lots, "AAPL.US": 1}
         
         # 初始化不同市场的最小交易单位字典
         self.market_lot_sizes = {
@@ -372,6 +372,12 @@ class OrderManager:
         
         # Symbols that the exchange rejected for short selling (e.g. 603301 error)
         self._short_blacklist: set = set()
+        self._short_sell_order_ids: set = set()
+        
+        # 🏗️ 初始化子服务
+        self.position_service = PositionService(self)
+        self.order_tracker = OrderTracker(self)
+        self.order_executor = OrderExecutor(self)
         
     async def initialize(self):
         """初始化订单管理器"""
@@ -395,225 +401,8 @@ class OrderManager:
         return True
 
     def _start_order_tracking(self):
-        """启动订单状态跟踪任务"""
-        self.logger.info("启动订单状态跟踪任务...")
-        self.order_tracking_task = asyncio.create_task(self._track_orders())
-        
-    async def _track_orders(self):
-        """持续跟踪和更新所有活跃订单的状态"""
-        self.logger.info(f"订单状态跟踪任务已启动，检查间隔: {self.order_check_interval}秒")
-        
-        while True:
-            try:
-                # 等待指定间隔
-                await asyncio.sleep(self.order_check_interval)
-                
-                # 检查是否有活跃订单
-                if not self.active_orders:
-                    continue
-                    
-                # 🔧 主动清理过多挂单
-                await self._cleanup_excessive_orders()
-                    
-                self.logger.info(f"检查活跃订单状态，共{len(self.active_orders)}个订单")
-                current_time = datetime.now()
-                
-                # 收集需要处理的订单
-                orders_to_check = list(self.active_orders.items())
-                
-                for order_id, order in orders_to_check:
-                    try:
-                        # 获取最新订单状态
-                        latest_order = await self._get_order_status(order_id)
-                        
-                        if not latest_order:
-                            self.logger.warning(f"无法获取订单状态: {order_id}")
-                            continue
-                            
-                        # 更新订单状态
-                        if latest_order.status != order.status:
-                            self.logger.info(f"订单状态更新: {order_id}, {order.status} -> {latest_order.status}")
-                            order.status = latest_order.status
-                            
-                            # 如果订单已完成（成交、取消、拒绝），从活跃订单中移除
-                            if order.is_filled() or order.is_canceled() or order.is_rejected():
-                                self.logger.info(f"订单已完成: {order_id}, 状态: {order.status}")
-                                del self.active_orders[order_id]
-                                if order_id in self.order_update_time:
-                                    del self.order_update_time[order_id]
-                                    
-                                # 通知回调
-                                self._notify_order_update(order)
-                            
-                        # 检查订单是否超时
-                        if (not order.is_filled() and not order.is_canceled() and not order.is_rejected() and
-                                order_id in self.order_update_time):
-                            elapsed = (current_time - self.order_update_time[order_id]).total_seconds()
-                            
-                            if elapsed > self.order_timeout:
-                                self.logger.warning(f"订单超时: {order_id}, 已等待{elapsed:.1f}秒")
-                                
-                                # 🔧 直接取消超时订单，不重新提交（避免资金占用）
-                                await self._cancel_order(order_id)
-                    except Exception as e:
-                        self.logger.error(f"处理订单{order_id}状态时出错: {e}")
-                
-            except asyncio.CancelledError:
-                self.logger.info("订单状态跟踪任务被取消")
-                break
-            except Exception as e:
-                self.logger.error(f"订单状态跟踪任务出错: {e}")
-                self.logger.error(f"Traceback:\n{traceback.format_exc()}")
-                # 短暂暂停后继续
-                await asyncio.sleep(10)
-
-    async def _get_order_status(self, order_id: str):
-        """获取订单最新状态"""
-        try:
-            # 检查交易上下文是否初始化
-            if not self._trade_ctx_initialized:
-                await self._init_trade_context()
-                
-            if not self._trade_ctx_initialized:
-                self.logger.error("无法获取订单状态：交易上下文未初始化")
-                return None
-                
-            # 获取订单详情
-            order_info = self.trade_ctx.order_detail(order_id)
-            if not order_info:
-                self.logger.warning(f"无法获取订单详情: {order_id}")
-                return None
-                
-            # 更新订单时间
-            self.order_update_time[order_id] = datetime.now()
-            
-            return order_info
-        except Exception as e:
-            self.logger.error(f"获取订单状态失败: {order_id}, 错误: {e}")
-            return None
-
-    async def _handle_timeout_order(self, order):
-        """处理超时订单，尝试取消并重新提交"""
-        if not order or not order.order_id:
-            return
-            
-        try:
-            order_id = order.order_id
-            
-            # 尝试取消订单
-            self.logger.info(f"尝试取消超时订单: {order_id}")
-            cancel_result = await self._cancel_order(order_id)
-            
-            if cancel_result:
-                self.logger.info(f"成功取消订单: {order_id}")
-                
-                # 等待短暂时间确保取消生效
-                await asyncio.sleep(2)
-                
-                # 获取最新价格
-                symbol = order.symbol
-                quote = self.realtime_mgr.get_latest_quote(symbol) if hasattr(self, 'realtime_mgr') else None
-                
-                if quote:
-                    latest_price = quote.last_done
-                    self.logger.info(f"获取{symbol}最新价格: {latest_price}")
-                    
-                    # 创建新订单
-                    side = "buy" if order.side == OrderSide.Buy else "sell"
-                    await self._submit_order(
-                        symbol=symbol,
-                        price=latest_price,  # 使用最新价格
-                        quantity=order.quantity,
-                        order_type=side,
-                        strategy_name=order.strategy_name
-                    )
-                else:
-                    self.logger.warning(f"无法获取{symbol}最新价格，未重新提交订单")
-            else:
-                self.logger.warning(f"取消订单失败: {order_id}")
-                
-        except Exception as e:
-            self.logger.error(f"处理超时订单时出错: {e}")
-            self.logger.error(f"Traceback:\n{traceback.format_exc()}")
-
-    async def _cleanup_excessive_orders(self):
-        """主动清理过多的挂单"""
-        try:
-            # 获取所有未成交的活跃订单
-            pending_orders = [
-                (order_id, order) for order_id, order in self.active_orders.items()
-                if not order.is_filled() and not order.is_canceled() and not order.is_rejected()
-            ]
-            
-            if len(pending_orders) > self.max_pending_orders:
-                # 按提交时间排序，取消最旧的订单
-                pending_orders.sort(key=lambda x: x[1].submitted_at)
-                orders_to_cancel = pending_orders[:len(pending_orders) - self.max_pending_orders + 1]
-                
-                self.logger.warning(f"清理过多挂单: {len(pending_orders)} -> {self.max_pending_orders}, 取消{len(orders_to_cancel)}个旧订单")
-                
-                for order_id, order in orders_to_cancel:
-                    await self._cancel_order(order_id)
-                    await asyncio.sleep(0.1)  # 避免API频率限制
-                    
-        except Exception as e:
-            self.logger.error(f"清理挂单时出错: {e}")
-
-    async def _cleanup_one_low_quality_order(self):
-        """清理一个低质量订单，为高质量信号让路"""
-        try:
-            # 获取所有未成交的活跃订单
-            pending_orders = [
-                (order_id, order) for order_id, order in self.active_orders.items()
-                if not order.is_filled() and not order.is_canceled() and not order.is_rejected()
-            ]
-            
-            if not pending_orders:
-                return
-            
-            # 优先清理低置信度、长时间未成交的订单
-            # 这里简化处理，按时间排序，取消最旧的一个订单
-            pending_orders.sort(key=lambda x: x[1].submitted_at)
-            
-            if pending_orders:
-                order_id, order = pending_orders[0]
-                self.logger.info(f"为高质量信号让路，取消旧订单: {order_id}, {order.symbol}")
-                await self._cancel_order(order_id)
-                
-        except Exception as e:
-            self.logger.error(f"清理低质量订单时出错: {e}")
-
-    async def _cancel_order(self, order_id: str) -> bool:
-        """
-        取消订单
-        
-        Args:
-            order_id: 订单ID
-            
-        Returns:
-            bool: 取消是否成功
-        """
-        try:
-            # 检查交易上下文是否初始化
-            if not self._trade_ctx_initialized:
-                await self._init_trade_context()
-                
-            if not self._trade_ctx_initialized:
-                self.logger.error("无法取消订单：交易上下文未初始化")
-                return False
-                
-            # 取消订单
-            self.trade_ctx.cancel_order(order_id)
-            
-            # 更新订单状态
-            if order_id in self.active_orders:
-                self.active_orders[order_id].status = OrderStatus.CancelSubmitted
-                self._notify_order_update(self.active_orders[order_id])
-                
-            return True
-        except Exception as e:
-            self.logger.error(f"取消订单失败: {order_id}, 错误: {e}")
-            return False
+        """启动订单状态跟踪任务 — delegates to OrderTracker"""
+        self.order_tracker._start_order_tracking()
 
     # 处理信号的方法
     async def process_signal(self, signal: Signal, realtime_mgr=None) -> Optional[OrderResult]:
@@ -621,14 +410,8 @@ class OrderManager:
         return await self.execute_signal(signal, realtime_mgr=realtime_mgr)
         
     def register_order_callback(self, callback: Callable[[OrderResult], None]):
-        """
-        注册订单回调函数
-        
-        Args:
-            callback: 回调函数，接收OrderResult参数
-        """
-        self.order_callbacks.append(callback)
-        self.logger.debug(f"已注册订单回调函数: {callback.__name__}")
+        """注册订单回调函数 — delegates to OrderTracker"""
+        self.order_tracker.register_order_callback(callback)
     
     def _check_pending_dedup(self, symbol: str, side: str) -> bool:
         """Return True if a duplicate pending order exists for this symbol+side."""
@@ -663,7 +446,7 @@ class OrderManager:
             
             signal_type_str = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
             
-            # SELL 无持仓时自动转为 SHORT（做空）
+            # SELL 无持仓时：根据配置决定是否自动转为 SHORT
             if signal_type == SignalType.SELL:
                 existing_positions = self.get_positions(symbol)
                 has_long = False
@@ -675,10 +458,16 @@ class OrderManager:
                                 has_long = True
                                 break
                 if not has_long:
-                    self.logger.info(f"🔄 {symbol} 无多头持仓，SELL 自动转为 SHORT")
-                    signal_type = SignalType.SHORT
-                    signal.signal_type = SignalType.SHORT
-                    signal_type_str = "SHORT"
+                    allow_auto_short = self.config.get("execution.allow_sell_to_short", False)
+                    if allow_auto_short and symbol not in self._short_blacklist:
+                        self.logger.info(f"🔄 {symbol} 无多头持仓，SELL 自动转为 SHORT (allow_sell_to_short=true)")
+                        signal_type = SignalType.SHORT
+                        signal.signal_type = SignalType.SHORT
+                        signal_type_str = "SHORT"
+                    else:
+                        reason = f"在做空黑名单中" if symbol in self._short_blacklist else "allow_sell_to_short=false"
+                        self.logger.info(f"⚠️ {symbol} 无多头持仓，SELL 信号跳过 ({reason})")
+                        return None
             
             if signal_type in [SignalType.BUY, SignalType.COVER]:
                 side_str = "Buy"
@@ -865,8 +654,9 @@ class OrderManager:
                 symbol = order.symbol
                 if symbol not in current_prices:
                     try:
-                        # 获取实时价格
                         current_prices[symbol] = await self._get_current_price(symbol)
+                        if current_prices[symbol] <= 0:
+                            current_prices[symbol] = order.price
                     except:
                         current_prices[symbol] = order.price
             
@@ -942,19 +732,27 @@ class OrderManager:
     async def _get_current_price(self, symbol: str) -> float:
         """获取股票当前价格"""
         try:
-            # 尝试从实时数据模块获取价格
             if hasattr(self, 'realtime_data') and self.realtime_data:
                 price = await self.realtime_data.get_current_price(symbol)
                 if price and price > 0:
                     return price
             
-            # 如果没有实时数据模块，使用简化的价格获取
-            # 这里可以集成其他价格数据源
-            return 100.0  # 默认价格，实际应该替换为真实价格获取
+            try:
+                from longport.openapi import QuoteContext as QCtx
+                quote_ctx = QCtx(self.longport_config)
+                quotes = quote_ctx.quote([symbol])
+                if quotes:
+                    p = float(quotes[0].last_done)
+                    if p > 0:
+                        return p
+            except Exception:
+                pass
+            
+            return 0.0
             
         except Exception as e:
             self.logger.warning(f"获取{symbol}实时价格失败: {e}")
-            return 100.0
+            return 0.0
 
     async def _cleanup_unreasonable_orders(self, unreasonable_orders):
         """清理不合理的挂单"""
@@ -1440,7 +1238,10 @@ class OrderManager:
                 strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
                 if hasattr(signal, 'confidence'):
                     strategy_info += f" confidence={signal.confidence:.3f}"
-                return await self._submit_order(symbol, price, quantity, "sell", strategy_info)
+                result = await self._submit_order(symbol, price, quantity, "sell", strategy_info)
+                if result and result.order_id:
+                    self._short_sell_order_ids.add(result.order_id)
+                return result
             else:
                 self.logger.warning(f"做空已禁用，无持仓可卖出: {symbol}, 实际持仓: {current_quantity}")
                 return OrderResult(
@@ -1505,514 +1306,53 @@ class OrderManager:
             strategy_info += f" confidence={signal.confidence:.3f}"
         return await self._submit_order(symbol, price, adjusted_quantity, "sell", strategy_info)
                 
-    async def _submit_order(self, symbol: str, price: float, quantity: int, order_type: str, strategy_name: str) -> OrderResult:
-        """
-        提交订单
-        
-        Args:
-            symbol: 股票代码
-            price: 价格
-            quantity: 数量
-            order_type: 订单类型
-            strategy_name: 策略名称
-            
-        Returns:
-            OrderResult: 订单结果
-        """
-        try:
-            # 🔧 检查挂单数量限制并实施智能降级策略
-            pending_count = len([order for order in self.active_orders.values() 
-                               if not order.is_filled() and not order.is_canceled() and not order.is_rejected()])
-            
-            if pending_count >= self.max_pending_orders:
-                self.logger.warning(f"达到最大挂单数量限制: {pending_count}/{self.max_pending_orders}")
-                
-                # 🚀 智能市价单降级机制
-                # 尝试从不同来源获取置信度信息
-                confidence = 0.05  # 默认低置信度
-                
-                # 如果strategy_name包含置信度信息，尝试解析
-                if isinstance(strategy_name, str) and 'confidence' in strategy_name.lower():
-                    try:
-                        # 简单的置信度解析（可能需要根据实际格式调整）
-                        import re
-                        confidence_match = re.search(r'confidence[=:]?\s*([0-9.]+)', strategy_name.lower())
-                        if confidence_match:
-                            confidence = float(confidence_match.group(1))
-                    except:
-                        pass
-                
-                # 高置信度信号转为市价单执行
-                if confidence > 0.10:  # 置信度大于10%
-                    self.logger.info(f"高置信度信号({confidence:.2%})转为市价单执行: {symbol}")
-                    
-                    # 先主动清理一个旧订单，为新的高质量信号让路
-                    await self._cleanup_one_low_quality_order()
-                    
-                    # 重新计算挂单数量
-                    pending_count = len([order for order in self.active_orders.values() 
-                                       if not order.is_filled() and not order.is_canceled() and not order.is_rejected()])
-                    
-                    # 如果仍然超限，转为市价单
-                    if pending_count >= self.max_pending_orders:
-                        self.logger.info(f"转为市价单执行: {symbol}, 置信度: {confidence:.2%}")
-                        # 这里可以实现市价单逻辑，暂时先用限价单但优先级更高
-                        pass
-                
-                # 低置信度信号直接拒绝或延迟执行
-                else:
-                    return OrderResult(
-                        order_id="",
-                        symbol=symbol,
-                        side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
-                        quantity=quantity,
-                        price=price,
-                        status=OrderStatus.Rejected,
-                        submitted_at=datetime.now(),
-                        msg=f"挂单限制且置信度低({confidence:.2%})，拒绝执行",
-                        strategy_name=strategy_name
-                    )
-            
-            # 自动调整价格到符合交易所规则
-            adjusted_price = self._adjust_price_to_tick(symbol, price)
-            
-            # 成本效益分析（仅对买入订单进行，假设默认置信度）
-            if order_type == "buy":
-                confidence = 0.1  # 默认置信度，实际应从信号中获取
-                is_effective, cost_reason = self._is_trade_cost_effective(symbol, quantity, adjusted_price, confidence)
-                
-                if not is_effective:
-                    self.logger.warning(f"交易被成本效益分析拒绝: {cost_reason}")
-                    
-                    # 尝试优化交易数量
-                    optimized_quantity = self._optimize_trade_size(symbol, quantity, adjusted_price, confidence)
-                    
-                    if optimized_quantity > 0 and optimized_quantity != quantity:
-                        self.logger.info(f"使用优化后的交易数量: {quantity} -> {optimized_quantity}")
-                        quantity = optimized_quantity
-                    elif optimized_quantity == 0:
-                        return OrderResult(
-                            order_id="",
-                            symbol=symbol,
-                            side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
-                            quantity=quantity,
-                            price=adjusted_price,
-                            status=OrderStatus.Rejected,
-                            submitted_at=datetime.now(),
-                            msg=f"成本效益分析失败: {cost_reason}",
-                            strategy_name=strategy_name
-                        )
-            
-            # 记录详细的订单信息
-            self.logger.info(f"准备提交订单 - 股票: {symbol}, 价格: {adjusted_price}, 数量: {quantity}, 类型: {order_type}, 策略: {strategy_name}")
-            
-            # 第二步：调整数量到符合手数要求
-            adjusted_quantity = self._adjust_lot_size(symbol, quantity)
-            self.logger.info(f"数量调整: {symbol} {quantity} -> {adjusted_quantity}")
-            
-            # 第三步：调用富途API
-            order_resp = self.trade_ctx.submit_order(
-                symbol=symbol,
-                order_type=OrderType.LO,  # 修复：使用正确的OrderType.LO
-                side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
-                submitted_quantity=quantity,
-                time_in_force=TimeInForceType.Day,
-                submitted_price=Decimal(str(adjusted_price)),
-                remark=f"策略订单-{strategy_name}"
-            )
+    # ── Delegation to OrderExecutor ──
 
-            self.logger.info(f"订单提交成功: {symbol}, 订单ID: {order_resp.order_id}")
-            
-            # 增加今日订单计数
-            self.daily_order_count += 1
-            
-            # 创建订单结果对象（移除id参数）
-            result = OrderResult(
-                order_id=order_resp.order_id,
-                symbol=symbol,
-                side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
-                quantity=quantity,
-                price=adjusted_price,
-                status=OrderStatus.NotReported,
-                submitted_at=datetime.now(),
-                msg="",
-                strategy_name=strategy_name
-            )
-            
-            # 保存到活跃订单
-            self.active_orders[order_resp.order_id] = result
-            self.order_update_time[order_resp.order_id] = time.time()
-            
-            # 保存订单到CSV
-            self._save_order_to_csv(result)
-            
-            self.logger.info(f"订单提交完成: {result}")
-            return result
-            
-        except Exception as e:
-            error_str = str(e)
-            self.logger.error(f"提交订单到交易所失败: {symbol}, 错误: {error_str}")
-            
-            if "603301" in error_str or "not support short selling" in error_str.lower():
-                self._short_blacklist.add(symbol.upper())
-                self.logger.warning(f"已将 {symbol} 加入做空黑名单 (603301)")
-            
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
-                quantity=quantity,
-                price=adjusted_price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg=f"提交失败: {error_str}",
-                strategy_name=strategy_name
-            )
-    
-    # Cached lot sizes queried from the exchange API
-    _lot_size_cache: Dict[str, int] = {}
-    
-    def _query_lot_size_from_api(self, symbol: str) -> Optional[int]:
-        """Query lot size from LongPort QuoteContext.static_info API."""
-        try:
-            from longport.openapi import QuoteContext as QCtx
-            quote_ctx = QCtx(self.longport_config)
-            infos = quote_ctx.static_info([symbol])
-            if infos:
-                info = infos[0] if isinstance(infos, list) else infos
-                lot = int(getattr(info, 'lot_size', 0))
-                if lot > 0:
-                    self.logger.info(f"从API获取 {symbol} 手数: {lot}")
-                    return lot
-        except Exception as e:
-            self.logger.warning(f"API查询 {symbol} 手数失败: {e}")
-        return None
-
-    def _get_real_lot_size(self, symbol: str) -> int:
-        """获取真实的港股手数信息（缓存 + API查询 + 硬编码兜底）"""
-        if symbol in self._lot_size_cache:
-            return self._lot_size_cache[symbol]
-        
-        lot = self._query_lot_size_from_api(symbol)
-        if lot:
-            self._lot_size_cache[symbol] = lot
-            return lot
-        
-        fallback = {
-            '700.HK': 100, '9988.HK': 100, '388.HK': 100,
-            '1299.HK': 500, '941.HK': 500, '9992.HK': 200,
-        }
-        lot = fallback.get(symbol, 100)
-        self._lot_size_cache[symbol] = lot
-        self.logger.warning(f"使用兜底手数 {symbol}: {lot}")
-        return lot
+    async def _submit_order(self, symbol, price, quantity, order_type, strategy_name):
+        return await self.order_executor._submit_order(symbol, price, quantity, order_type, strategy_name)
 
     def get_lot_size(self, symbol: str) -> int:
-        """获取股票的最小交易单位"""
-        try:
-            if '.HK' in symbol:
-                lot_size = self._get_real_lot_size(symbol)
-            elif '.US' in symbol:
-                lot_size = 1
-            elif '.SH' in symbol or '.SZ' in symbol:
-                lot_size = 100
-            else:
-                lot_size = 100
-                
-            if symbol not in self.min_quantity_unit:
-                self.min_quantity_unit[symbol] = lot_size
-                
-            return lot_size
-        except Exception as e:
-            self.logger.error(f"获取股票手数出错: {e}")
-            return 100
-    
+        return self.order_executor.get_lot_size(symbol)
+
+    def _adjust_price_to_tick(self, symbol, price):
+        return self.order_executor._adjust_price_to_tick(symbol, price)
+
+    def _adjust_lot_size(self, symbol, quantity):
+        return self.order_executor._adjust_lot_size(symbol, quantity)
+
+    def _get_hk_price_tick(self, price):
+        return self.order_executor._get_hk_price_tick(price)
+
+    def _validate_order_parameters(self, symbol, price, quantity):
+        return self.order_executor._validate_order_parameters(symbol, price, quantity)
+
     async def cancel_order(self, order_id: str) -> bool:
-        """
-        取消订单
-        
-        Args:
-            order_id: 订单ID
-            
-        Returns:
-            是否取消成功
-        """
-        if not self.trade_ctx:
-            await self.initialize()
-            
-        if order_id not in self.active_orders:
-            self.logger.warning(f"订单ID不存在: {order_id}")
-            return False
-            
-        order = self.active_orders[order_id]
-        if not order.is_active():
-            self.logger.warning(f"订单不是活跃状态，无法取消: {order}")
-            return False
-            
-        self.logger.info(f"取消订单: {order_id}")
-        
-        try:
-            # 移除await关键字
-            response = self.trade_ctx.cancel_order(order_id)
-            
-            # 更新订单状态
-            order.status = OrderStatus.CancelSubmitted
-            order.last_updated = datetime.now()
-            order.msg = "Cancellation submitted"
-            
-            # 调用回调函数
-            for callback in self.order_callbacks:
-                try:
-                    callback(order)
-                except Exception as e:
-                    self.logger.error(f"执行订单回调函数出错: {e}")
-            
-            return True
-        except Exception as e:
-            self.logger.error(f"取消订单失败: {e}")
-            return False
-    
+        return await self.order_executor.cancel_order(order_id)
+
+    # ── Delegation to OrderTracker ──
+
     async def get_order_status(self, order_id: str) -> Optional[OrderResult]:
-        """
-        获取订单状态
-        
-        Args:
-            order_id: 订单ID
-            
-        Returns:
-            更新后的订单结果
-        """
-        if not self.trade_ctx:
-            await self.initialize()
-            
-        if order_id not in self.active_orders:
-            self.logger.warning(f"订单ID不存在: {order_id}")
-            return None
-            
-        try:
-            # 移除await关键字
-            order_info = self.trade_ctx.order_detail(order_id)
-            
-            # 更新订单状态
-            order = self.active_orders[order_id]
-            order.update_from_order_info(order_info)
-            
-            # 调用回调函数
-            for callback in self.order_callbacks:
-                try:
-                    callback(order)
-                except Exception as e:
-                    self.logger.error(f"执行订单回调函数出错: {e}")
-            
-            return order
-        except Exception as e:
-            self.logger.error(f"获取订单状态失败: {e}")
-            return self.active_orders[order_id]
-    
+        return await self.order_tracker.get_order_status(order_id)
+
     async def get_today_orders(self, symbol: str = None):
-        """
-        获取今日委托
-        
-        Args:
-            symbol: 可选，指定股票代码
-            
-        Returns:
-            今日委托列表
-        """
-        try:
-            orders_response = self.trade_ctx.today_orders()
-            
-            # TodayOrdersResponse需要通过list属性获取委托列表
-            orders = orders_response.list if hasattr(orders_response, 'list') else []
-            order_count = len(orders) if orders else 0
-            self.logger.info(f"成功获取今日委托, 共{order_count}个")
-            
-            # 如果指定了股票代码，则过滤委托
-            if symbol and orders:
-                orders = [o for o in orders if o.symbol.lower() == symbol.lower()]
-                self.logger.debug(f"过滤委托 {symbol}, 结果: {len(orders)}个")
-                
-            return orders
-        except Exception as e:
-            self.logger.error(f"获取今日委托失败: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return []
+        return await self.order_tracker.get_today_orders(symbol)
+
+    def _notify_order_update(self, order):
+        self.order_tracker._notify_order_update(order)
+
+    def _save_order_to_csv(self, result):
+        self.order_tracker._save_order_to_csv(result)
     
+    # ── Delegation to PositionService ──
+
     def get_account_balance(self):
-        """
-        获取账户余额
-        
-        Returns:
-            可用资金总额（浮点数），如果失败则返回0
-        """
-        try:
-            # 获取账户余额
-            balance_response = self.trade_ctx.account_balance()
-            
-            # 对象属性的日志记录，用于调试
-            self.logger.debug(f"账户余额对象类型: {type(balance_response)}")
-            
-            # 处理列表类型的响应 - 长桥SDK最新版本返回的是列表
-            if isinstance(balance_response, list):
-                self.logger.info(f"账户余额是列表格式，包含 {len(balance_response)} 项")
-                
-                total_available = 0.0
-                
-                for item in balance_response:
-                    # 获取cash_infos属性，它是一个包含各种货币可用资金的列表
-                    if hasattr(item, 'cash_infos') and item.cash_infos:
-                        for cash_info in item.cash_infos:
-                            if hasattr(cash_info, 'available_cash'):
-                                self.logger.info(f"获取到{cash_info.currency}可用资金: {cash_info.available_cash}")
-                                # 所有货币都转换为账户的基准货币
-                                if cash_info.currency == "USD":
-                                    # 美元按1:7.8转换为港币计算(假设账户基准货币是港币)
-                                    total_available += float(cash_info.available_cash) * 7.8
-                                elif cash_info.currency == "HKD":
-                                    # 港币直接加入
-                                    total_available += float(cash_info.available_cash)
-                                else:
-                                    # 其他货币假设已转换为账户基准货币
-                                    total_available += float(cash_info.available_cash)
-                
-                self.logger.info(f"账户总可用资金: {total_available}")
-                return total_available
-            
-            # 检查响应类型
-            if hasattr(balance_response, 'cash_infos') and balance_response.cash_infos:
-                # 新的API返回格式
-                total_available = 0.0
-                
-                # 记录每种货币的余额
-                for cash_info in balance_response.cash_infos:
-                    if hasattr(cash_info, 'available_cash'):
-                        self.logger.info(f"获取到{cash_info.currency}可用资金: {cash_info.available_cash}")
-                        if cash_info.currency == "USD":
-                            # 美元按1:7.8转换为港币计算(假设账户基准货币是港币)
-                            total_available += float(cash_info.available_cash) * 7.8
-                        elif cash_info.currency == "HKD":
-                            # 港币直接加入
-                            total_available += float(cash_info.available_cash)
-                        else:
-                            # 其他货币假设已转换为账户基准货币
-                            total_available += float(cash_info.available_cash)
-                
-                self.logger.info(f"账户总可用资金: {total_available}")
-                return total_available
-            elif hasattr(balance_response, 'list'):
-                # 旧API返回格式 - 列表形式
-                balances = balance_response.list
-                total_available = 0.0
-                
-                for balance in balances:
-                    if hasattr(balance, 'available'):
-                        self.logger.info(f"获取到{balance.currency}可用资金: {balance.available}")
-                        if balance.currency == "USD":
-                            # 美元按1:7.8转换为港币计算(假设账户基准货币是港币)
-                            total_available += float(balance.available) * 7.8
-                        elif balance.currency == "HKD":
-                            # 港币直接加入
-                            total_available += float(balance.available)
-                        else:
-                            # 其他货币假设已转换为账户基准货币
-                            total_available += float(balance.available)
-                    
-                self.logger.info(f"账户总可用资金: {total_available}")
-                return total_available
-            elif hasattr(balance_response, 'cash') and isinstance(balance_response.cash, dict):
-                # 模拟数据格式
-                total_available = 0.0
-                
-                for currency, info in balance_response.cash.items():
-                    if hasattr(info, 'available'):
-                        self.logger.info(f"获取到{currency}可用资金: {info.available}")
-                        total_available += float(info.available)
-                
-                self.logger.info(f"账户总可用资金: {total_available}")
-                return total_available
-            else:
-                # 未知格式，尝试记录对象属性以便调试
-                attrs = dir(balance_response)
-                self.logger.warning(f"无法识别的账户余额格式，对象属性: {attrs}")
-                
-                # 尝试查找可能的余额属性
-                if hasattr(balance_response, 'net_assets'):
-                    self.logger.info(f"使用net_assets作为可用资金: {balance_response.net_assets}")
-                    return float(balance_response.net_assets)
-                elif hasattr(balance_response, 'total_cash'):
-                    self.logger.info(f"使用total_cash作为可用资金: {balance_response.total_cash}")
-                    return float(balance_response.total_cash)
-                
-                # 如果无法解析，返回默认值
-                self.logger.error(f"无法获取账户可用资金，返回默认值")
-                return 100000.0  # 返回一个默认值，避免交易被完全阻止
-        except Exception as e:
-            self.logger.error(f"获取账户余额失败: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return 0.0
-    
+        return self.position_service.get_account_balance()
+
     def get_positions(self, symbol: str = None):
-        """
-        获取当前持仓
-        
-        Args:
-            symbol: 可选，指定股票代码
-            
-        Returns:
-            持仓列表
-        """
-        try:
-            # 注意：stock_positions()方法可能不是异步方法，不需要await
-            positions_response = self.trade_ctx.stock_positions()
-            
-            # 正确解析持仓数据结构：使用channels属性
-            positions = []
-            if hasattr(positions_response, 'channels') and positions_response.channels:
-                for channel in positions_response.channels:
-                    if hasattr(channel, 'positions') and channel.positions:
-                        positions.extend(channel.positions)
-            
-            position_count = len(positions) if positions else 0
-            self.logger.info(f"成功获取持仓, 共{position_count}个")
-            
-            # 记录详细持仓信息
-            if positions:
-                for pos in positions:
-                    self.logger.debug(f"持仓: {pos.symbol}, 数量: {pos.quantity}, 可用: {pos.available_quantity}")
-            
-            # 如果指定了股票代码，则过滤持仓
-            if symbol and positions:
-                filtered_positions = [p for p in positions if p.symbol.upper() == symbol.upper()]
-                self.logger.debug(f"过滤持仓 {symbol}, 结果: {len(filtered_positions)}个")
-                return filtered_positions
-                
-            return positions
-        except Exception as e:
-            self.logger.error(f"获取持仓失败: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return []
-            
+        return self.position_service.get_positions(symbol)
+
     async def get_position(self, symbol: str):
-        """
-        获取指定股票的持仓
-        
-        Args:
-            symbol: 股票代码
-            
-        Returns:
-            如果持有则返回持仓对象，否则返回None
-        """
-        try:
-            positions = self.get_positions(symbol)
-            
-            if positions and len(positions) > 0:
-                return positions[0]  # 返回第一个匹配的持仓
-            
-            return None
-        except Exception as e:
-            self.logger.error(f"获取{symbol}持仓失败: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return None
+        return await self.position_service.get_position(symbol)
     
     def _validate_risk_control(self, signal: Signal) -> bool:
         """
@@ -2072,111 +1412,13 @@ class OrderManager:
             self.logger.error(traceback.format_exc())
 
     def _save_order(self, order_result: OrderResult, strategy_name: str):
-        """
-        保存订单信息
-        
-        Args:
-            order_result: 订单结果
-            strategy_name: 策略名称
-        """
-        try:
-            # 确保日志目录存在
-            log_dir = self.config.get('logging', {}).get('dir', 'logs')
-            os.makedirs(log_dir, exist_ok=True)
-            
-            # 保存到CSV文件
-            orders_file = os.path.join(log_dir, 'orders.csv')
-            file_exists = os.path.exists(orders_file)
-            
-            with open(orders_file, 'a', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=[
-                    'order_id', 'symbol', 'side', 'quantity', 'price',
-                    'status', 'submitted_at', 'filled_at', 'cancelled_at',
-                    'rejected_at', 'msg', 'strategy_name'
-                ])
-                
-                if not file_exists:
-                    writer.writeheader()
-                    
-                writer.writerow({
-                    'order_id': order_result.order_id,
-                    'symbol': order_result.symbol,
-                    'side': order_result.side.name if hasattr(order_result.side, 'name') else str(order_result.side),
-                    'quantity': order_result.quantity,
-                    'price': order_result.price,
-                    'status': order_result.status.name if hasattr(order_result.status, 'name') else str(order_result.status),
-                    'submitted_at': order_result.submitted_at.isoformat() if order_result.submitted_at else '',
-                    'filled_at': order_result.filled_at.isoformat() if hasattr(order_result, 'filled_at') and order_result.filled_at else '',
-                    'cancelled_at': order_result.cancelled_at.isoformat() if hasattr(order_result, 'cancelled_at') and order_result.cancelled_at else '',
-                    'rejected_at': order_result.rejected_at.isoformat() if hasattr(order_result, 'rejected_at') and order_result.rejected_at else '',
-                    'msg': order_result.msg if hasattr(order_result, 'msg') else '',
-                    'strategy_name': strategy_name
-                })
-                
-            self.logger.info(f"订单信息已保存到 {orders_file}")
-            
-        except Exception as e:
-            self.logger.error(f"保存订单信息时发生错误: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
+        self.order_tracker._save_order(order_result, strategy_name)
 
     def _check_daily_order_limit(self) -> bool:
-        """
-        检查是否达到每日订单数量限制
-        
-        Returns:
-            bool: 如果未达到限制则返回True，否则返回False
-        """
-        # 获取每日最大订单数量配置
-        max_daily_orders = self.max_daily_orders
-        
-        # 如果每日订单数已达到或超过限制，则返回False
-        if self.daily_order_count >= max_daily_orders:
-            self.logger.warning(f"已达到每日订单数量限制: {self.daily_order_count}/{max_daily_orders}")
-            return False
-        
-        # 否则返回True
-        return True
+        return self.order_tracker._check_daily_order_limit()
 
     def is_enough_balance(self, cost: float, symbol: str = None) -> bool:
-        """检查账户余额是否足够支付交易成本（优先使用购买力）"""
-        try:
-            balance_response = self.trade_ctx.account_balance()
-            
-            if isinstance(balance_response, list):
-                for item in balance_response:
-                    buy_power = float(getattr(item, 'buy_power', 0) or 0)
-                    if buy_power > 0:
-                        if buy_power >= cost:
-                            self.logger.info(f"购买力充足: {buy_power:.2f} >= {cost:.2f}")
-                            return True
-                        else:
-                            self.logger.warning(f"购买力不足: {buy_power:.2f} < {cost:.2f}")
-                            return False
-                
-                target_currency = "USD" if (symbol and '.US' in symbol) else "HKD"
-                for item in balance_response:
-                    if hasattr(item, 'cash_infos') and item.cash_infos:
-                        for cash_info in item.cash_infos:
-                            if getattr(cash_info, 'currency', '') == target_currency:
-                                available = float(getattr(cash_info, 'available_cash', 0) or 0)
-                                if available >= cost:
-                                    self.logger.info(f"{target_currency}可用现金充足: {available:.2f} >= {cost:.2f}")
-                                    return True
-                                else:
-                                    self.logger.warning(f"{target_currency}可用现金不足: {available:.2f} < {cost:.2f}")
-                                    return False
-            
-            total_available = self.get_account_balance()
-            if total_available >= cost:
-                self.logger.info(f"总账户余额充足: {total_available:.2f} >= {cost:.2f}")
-                return True
-            
-            self.logger.warning(f"总账户余额不足: {total_available:.2f} < {cost:.2f}")
-            return False
-                
-        except Exception as e:
-            self.logger.error(f"检查账户余额时出错: {str(e)}")
-            return False
+        return self.position_service.is_enough_balance(cost, symbol)
 
     async def risk_control_check(self, symbol: str, quantity: int, price: float, is_buy: bool) -> bool:
         """
@@ -2268,263 +1510,11 @@ class OrderManager:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
-    def _get_hk_price_tick(self, price) -> float:
-        """
-        获取港股价格的最小变动单位（价格精度）
-        
-        Args:
-            price: 股票价格 (支持 float 或 Decimal)
-            
-        Returns:
-            最小价格变动单位
-        """
-        try:
-            # 统一转换为 float 进行计算
-            price_float = float(price) if price else 0.0
-            
-            if price_float <= 0.25:
-                return 0.001
-            elif price_float <= 0.50:
-                return 0.005
-            elif price_float <= 10.00:
-                return 0.01
-            elif price_float <= 20.00:
-                return 0.02
-            elif price_float <= 100.00:
-                return 0.05
-            elif price_float <= 200.00:
-                return 0.10
-            elif price_float <= 500.00:
-                return 0.20
-            else:
-                return 0.50
-        except (ValueError, TypeError) as e:
-            self.logger.error(f"获取港股价格精度时出错: {e}, 使用默认精度0.05")
-            return 0.05
-    
-    def _adjust_price_to_tick(self, symbol: str, price) -> float:
-        """
-        调整价格到符合最小变动单位的价格
-        
-        Args:
-            symbol: 股票代码
-            price: 原始价格 (支持 float 或 Decimal)
-            
-        Returns:
-            调整后的价格
-        """
-        try:
-            # 统一转换为 float，支持 Decimal 和 float 类型
-            if isinstance(price, Decimal):
-                price_float = float(price)
-            elif isinstance(price, (int, float)):
-                price_float = float(price)
-            else:
-                # 尝试转换字符串或其他类型
-                price_float = float(str(price))
-            
-            if ".HK" in symbol:
-                tick = self._get_hk_price_tick(price_float)
-                # 调整到最接近的有效价格点
-                adjusted_price = round(price_float / tick) * tick
-                if abs(adjusted_price - price_float) > 0.001:
-                    self.logger.info(f"调整港股价格 {symbol}: {price_float} -> {adjusted_price} (精度: {tick})")
-                return round(adjusted_price, 3)  # 保留3位小数
-            elif ".US" in symbol:
-                # 美股精度为0.01
-                adjusted_price = round(price_float, 2)
-                return adjusted_price
-            else:
-                # 其他市场默认精度为0.01
-                adjusted_price = round(price_float, 2)
-                return adjusted_price
-        except (ValueError, TypeError, decimal.InvalidOperation) as e:
-            self.logger.error(f"调整价格精度时出错: {e}, 使用原始价格: {price}")
-            try:
-                return float(price) if price else 0.0
-            except:
-                return 0.0
+    async def submit_buy_order(self, symbol, price, quantity, strategy_name="default"):
+        return await self.order_executor.submit_buy_order(symbol, price, quantity, strategy_name)
 
-    def _validate_order_parameters(self, symbol: str, price, quantity: int) -> Tuple[bool, str, float, int]:
-        """
-        验证并自动修正订单参数，使其符合交易所规则
-        
-        Args:
-            symbol: 股票代码
-            price: 价格 (支持 float 或 Decimal)
-            quantity: 数量
-            
-        Returns:
-            (是否有效, 错误信息或空字符串, 修正后价格, 修正后数量)
-        """
-        try:
-            if isinstance(price, Decimal):
-                price_float = float(price)
-            elif isinstance(price, (int, float)):
-                price_float = float(price)
-            else:
-                price_float = float(str(price))
-            
-            corrected_price = price_float
-            corrected_quantity = quantity
-            
-            if price_float <= 0:
-                return False, "价格必须大于0", price_float, quantity
-            
-            if quantity <= 0:
-                return False, "数量必须大于0", price_float, quantity
-            
-            if ".HK" in symbol:
-                tick = self._get_hk_price_tick(price_float)
-                
-                try:
-                    from decimal import Decimal as D, ROUND_HALF_UP
-                    price_decimal = D(str(price_float))
-                    tick_decimal = D(str(tick))
-                    remainder = price_decimal % tick_decimal
-                    
-                    if remainder != D('0'):
-                        adjusted = (price_decimal / tick_decimal).quantize(D('1'), rounding=ROUND_HALF_UP) * tick_decimal
-                        corrected_price = float(adjusted)
-                        self.logger.info(f"自动修正港股价格: {price_float} -> {corrected_price} (tick={tick})")
-                except Exception as e:
-                    self.logger.warning(f"Decimal计算失败，使用浮点数逻辑: {e}")
-                    remainder = price_float % tick
-                    if abs(remainder) > 0.0001 and abs(remainder - tick) > 0.0001:
-                        corrected_price = round(round(price_float / tick) * tick, 3)
-                        self.logger.info(f"自动修正港股价格: {price_float} -> {corrected_price} (tick={tick})")
-                
-                lot_size = self.get_lot_size(symbol)
-                if corrected_quantity % lot_size != 0:
-                    corrected_quantity = max(lot_size, (corrected_quantity // lot_size) * lot_size)
-                    self.logger.info(f"自动修正港股数量: {quantity} -> {corrected_quantity} (lot_size={lot_size})")
-                    if corrected_quantity <= 0:
-                        return False, f"数量{quantity}调整后为0，最小交易手数{lot_size}", price_float, quantity
-            
-            elif ".US" in symbol:
-                if round(price_float, 2) != price_float:
-                    corrected_price = round(price_float, 2)
-                    self.logger.info(f"自动修正美股价格精度: {price_float} -> {corrected_price}")
-            
-            return True, "", corrected_price, corrected_quantity
-            
-        except Exception as e:
-            error_msg = f"验证订单参数时发生错误: {e}"
-            self.logger.error(error_msg)
-            return False, error_msg, float(price) if price else 0.0, quantity
-
-    async def submit_buy_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default") -> OrderResult:
-        """
-        提交买入订单
-        
-        Args:
-            symbol: 股票代码
-            price: 价格
-            quantity: 数量
-            strategy_name: 策略名称
-            
-        Returns:
-            OrderResult: 订单结果对象
-        """
-        self.logger.info(f"提交买入订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
-        
-        is_valid, error_msg, corrected_price, corrected_quantity = self._validate_order_parameters(symbol, price, quantity)
-        if not is_valid:
-            self.logger.error(f"订单参数验证失败: {error_msg}")
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Buy,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg=error_msg,
-                strategy_name=strategy_name
-            )
-        
-        price = corrected_price
-        quantity = corrected_quantity
-        
-        is_exit_order = strategy_name and strategy_name.startswith("profit_stop_")
-        if is_exit_order:
-            self.logger.info(f"止盈止损平仓订单，跳过风控现金检查: {symbol}")
-        elif not await self.risk_control_check(symbol, quantity, price, is_buy=True):
-            self.logger.warning(f"买入订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Buy,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg="未通过风险控制检查",
-                strategy_name=strategy_name
-            )
-            
-        return await self._submit_order(
-            symbol=symbol,
-            price=price,
-            quantity=quantity,
-            order_type="BUY",
-            strategy_name=strategy_name
-        )
-        
-    async def submit_sell_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default") -> OrderResult:
-        """
-        提交卖出订单
-        
-        Args:
-            symbol: 股票代码
-            price: 价格
-            quantity: 数量
-            strategy_name: 策略名称
-            
-        Returns:
-            OrderResult: 订单结果对象
-        """
-        self.logger.info(f"提交卖出订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
-        
-        is_valid, error_msg, corrected_price, corrected_quantity = self._validate_order_parameters(symbol, price, quantity)
-        if not is_valid:
-            self.logger.error(f"订单参数验证失败: {error_msg}")
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Sell,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg=error_msg,
-                strategy_name=strategy_name
-            )
-        
-        price = corrected_price
-        quantity = corrected_quantity
-        
-        if not await self.risk_control_check(symbol, quantity, price, is_buy=False):
-            self.logger.warning(f"卖出订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
-            return OrderResult(
-                order_id="",
-                symbol=symbol,
-                side=OrderSide.Sell,
-                quantity=quantity,
-                price=price,
-                status=OrderStatus.Rejected,
-                submitted_at=datetime.now(),
-                msg="未通过风险控制检查",
-                strategy_name=strategy_name
-            )
-            
-        return await self._submit_order(
-            symbol=symbol,
-            price=price,
-            quantity=quantity,
-            order_type="SELL",
-            strategy_name=strategy_name
-        )
+    async def submit_sell_order(self, symbol, price, quantity, strategy_name="default"):
+        return await self.order_executor.submit_sell_order(symbol, price, quantity, strategy_name)
 
     async def _init_trade_context(self):
         """初始化交易上下文，带重试机制"""
@@ -2579,22 +1569,6 @@ class OrderManager:
                     return False
         
         return False
-
-    def _notify_order_update(self, order: OrderResult):
-        """通知订单状态更新"""
-        try:
-            if hasattr(self, 'order_callbacks') and self.order_callbacks:
-                for callback in self.order_callbacks:
-                    try:
-                        callback(order)
-                    except Exception as e:
-                        self.logger.error(f"执行订单回调时出错: {e}")
-            else:
-                # 如果没有回调，仍然记录订单状态变化
-                self.logger.info(f"订单状态变化: {order.order_id}, {order.symbol}, {order.status}")
-        except Exception as e:
-            self.logger.error(f"通知订单更新时出错: {e}")
-            self.logger.error(f"Traceback:\n{traceback.format_exc()}")
 
     async def on_signal(self, signal: Signal):
         """
@@ -2688,593 +1662,30 @@ class OrderManager:
             self.logger.error(f"验证信号时出错: {e}")
             return False
 
-    async def place_order(self, symbol: str, side: str, quantity: int, price_type: str = "LIMIT", price: float = None):
-        """
-        下单
-        
-        Args:
-            symbol: 股票代码
-            side: 交易方向，"BUY"或"SELL"
-            quantity: 数量
-            price_type: 价格类型，"LIMIT"或"MARKET"
-            price: 价格，仅限价单需要
-            
-        Returns:
-            订单结果
-        """
-        try:
-            self.logger.info(f"下单: {symbol}, 方向: {side}, 数量: {quantity}, 类型: {price_type}")
-            
-            # 转换交易方向
-            order_side = OrderSide.Buy if side.upper() == "BUY" else OrderSide.Sell
-            
-            # 对于美股，如果余额不足且购买数量大于10，尝试减少到10股
-            is_us_stock = '.US' in symbol
-            available_balance = self.get_account_balance()
-            
-            if is_us_stock and order_side == OrderSide.Buy and available_balance <= 0:
-                if quantity > 10:  # 如果原始数量大于10股
-                    self.logger.info(f"美股交易: 账户余额不足，尝试减少交易数量至10股进行尝试")
-                    quantity = 10
-            
-            # 如果是市价单
-            if price_type.upper() == "MARKET":
-                # 确保价格有效
-                if price is None or price <= 0:
-                    price = 100  # 默认价格
-                    self.logger.warning(f"市价单需要有效价格，使用默认价格: {price}")
-                
-                # 调用提交市价单方法
-                if order_side == OrderSide.Buy:
-                    return await self.submit_buy_order(symbol, price, quantity, "default")
-                else:
-                    return await self.submit_sell_order(symbol, price, quantity, "default")
-            else:
-                # 限价单必须有价格
-                if price is None or price <= 0:
-                    self.logger.error("限价单必须指定有效价格")
-                    return OrderResult(
-                        order_id="",
-                        symbol=symbol,
-                        side=order_side,
-                        quantity=quantity,
-                        price=0,
-                        status=OrderStatus.Rejected,
-                        submitted_at=datetime.now(),
-                        msg="限价单必须指定有效价格",
-                        strategy_name="default"
-                    )
-                
-                # 调用提交限价单方法
-                if order_side == OrderSide.Buy:
-                    return await self.submit_buy_order(symbol, price, quantity, "default")
-                else:
-                    return await self.submit_sell_order(symbol, price, quantity, "default")
-                    
-        except Exception as e:
-            self.logger.error(f"下单失败: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return None
+    async def place_order(self, symbol, side, quantity, price_type="LIMIT", price=None):
+        return await self.order_executor.place_order(symbol, side, quantity, price_type, price)
 
-    def _adjust_lot_size(self, symbol: str, quantity: int) -> int:
-        """
-        调整股票手数，确保符合最小交易单位
-        
-        Args:
-            symbol: 股票代码
-            quantity: 原始数量
-            
-        Returns:
-            调整后的数量
-        """
-        if not self.trade_ctx:
-            try:
-                # 同步初始化
-                if hasattr(self, 'initialize'):
-                    self.initialize()
-            except Exception as e:
-                self.logger.error(f"初始化交易上下文失败: {e}")
-            
-        try:
-            # 获取股票交易信息
-            lot_size = self.get_lot_size(symbol)
-            self.logger.debug(f"{symbol} 获取到手数: {lot_size}")
-            
-            # 美股特殊处理 - 支持碎股交易
-            if '.US' in symbol:
-                # 美股最小交易单位为1股，不需要调整为整手
-                if quantity < 1:
-                    adjusted_quantity = 1
-                    self.logger.info(f"美股交易数量小于1股，调整为最小交易单位: 1股")
-                else:
-                    adjusted_quantity = quantity
-                return adjusted_quantity
-            
-            # 非美股市场，调整为整手数量
-            if lot_size > 0:
-                adjusted_quantity = (quantity // lot_size) * lot_size
-                if adjusted_quantity == 0 and quantity > 0:
-                    adjusted_quantity = lot_size
-                
-                if adjusted_quantity != quantity:
-                    self.logger.info(f"调整交易数量以符合最小交易单位: {quantity} -> {adjusted_quantity}")
-                
-                return adjusted_quantity
-            else:
-                self.logger.warning(f"无法获取正确的手数信息，使用原始数量: {quantity}")
-                return quantity
-        except Exception as e:
-            self.logger.warning(f"调整交易数量出错: {e}，使用原始数量: {quantity}")
-            return quantity
+    # ── Delegation to OrderExecutor (cost analysis) ──
 
-    async def _risk_control_check(self, symbol: str, quantity: int, price: float, is_buy: bool) -> bool:
-        """
-        执行风险控制检查（内部方法）
-        
-        Args:
-            symbol: 股票代码
-            quantity: 数量
-            price: 价格
-            is_buy: 是否为买入操作
-            
-        Returns:
-            bool: 如果通过风险控制检查则返回True，否则返回False
-        """
-        try:
-            self.logger.info(f"开始风险控制检查: {symbol}, 数量={quantity}, 价格={price}, 买入={is_buy}")
-            
-            # 1. 检查每日订单上限
-            if not self._check_daily_order_limit():
-                self.logger.warning(f"风险控制: 今日订单数已达上限 {self.daily_order_count}/{self.max_daily_orders}")
-                return False
-                
-            # 2. 获取当前持仓
-            positions = self.get_positions(symbol)
-            self.logger.info(f"当前持仓: {positions}")
-            
-            # 判断是否是美股交易
-            is_us_stock = '.US' in symbol
-            
-            if is_buy:
-                # 3. 买入风险控制
-                # 3.1 检查是否超过最大持仓数量
-                current_position = 0
-                for pos in positions:
-                    if pos.symbol == symbol:
-                        current_position += float(pos.quantity)
-                
-                self.logger.info(f"当前持仓数量: {current_position}, 最大持仓限制: {self.max_position_size}")
-                if current_position + float(quantity) > self.max_position_size:
-                    self.logger.warning(f"风险控制: 买入{symbol}的数量{quantity}会导致持仓({current_position})超过最大限制({self.max_position_size})")
-                    return False
-                
-                # 3.2 检查账户余额是否足够
-                try:
-                    # 确保所有类型转换为float
-                    price_float = float(price)
-                    quantity_float = float(quantity)
-                    commission_rate = float(self.config.get('commission_rate', 0.0025))
-                    
-                    cost = price_float * quantity_float * (1 + commission_rate)
-                    self.logger.info(f"计算交易成本: {cost}")
-                    
-                    # 获取账户余额
-                    balance_response = self.trade_ctx.account_balance()
-                    
-                    # 根据股票类型确定使用的货币
-                    target_currency = "USD" if is_us_stock else "HKD"
-                    available_balance = 0.0
-                    
-                    if isinstance(balance_response, list):
-                        self.logger.debug(f"账户余额对象类型: {type(balance_response)}")
-                        self.logger.info(f"账户余额是列表格式，包含 {len(balance_response)} 项")
-                        
-                        # 获取USD和HKD可用资金
-                        usd_balance = 0.0
-                        hkd_balance = 0.0
-                        
-                        for item in balance_response:
-                            if hasattr(item, 'cash_infos') and item.cash_infos:
-                                for cash_info in item.cash_infos:
-                                    if hasattr(cash_info, 'currency') and hasattr(cash_info, 'available_cash'):
-                                        if cash_info.currency == "USD":
-                                            usd_balance = float(cash_info.available_cash)
-                                            self.logger.info(f"获取到USD可用资金: {usd_balance}")
-                                        elif cash_info.currency == "HKD":
-                                            hkd_balance = float(cash_info.available_cash)
-                                            self.logger.info(f"获取到HKD可用资金: {hkd_balance}")
-                        
-                        # 检查目标货币余额
-                        if target_currency == "USD":
-                            available_balance = usd_balance
-                        else:
-                            available_balance = hkd_balance
-                        
-                        # 检查对应货币账户余额
-                        if available_balance >= cost:
-                            self.logger.info(f"{target_currency}账户余额充足: {available_balance} >= {cost}")
-                            return True
-                        else:
-                            self.logger.warning(f"{target_currency}账户余额不足: {available_balance} < {cost}")
-                            
-                            # 计算总可用资金（按汇率转换）
-                            # 假设汇率为 1 USD = 7.8 HKD
-                            exchange_rate = 7.8
-                            if target_currency == "USD":
-                                # 需要USD，检查能否用HKD兑换
-                                total_available = usd_balance + (hkd_balance / exchange_rate)
-                            else:
-                                # 需要HKD，检查能否用USD兑换
-                                total_available = hkd_balance + (usd_balance * exchange_rate)
-                            
-                            self.logger.info(f"账户总可用资金: {total_available}")
-                            
-                            if total_available >= cost:
-                                self.logger.info(f"总可用资金充足，允许跨币种交易")
-                                return True
-                            else:
-                                self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前可用资金: {total_available}")
-                                return False
-                    else:
-                        # 兼容处理：如果不是列表格式，直接获取总余额
-                        total_balance = self.get_account_balance()
-                        if total_balance >= cost:
-                            self.logger.info(f"总余额充足: {total_balance} >= {cost}")
-                            return True
-                        else:
-                            self.logger.warning(f"风险控制: 账户余额不足，需要{cost}，当前总余额: {total_balance}")
-                            return False
-                            
-                except Exception as e:
-                    self.logger.error(f"风险控制检查中发生错误: {e}")
-                    return False
-            else:
-                # 4. 卖出风险控制
-                # 4.1 检查卖出数量是否超过当前持仓
-                current_position = 0
-                for pos in positions:
-                    if pos.symbol == symbol:
-                        current_position += float(pos.quantity)
-                
-                self.logger.info(f"当前持仓数量: {current_position}, 计划卖出数量: {quantity}")
-                if float(quantity) > current_position:
-                    self.logger.warning(f"风险控制: 卖出{symbol}的数量{quantity}超过当前持仓{current_position}")
-                    return False
-                    
-                return True
-        except Exception as e:
-            self.logger.error(f"执行风险控制检查时发生错误: {str(e)}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
-            return False
+    def _calculate_transaction_costs(self, symbol, price, quantity):
+        return self.order_executor._calculate_transaction_costs(symbol, price, quantity)
 
-    def _save_order_to_csv(self, result: OrderResult):
-        """
-        保存订单信息到CSV文件
-        
-        Args:
-            result: 订单结果对象
-        """
-        try:
-            # 确保logs目录存在
-            os.makedirs("logs", exist_ok=True)
-            
-            # CSV文件路径
-            csv_file = "logs/orders.csv"
-            
-            # 检查文件是否存在，不存在则创建并写入标题行
-            file_exists = os.path.exists(csv_file)
-            
-            with open(csv_file, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                
-                # 如果文件不存在，写入标题行
-                if not file_exists:
-                    writer.writerow([
-                        'timestamp', 'order_id', 'symbol', 'side', 'quantity', 
-                        'price', 'status', 'executed_quantity'
-                    ])
-                
-                # 写入订单数据
-                side_str = str(result.side.value) if hasattr(result.side, 'value') else str(result.side)
-                status_str = str(result.status.value) if hasattr(result.status, 'value') else str(result.status)
-                executed_qty = getattr(result, 'executed_quantity', getattr(result, 'filled_quantity', 0))
-                writer.writerow([
-                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    result.order_id,
-                    result.symbol,
-                    side_str,
-                    result.quantity,
-                    result.price,
-                    status_str,
-                    executed_qty
-                ])
-                
-            self.logger.info(f"订单信息已保存到 {csv_file}")
-            
-        except Exception as e:
-            self.logger.error(f"保存订单信息到CSV时出错: {e}")
+    def _calculate_trading_costs(self, symbol, quantity, price):
+        return self.order_executor._calculate_trading_costs(symbol, quantity, price)
 
-    def _calculate_transaction_costs(self, symbol: str, price: float, quantity: int) -> Dict[str, float]:
-        """
-        计算交易总成本（包括各种手续费）
-        
-        Args:
-            symbol: 股票代码
-            price: 价格
-            quantity: 数量
-            
-        Returns:
-            成本详情字典
-        """
-        try:
-            is_us_stock = '.US' in symbol
-            is_hk_stock = '.HK' in symbol
-            
-            # 基础交易金额
-            transaction_value = float(price) * int(quantity)
-            
-            if is_us_stock:
-                # 美股手续费结构（更精确）
-                commission_rate = 0.005  # 0.5% 佣金
-                platform_fee = max(0.99, transaction_value * 0.0001)  # 平台费，最低$0.99
-                sec_fee = transaction_value * 0.0000051  # SEC费用
-                finra_fee = max(0.01, quantity * 0.000119)  # FINRA费用
-                
-                total_cost = commission_rate + platform_fee + sec_fee + finra_fee
-                
-            elif is_hk_stock:
-                # 港股手续费结构（更精确）
-                commission_rate = transaction_value * 0.0025  # 0.25% 佣金
-                stamp_duty = transaction_value * 0.001  # 0.1% 印花税
-                trading_fee = transaction_value * 0.0000565  # 交易费
-                clearing_fee = max(2.5, transaction_value * 0.00002)  # 结算费
-                
-                total_cost = commission_rate + stamp_duty + trading_fee + clearing_fee
-                
-            else:
-                # 其他市场默认
-                total_cost = transaction_value * 0.003  # 0.3%
-            
-            return {
-                'transaction_value': transaction_value,
-                'total_cost': total_cost,
-                'cost_ratio': total_cost / transaction_value if transaction_value > 0 else 0,
-                'break_even_move': total_cost * 2 / quantity  # 双向交易需要的价格变动
-            }
-            
-        except Exception as e:
-            self.logger.error(f"计算交易成本失败: {e}")
-            # 返回保守估计
-            transaction_value = float(price) * int(quantity)
-            conservative_cost = transaction_value * 0.01  # 1%保守估计
-            return {
-                'transaction_value': transaction_value,
-                'total_cost': conservative_cost,
-                'cost_ratio': 0.01,
-                'break_even_move': conservative_cost * 2 / quantity
-            }
+    def _is_trade_cost_effective(self, symbol, quantity, price, confidence):
+        return self.order_executor._is_trade_cost_effective(symbol, quantity, price, confidence)
 
-    def _calculate_trading_costs(self, symbol: str, quantity: int, price: float) -> Dict[str, float]:
-        """
-        计算完整的交易成本
-        
-        Args:
-            symbol: 股票代码
-            quantity: 交易数量
-            price: 交易价格
-            
-        Returns:
-            交易成本详情字典
-        """
-        try:
-            # 基础交易金额
-            trade_value = float(price) * int(quantity)
-            
-            # 获取真实手续费率配置
-            if '.US' in symbol:
-                # 美股手续费结构
-                commission_rate = float(self.config.get('us_commission_rate', 0.005))  # 0.5%
-                platform_fee = float(self.config.get('us_platform_fee', 0.99))  # 平台费$0.99
-                sec_fee = trade_value * 0.0000278  # SEC费用
-                total_commission = max(platform_fee, trade_value * commission_rate) + sec_fee
-            elif '.HK' in symbol:
-                # 港股手续费结构
-                commission_rate = float(self.config.get('hk_commission_rate', 0.0025))  # 0.25%
-                stamp_duty = trade_value * 0.001  # 印花税0.1%
-                trading_fee = trade_value * 0.00005  # 交易费0.005%
-                clearing_fee = min(trade_value * 0.00002, 100)  # 结算费，最高$100
-                total_commission = trade_value * commission_rate + stamp_duty + trading_fee + clearing_fee
-            else:
-                # 其他市场默认
-                commission_rate = float(self.config.get('default_commission_rate', 0.0025))
-                total_commission = trade_value * commission_rate
-            
-            # 双向交易成本（买入+卖出）
-            round_trip_cost = total_commission * 2
-            
-            # 成本占比
-            cost_percentage = (round_trip_cost / trade_value) * 100
-            
-            return {
-                'trade_value': trade_value,
-                'single_commission': total_commission,
-                'round_trip_cost': round_trip_cost,
-                'cost_percentage': cost_percentage,
-                'break_even_change': cost_percentage  # 需要的最小价格变动百分比
-            }
-            
-        except Exception as e:
-            self.logger.error(f"计算交易成本失败: {e}")
-            return {
-                'trade_value': 0,
-                'single_commission': 0,
-                'round_trip_cost': 0,
-                'cost_percentage': 5.0,  # 保守估计5%
-                'break_even_change': 5.0
-            }
+    def _optimize_trade_size(self, symbol, original_quantity, price, confidence):
+        return self.order_executor._optimize_trade_size(symbol, original_quantity, price, confidence)
 
-    def _is_trade_cost_effective(self, symbol: str, quantity: int, price: float, confidence: float) -> Tuple[bool, str]:
-        """
-        检查交易是否具有成本效益
-        
-        Args:
-            symbol: 股票代码
-            quantity: 交易数量
-            price: 交易价格
-            confidence: 信号置信度
-            
-        Returns:
-            (是否具有成本效益, 详细说明)
-        """
-        try:
-            # 计算交易成本
-            costs = self._calculate_trading_costs(symbol, quantity, price)
-            
-            # 获取配置的成本效益参数
-            min_profit_threshold = float(self.config.get('execution.min_profit_threshold', 3.0))  # 默认3%
-            max_cost_ratio = float(self.config.get('execution.max_cost_ratio', 2.0))  # 默认最大成本占比2.0%
-            min_trade_value = float(self.config.get('execution.min_trade_value', 300))  # 默认最小交易$300
-            
-            # 小额交易特殊参数
-            small_trade_threshold = float(self.config.get('execution.small_trade_threshold', 500))  # 小额交易阈值$500
-            small_trade_max_cost_ratio = float(self.config.get('execution.small_trade_max_cost_ratio', 3.0))  # 小额交易最大成本占比3.0%
-            
-            # 判断是否为小额交易
-            is_small_trade = costs['trade_value'] < small_trade_threshold
-            
-            # 根据交易大小选择不同的成本阈值
-            effective_max_cost_ratio = small_trade_max_cost_ratio if is_small_trade else max_cost_ratio
-            
-            # 基础检查：交易金额是否过小
-            if costs['trade_value'] < min_trade_value:
-                return False, f"交易金额过小: ${costs['trade_value']:.0f} < ${min_trade_value:.0f}"
-            
-            # 成本占比检查
-            if costs['cost_percentage'] > effective_max_cost_ratio:
-                trade_type = "小额交易" if is_small_trade else "常规交易"
-                return False, f"{trade_type}成本过高: {costs['cost_percentage']:.2f}% > {effective_max_cost_ratio}%"
-            
-            # 预期收益检查（基于信号置信度）
-            expected_return = abs(confidence) * 100  # 将置信度转换为预期收益百分比
-            required_return = costs['break_even_change'] + min_profit_threshold
-            
-            if expected_return < required_return:
-                return False, f"预期收益不足: {expected_return:.2f}% < 需求{required_return:.2f}% (成本{costs['break_even_change']:.2f}% + 利润{min_profit_threshold}%)"
-            
-            # 记录成功的成本效益分析
-            trade_type = "小额交易" if is_small_trade else "常规交易"
-            self.logger.info(f"{trade_type}成本分析通过 {symbol}: 交易额=${costs['trade_value']:.0f}, "
-                           f"成本{costs['cost_percentage']:.2f}%(<{effective_max_cost_ratio}%), "
-                           f"预期收益{expected_return:.2f}%(>{required_return:.2f}%)")
-            
-            return True, f"交易具有成本效益: 预期收益{expected_return:.2f}% > 成本要求{required_return:.2f}%"
-            
-        except Exception as e:
-            self.logger.error(f"成本效益分析失败: {e}")
-            return False, f"成本效益分析失败: {e}"
+    def _check_profitability(self, symbol, price, quantity, confidence):
+        return self.order_executor._check_profitability(symbol, price, quantity, confidence)
 
-    def _optimize_trade_size(self, symbol: str, original_quantity: int, price: float, confidence: float) -> int:
-        """
-        优化交易数量以提高成本效益
-        
-        Args:
-            symbol: 股票代码
-            original_quantity: 原始数量
-            price: 交易价格
-            confidence: 信号置信度
-            
-        Returns:
-            优化后的交易数量
-        """
-        try:
-            # 获取最小有效交易金额
-            min_trade_value = float(self.config.get('execution.min_trade_value', 300))  # 默认$300
-            
-            # 计算当前交易金额
-            current_value = float(price) * original_quantity
-            
-            # 🔧 严格检查：如果信号置信度过低，不值得进行大额交易
-            if abs(confidence) < 0.1:  # 置信度低于10%
-                max_low_confidence_value = 500  # 低置信度最大交易$500
-                if current_value > max_low_confidence_value:
-                    self.logger.warning(f"信号置信度过低({confidence:.1%})，限制交易金额到${max_low_confidence_value}")
-                    optimized_quantity = int(max_low_confidence_value / float(price))
-                    optimized_quantity = self._adjust_lot_size(symbol, optimized_quantity)
-                    if optimized_quantity * float(price) < min_trade_value:
-                        return 0  # 优化后仍低于最小交易金额，拒绝交易
-                    return optimized_quantity
-            
-            # 如果当前交易金额太小，尝试增加到最小有效金额
-            if current_value < min_trade_value:
-                # 检查是否值得增加交易量
-                if abs(confidence) < 0.15:  # 置信度低于15%时不增加交易量
-                    self.logger.warning(f"信号置信度过低({confidence:.1%})，不增加交易量")
-                    return 0
-                
-                optimized_quantity = max(int(min_trade_value / float(price)), 1)
-                
-                # 调整为合适的手数
-                optimized_quantity = self._adjust_lot_size(symbol, optimized_quantity)
-                
-                # 验证优化后的交易是否具有成本效益
-                is_effective, reason = self._is_trade_cost_effective(symbol, optimized_quantity, price, confidence)
-                
-                if is_effective:
-                    self.logger.info(f"优化交易数量: {symbol} {original_quantity} -> {optimized_quantity} 股 "
-                                   f"(${current_value:.0f} -> ${float(price) * optimized_quantity:.0f})")
-                    return optimized_quantity
-                else:
-                    self.logger.warning(f"即使优化后仍不具成本效益: {reason}")
-                    return 0  # 不执行交易
-            
-            # 对于现有数量合适的交易，仍需验证成本效益
-            is_effective, reason = self._is_trade_cost_effective(symbol, original_quantity, price, confidence)
-            if not is_effective:
-                self.logger.warning(f"原始交易量不具成本效益: {reason}")
-                return 0
-            
-            return original_quantity
-            
-        except Exception as e:
-            self.logger.error(f"优化交易数量失败: {e}")
-            return 0  # 发生错误时拒绝交易
-
-    def _check_profitability(self, symbol: str, price: float, quantity: int, confidence: float) -> Tuple[bool, str]:
-        """
-        检查交易的盈利能力（保留原有方法兼容性）
-        """
-        return self._is_trade_cost_effective(symbol, quantity, price, confidence)
+    # ── Delegation to PositionService (account info) ──
 
     def get_account_info(self):
-        """
-        获取账户信息
-        
-        Returns:
-            dict: 账户信息字典
-        """
-        try:
-            total_cash = self.get_account_balance()
-            positions = self.get_positions()
-            
-            return {
-                'total_cash': total_cash,
-                'total_market_value': 0.0,
-                'positions_count': len(positions) if positions else 0,
-                'currency': 'USD',
-                'positions': positions or []
-            }
-            
-        except Exception as e:
-            self.logger.error(f"获取账户信息失败: {e}")
-            return self._create_default_account_info()
-    
+        return self.position_service.get_account_info()
+
     def _create_default_account_info(self):
-        """创建默认账户信息"""
-        return {
-            'total_cash': 0.0,
-            'total_market_value': 0.0,
-            'positions_count': 0,
-            'currency': 'USD',
-            'balances': [],
-            'positions': []
-        }
+        return PositionService._create_default_account_info()

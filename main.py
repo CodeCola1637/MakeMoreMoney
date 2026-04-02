@@ -33,33 +33,48 @@ from strategy.sec_strategy import SECStrategy
 from strategy.volume_strategy import VolumeStrategy
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
+from tasks import (
+    TradingContext,
+    ensemble_signal_generation,
+    single_strategy_signal_generation,
+    volume_anomaly_task,
+    portfolio_update,
+    profit_stop_monitor,
+    health_check,
+    stock_discovery_task,
+    institutional_tracking_task,
+)
 
 # 全局变量
 logger = None
 task_manager: TaskManager = None
 
 # 创建信号处理回调函数
-def create_signal_handler(order_mgr, realtime_mgr=None):
+def create_signal_handler(order_mgr, realtime_mgr=None, portfolio_mgr=None):
     """创建交易信号处理函数
     
     Args:
         order_mgr: 订单管理器
         realtime_mgr: 实时数据管理器，用于订单预验证获取当前价格
+        portfolio_mgr: 投资组合管理器，用于关联性检查
     """
     async def on_signal(signal_obj: Signal):
         """处理交易信号"""
         try:
             symbol = signal_obj.symbol
             signal_type = signal_obj.signal_type
-            # 安全地获取signal_type的value属性
             signal_type_val = signal_type.value if hasattr(signal_type, 'value') else str(signal_type)
             price = signal_obj.price
             quantity = signal_obj.quantity
             
-            # 使用安全获取的枚举值字符串进行信息记录
             logger.info(f"收到交易信号: {symbol} {signal_type_val} {quantity}股 @ {price}")
             
-            # 触发订单执行（传递realtime_mgr用于订单预验证）
+            if signal_type == SignalType.BUY and portfolio_mgr is not None:
+                allowed, reason = portfolio_mgr.check_correlation(symbol)
+                if not allowed:
+                    logger.info(f"关联性过滤拦截: {symbol} - {reason}")
+                    return
+            
             await order_mgr.process_signal(signal_obj, realtime_mgr=realtime_mgr)
         except Exception as e:
             logger.error(f"处理信号时出错: {e}")
@@ -69,11 +84,21 @@ def create_signal_handler(order_mgr, realtime_mgr=None):
     return on_signal
 
 # 创建订单更新回调
-def create_order_update_handler():
+def create_order_update_handler(profit_stop_mgr=None):
     """创建订单状态更新处理函数"""
     def on_order_update(order_result: OrderResult):
         """处理订单状态更新"""
         logger.info(f"订单状态更新: {order_result}")
+        
+        if profit_stop_mgr and hasattr(order_result, 'order_id') and hasattr(order_result, 'symbol'):
+            status = getattr(order_result, 'status', None)
+            status_name = status.value if hasattr(status, 'value') else str(status)
+            terminal = {'Filled', 'Rejected', 'Canceled', 'Expired', 'PartiallyFilledCanceled'}
+            if status_name in terminal:
+                is_filled = (status_name == 'Filled')
+                profit_stop_mgr.on_order_completed(
+                    str(order_result.order_id), order_result.symbol, is_filled
+                )
     
     return on_order_update
 
@@ -198,6 +223,8 @@ async def main():
     
     # 🚀 初始化策略组合器
     ensemble_enabled = config.get("ensemble.enable", False)
+    sec_strategy = None
+    volume_strategy = None
     
     if ensemble_enabled:
         logger.info("初始化策略组合器...")
@@ -233,7 +260,7 @@ async def main():
             ensemble_method = EnsembleMethod.CONFIDENCE_WEIGHT
         
         # 初始化策略组合器
-        signal_gen = StrategyEnsemble(config, strategies, ensemble_method)
+        signal_gen = StrategyEnsemble(config, strategies, ensemble_method, order_manager=order_mgr)
         logger.info(f"策略组合器初始化完成 - 方法: {ensemble_method.value}, 策略数: {len(strategies)}")
         
         # 为LSTM策略单独启动
@@ -246,25 +273,17 @@ async def main():
         logger.info("信号生成器初始化完成（单一策略模式）")
     
     # 创建回调处理函数（传递realtime_mgr用于订单预验证）
-    on_signal = create_signal_handler(order_mgr, realtime_mgr)
-    on_order_update = create_order_update_handler()
+    on_signal = create_signal_handler(order_mgr, realtime_mgr, portfolio_mgr)
+    on_order_update = create_order_update_handler(profit_stop_mgr)
     
     # 如果指定了训练模式，则先训练模型
     if args.train:
-        logger.info("开始训练模型...")
-        for symbol in args.symbols:
-            # 加载历史数据
-            try:
-                hist_data = await hist_loader.get_candlesticks(symbol)
-                if hist_data.empty:
-                    logger.warning(f"无法获取{symbol}的历史数据，跳过训练")
-                    continue
-                    
-                # 训练模型
-                await model_trainer.train_model([symbol])
-                logger.info(f"{symbol}的模型训练完成")
-            except Exception as e:
-                logger.error(f"训练{symbol}的模型时出错: {e}")
+        logger.info("开始训练模型（全量标的联合训练）...")
+        try:
+            await model_trainer.train_model(symbols=args.symbols, force_retrain=True)
+            logger.info(f"模型训练完成，标的: {args.symbols}")
+        except Exception as e:
+            logger.error(f"模型训练失败: {e}")
     
     # 注册回调和启动组件
     if not ensemble_enabled:
@@ -391,252 +410,31 @@ async def main():
         signal_interval = config.get("strategy.signal_interval", 30)
         logger.info(f"信号生成间隔设置为 {signal_interval} 秒")
         
-        # ========== 定义任务函数 ==========
-        
-        # 1. 信号生成任务（组合器模式）
-        async def ensemble_signal_generation():
-            """策略组合器信号生成任务（单次执行）"""
-            start_time = datetime.now()
-            signals_generated = 0
-            
-            for symbol in args.symbols:
-                try:
-                    quotes = await realtime_mgr.get_quote([symbol])
-                    if quotes and symbol in quotes:
-                        market_data = {
-                            'last_done': float(quotes[symbol].last_done),
-                            'timestamp': datetime.now().isoformat()
-                        }
-                        
-                        ensemble_signal = await signal_gen.generate_ensemble_signal(symbol, market_data)
-                        
-                        if ensemble_signal and ensemble_signal.signal_type.value != 'HOLD':
-                            logger.info(f"📊 组合信号: {symbol} - {ensemble_signal.signal_type.value}, "
-                                      f"置信度: {ensemble_signal.confidence:.3f}")
-                            await on_signal(ensemble_signal)
-                            signals_generated += 1
-                    else:
-                        logger.warning(f"无法获取 {symbol} 的最新行情数据")
-                        
-                except Exception as e:
-                    logger.error(f"处理组合信号失败: {symbol}, 错误: {e}")
-                    
-            duration = (datetime.now() - start_time).total_seconds()
-            logger.info(f"✅ 信号生成完成，耗时: {duration:.2f}秒, 生成信号: {signals_generated}个")
-        
-        # 2. 单一策略信号生成任务
-        async def single_strategy_signal_generation():
-            """单一策略信号生成任务（单次执行）"""
-            await signal_gen.generate_all_signals()
-        
-        # 3. 投资组合更新任务
-        async def portfolio_update():
-            """投资组合更新任务（单次执行）"""
-            try:
-                await portfolio_mgr.update_portfolio_status()
-                
-                if portfolio_mgr.portfolio_status and portfolio_mgr.portfolio_status.rebalance_needed:
-                    logger.info("检测到需要再平衡，开始执行...")
-                    await portfolio_mgr.execute_rebalance()
-            except Exception as e:
-                logger.error(f"投资组合更新错误: {e}")
-        
-        # 4. 止盈止损监控任务
-        async def profit_stop_monitor():
-            """止盈止损监控任务（单次执行）"""
-            try:
-                positions = order_mgr.get_positions()
-                for position in positions:
-                    quotes = await realtime_mgr.get_quote([position.symbol])
-                    if quotes and position.symbol in quotes:
-                        current_price = float(quotes[position.symbol].last_done)
-                        
-                        # 获取真实成本价
-                        cost_price = getattr(position, 'cost_price', None)
-                        if cost_price is not None:
-                            cost_price = float(cost_price)
-                        else:
-                            cost_price = profit_stop_mgr.get_real_cost_price(position.symbol)
-                            if cost_price is None:
-                                cost_price = current_price
-                                logger.warning(f"⚠️ 无法获取 {position.symbol} 真实成本价")
-                        
-                        await profit_stop_mgr.update_position_status(
-                            position.symbol, 
-                            int(position.quantity), 
-                            cost_price, 
-                            current_price
-                        )
-                
-                exit_signals = await profit_stop_mgr.check_exit_signals()
-                for sig in exit_signals:
-                    success = await profit_stop_mgr.execute_exit_signal(sig)
-                    if success:
-                        logger.info(f"止盈止损订单执行成功: {sig.symbol}")
-                    else:
-                        logger.warning(f"止盈止损订单执行失败: {sig.symbol}")
-                        
-            except Exception as e:
-                logger.error(f"止盈止损监控错误: {e}")
-        
-        # 5. 系统健康检查任务
-        async def health_check():
-            """系统健康检查任务（单次执行）"""
-            health_report = task_manager.get_health_report()
-            
-            if not health_report['is_healthy']:
-                logger.warning(f"⚠️ 系统健康状态异常: 失败任务={health_report['failed_tasks']}")
-            else:
-                logger.info(f"✅ 系统运行正常: 任务={health_report['total_tasks']}, "
-                          f"运行中={health_report['running_tasks']}")
-            
-            # 输出止盈止损摘要
-            summary = profit_stop_mgr.get_status_summary()
-            if summary:
-                logger.info(f"📊 持仓状态: 总{summary.get('total_positions', 0)}, "
-                          f"盈利{summary.get('profitable_positions', 0)}, "
-                          f"亏损{summary.get('losing_positions', 0)}")
-        
-        # 6. 股票发现任务
-        async def stock_discovery_task():
-            """股票发现任务（单次执行）"""
-            if not stock_discovery:
-                return
-            
-            try:
-                # 运行发现周期
-                ready_stocks = await stock_discovery.run_discovery_cycle()
-                
-                # 输出观察列表摘要
-                logger.info(stock_discovery.get_watch_list_summary())
-                
-                auto_trade = config.get("discovery.auto_trade", False)
-                if ready_stocks and auto_trade:
-                    existing_symbols = set()
-                    try:
-                        positions = order_mgr.get_positions()
-                        existing_symbols = {
-                            getattr(p, 'symbol', '').upper() for p in positions
-                        }
-                    except Exception:
-                        pass
-                    
-                    for candidate in ready_stocks:
-                        if candidate.symbol.upper() in existing_symbols:
-                            logger.debug(f"发现模块跳过已持仓: {candidate.symbol}")
-                            continue
-                        try:
-                            lot_size = order_mgr.get_lot_size(candidate.symbol)
-                            min_trade_val = config.get("execution.min_trade_value", 200)
-                            quantity = max(lot_size, int(min_trade_val / candidate.entry_price) if candidate.entry_price > 0 else lot_size)
-                            quantity = (quantity // lot_size) * lot_size
-                            if quantity <= 0:
-                                quantity = lot_size
-                            
-                            signal = Signal(
-                                symbol=candidate.symbol,
-                                signal_type=SignalType.BUY,
-                                price=candidate.entry_price,
-                                quantity=quantity,
-                                confidence=candidate.confidence,
-                                strategy_name="discovery"
-                            )
-                            await on_signal(signal)
-                            logger.info(f"🎯 发现模块生成买入信号: {candidate.symbol}, 数量: {quantity}")
-                        except Exception as e:
-                            logger.error(f"生成发现信号失败: {candidate.symbol}, {e}")
-                elif ready_stocks:
-                    # 仅提醒，不自动交易
-                    for candidate in ready_stocks:
-                        logger.info(f"💡 发现入场机会（未启用自动交易）: {candidate.symbol} "
-                                  f"@ {candidate.current_price:.2f}, "
-                                  f"原因: {candidate.discovery_reason.value}")
-                        
-            except Exception as e:
-                logger.error(f"股票发现任务错误: {e}")
-        
-        # 7. 机构交易跟踪任务（更新 SEC 策略缓存，由 ensemble 统一决策）
-        async def institutional_tracking_task():
-            """机构交易跟踪任务 — 扫描 SEC 数据并更新策略缓存"""
-            if not institutional_tracker:
-                return
-            
-            try:
-                signals = await institutional_tracker.run_scan_cycle(watch_symbols=args.symbols)
-                
-                logger.info(institutional_tracker.get_summary())
-                
-                if signals:
-                    sec_strategy.update_signals(signals)
-                    for inst_sig in signals:
-                        logger.info(f"🏦 SEC 信号已缓存: {inst_sig.symbol} "
-                                  f"{inst_sig.signal_type}, 置信度={inst_sig.confidence:.2f}, "
-                                  f"{inst_sig.reason}")
-                        
-            except Exception as e:
-                logger.error(f"机构交易跟踪任务错误: {e}")
-        
-        # 8. 异常成交量检测任务（更新缓存 + 即时触发 ensemble 评估）
-        async def volume_anomaly_task():
-            """异常成交量检测 — 更新策略缓存并立即触发 ensemble 投票"""
-            if not volume_detector:
-                return
-            
-            try:
-                vol_signals = await volume_detector.check_and_generate_signals()
-                
-                if not vol_signals:
-                    return
-                
-                logger.info(volume_detector.get_summary())
-                
-                # 更新 VolumeStrategy 缓存
-                triggered_symbols = volume_strategy.update_signals(vol_signals)
-                
-                # 立即对受影响的股票触发 ensemble 4 策略投票
-                if ensemble_enabled and triggered_symbols:
-                    for symbol in triggered_symbols:
-                        try:
-                            quotes = await realtime_mgr.get_quote([symbol])
-                            if not (quotes and symbol in quotes):
-                                logger.warning(f"即时评估: 无法获取 {symbol} 行情，跳过")
-                                continue
-                            
-                            market_data = {
-                                'last_done': float(quotes[symbol].last_done),
-                                'timestamp': datetime.now().isoformat(),
-                            }
-                            
-                            ensemble_signal = await signal_gen.generate_ensemble_signal(
-                                symbol, market_data
-                            )
-                            
-                            if ensemble_signal and ensemble_signal.signal_type.value != 'HOLD':
-                                logger.info(
-                                    f"⚡ 即时 Ensemble 投票结果: {symbol} "
-                                    f"{ensemble_signal.signal_type.value}, "
-                                    f"置信度={ensemble_signal.confidence:.3f}, "
-                                    f"策略={ensemble_signal.extra_data.get('contributing_strategies', [])}"
-                                )
-                                await on_signal(ensemble_signal)
-                            else:
-                                logger.info(
-                                    f"📊 即时 Ensemble: {symbol} 综合判定 HOLD, "
-                                    f"暂不交易"
-                                )
-                        except Exception as e:
-                            logger.error(f"即时 ensemble 评估失败 {symbol}: {e}")
-                        
-            except Exception as e:
-                logger.error(f"异常成交量检测任务错误: {e}")
-        
+        # ========== 构建 TradingContext ==========
+        ctx = TradingContext(
+            config=config,
+            symbols=args.symbols,
+            realtime_mgr=realtime_mgr,
+            order_mgr=order_mgr,
+            portfolio_mgr=portfolio_mgr,
+            profit_stop_mgr=profit_stop_mgr,
+            signal_gen=signal_gen,
+            on_signal=on_signal,
+            task_manager=task_manager,
+            stock_discovery=stock_discovery if discovery_enabled else None,
+            institutional_tracker=institutional_tracker if institutional_enabled else None,
+            sec_strategy=sec_strategy if ensemble_enabled else None,
+            volume_detector=volume_detector if volume_anomaly_enabled else None,
+            volume_strategy=volume_strategy if ensemble_enabled else None,
+            ensemble_enabled=ensemble_enabled,
+        )
+
         # ========== 使用 TaskManager 创建任务 ==========
-        
-        # 信号生成任务
+
         if ensemble_enabled:
             task_manager.create_periodic_task(
                 name="signal_generation",
-                coro_func=ensemble_signal_generation,
+                coro_func=lambda: ensemble_signal_generation(ctx),
                 interval=signal_interval,
                 max_restarts=10,
                 is_critical=True
@@ -645,73 +443,67 @@ async def main():
         else:
             task_manager.create_periodic_task(
                 name="signal_generation",
-                coro_func=single_strategy_signal_generation,
+                coro_func=lambda: single_strategy_signal_generation(ctx),
                 interval=signal_interval,
                 max_restarts=10,
                 is_critical=True
             )
             logger.info("📡 单一策略信号生成任务已创建（周期性）")
         
-        # 投资组合管理任务（每5分钟）
         task_manager.create_periodic_task(
             name="portfolio_update",
-            coro_func=portfolio_update,
+            coro_func=lambda: portfolio_update(ctx),
             interval=300,
             max_restarts=5,
             is_critical=False
         )
         logger.info("📈 投资组合管理任务已创建（周期性，间隔300秒）")
         
-        # 止盈止损监控任务（每30秒）
         task_manager.create_periodic_task(
             name="profit_stop_monitor",
-            coro_func=profit_stop_monitor,
+            coro_func=lambda: profit_stop_monitor(ctx),
             interval=30,
             max_restarts=10,
             is_critical=True
         )
         logger.info("🛡️ 止盈止损监控任务已创建（周期性，间隔30秒）")
         
-        # 系统健康检查任务（每5分钟）
         task_manager.create_periodic_task(
             name="health_check",
-            coro_func=health_check,
+            coro_func=lambda: health_check(ctx),
             interval=300,
             max_restarts=3,
             is_critical=False
         )
         logger.info("💓 系统健康检查任务已创建（周期性，间隔300秒）")
         
-        # 股票发现任务（每小时）
         if discovery_enabled and stock_discovery:
             discovery_interval = config.get("discovery.scan_interval", 3600)
             task_manager.create_periodic_task(
                 name="stock_discovery",
-                coro_func=stock_discovery_task,
+                coro_func=lambda: stock_discovery_task(ctx),
                 interval=discovery_interval,
                 max_restarts=5,
                 is_critical=False
             )
             logger.info(f"🔍 股票发现任务已创建（周期性，间隔{discovery_interval}秒）")
         
-        # 机构交易跟踪任务（每2小时）
         if institutional_enabled and institutional_tracker:
             inst_interval = config.get("institutional.scan_interval", 7200)
             task_manager.create_periodic_task(
                 name="institutional_tracking",
-                coro_func=institutional_tracking_task,
+                coro_func=lambda: institutional_tracking_task(ctx),
                 interval=inst_interval,
                 max_restarts=5,
                 is_critical=False
             )
             logger.info(f"🏦 机构交易跟踪任务已创建（周期性，间隔{inst_interval}秒）")
         
-        # 异常成交量检测任务
         if volume_anomaly_enabled and volume_detector:
             vol_interval = config.get("volume_anomaly.check_interval", 60)
             task_manager.create_periodic_task(
                 name="volume_anomaly",
-                coro_func=volume_anomaly_task,
+                coro_func=lambda: volume_anomaly_task(ctx),
                 interval=vol_interval,
                 max_restarts=5,
                 is_critical=False

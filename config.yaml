@@ -1,7 +1,7 @@
 api:
-  access_token: m_eyJhbGciOiJSUzI1NiIsImtpZCI6ImQ5YWRiMGIxYTdlNzYxNzEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJsb25nYnJpZGdlIiwic3ViIjoiYWNjZXNzX3Rva2VuIiwiZXhwIjoxNzc4NTgxMjE0LCJpYXQiOjE3NzA4MDUyMTgsImFrIjoiY2ZiZGM4ZDhiM2I2NzNiYjczM2MyNjg1MTUwODc3OTMiLCJhYWlkIjoyMDY1MDQ2MCwiYWMiOiJsYl9wYXBlcnRyYWRpbmciLCJtaWQiOjg3NjU0NDMsInNpZCI6Im1IMUI0TlU0TWRWeWlDQUNzTVRHZUE9PSIsImJsIjozLCJ1bCI6MCwiaWsiOiJsYl9wYXBlcnRyYWRpbmdfMjA2NTA0NjAifQ.jK-I1OqywZpkEZ_YOBx1vq3E6sIy7tz55pNEJi-Tp4RJFecMnxZHdBsLRiGPLo7JM8yxxoK8-YJNT4Oxwu0iflq2LlMJAM3O-44yH3cn4LkVDBEDIVdlS-MkufV7zADJliFS5ELkYmiMPBB0mSRNeNfkNWDHs8Qp_8oYX9XCprHRGUN3VwtvZTwLUn8jXXMD9q9HGZcThtt0coxczt0nz3sl4ALHZhBJxWP3YDSrTNyzOLV6JXXDmLKJg8wmry2B4Wbx01cQL2opLOsRn9mO0jeCYPrcRlKrCyghU-7CqAk-5OVS0HSikJqesOkG8reZe8dPhLmt9EuIIfZtr75ryw2EfIX2RGHF-35kMvbBbFhiWtuQUCW1C2s1NxR-hrmz2n7gmzf0QgbYXdHghZqwTduzrIs6O-TPAOcoY-arVJ_gGkc6fzOYMcpGPGK-u0fgBSUsJwQMYajoXffgg7D8Xl0M2dXJ9L-j-nQx4Ch-KDAL9qDUeOxGrGx-JhaaKBANE0lN4gmenuqu28_PHhzVOpy4T0CbZXeBIhN6jigK7OAPzkeMUOLk0eBPRzHRRvVJyLuupGpjPxSbbQLqpHIl7fFoHQzYi7LS2_xROuELaTIzSPjb-9D1z1biVEr8EYlHN-jF23l_uCY70AzZYTKjxj8NA-f0W2OwJl9rIPNH12s
-  app_key: cfbdc8d8b3b673bb733c268515087793
-  app_secret: f555bf3ce53149bdffec9f3c882bc47684bf04d1857b14751237405427d1e963
+  access_token: ${LONGPORT_ACCESS_TOKEN}
+  app_key: ${LONGPORT_APP_KEY}
+  app_secret: ${LONGPORT_APP_SECRET}
   base_url: ${API_BASE_URL}
   quote_ws_url: ${API_WS_URL}
 execution:
@@ -18,14 +18,22 @@ execution:
     after_hours_start: "16:00"    # 盘后开始时间
     after_hours_end: "20:00"      # 盘后结束时间
   # 做空交易配置（仅美股支持）
+  allow_sell_to_short: false      # SELL 无持仓时是否自动转为 SHORT
+  strict_validation: true         # 验证异常时拒绝交易（fail-closed）
   enable_short_selling: true      # 启用做空交易
   max_short_position: 100         # 单只股票最大空头持仓
   max_total_short_exposure: 50000 # 总空头敞口限制（美元）
   short_margin_requirement: 1.5   # 做空保证金要求（150%）
+  lot_sizes:
+    700.HK: 100
+    9988.HK: 100
+    388.HK: 100
+    941.HK: 500
+    9992.HK: 200
   hk_commission_rate: 0.0025
   initial_capital: 15000.0
   max_cost_ratio: 1.8
-  max_daily_orders: 200
+  max_daily_orders: 999999
   max_drawdown_pct: 10.0
   max_position_size: 2000.0
   min_profit_threshold: 2.5
@@ -66,6 +74,8 @@ execution:
     max_loss_per_day: 3.0
     trailing_stop_pct: 3.0
   trailing_stop_pct: 2.0
+  leveraged_symbols: []
+  leveraged_overrides: {}
   us_commission_rate: 0.005
   us_platform_fee: 0.99
 logging:
@@ -87,7 +97,6 @@ quote:
   symbols:
   - 700.HK
   - 9988.HK
-  - 1299.HK
   - 388.HK
   - 941.HK
   - 9992.HK
@@ -96,10 +105,19 @@ quote:
   - MSFT.US
   - NVDA.US
   - TSLA.US
+  - MU.US
+  - SNDK.US
   use_mock_data: false
 strategy:
   lookback_period: 90
   model_path: ./models/lstm_model.h5
+  training:
+    features:
+      - close
+      - volume
+      - high
+      - low
+      - turnover
   risk_management:
     correlation_limit: 0.7
     max_positions: 8
@@ -115,8 +133,9 @@ strategy:
     signal_decay_factor: 0.95
     trend_confirmation: true
     volume_confirmation: true
-  # 信号过滤器配置 - 防止重复信号和过度交易
-  signal_cooldown: 1800          # 同一股票相同信号冷却期（秒）30分钟
+  # 信号过滤器配置 - 触发驱动模式下仅做去重，不限流
+  signal_cooldown: 60             # 同一股票相同信号去重窗口（秒）
+  stop_loss_reentry_cooldown: 900   # 止损后再入场冷却期（秒），防止止损→买入→止损循环
   max_signals_per_day: 10        # 每个股票每日最大信号数量
   price_change_threshold: 0.01   # 价格变化阈值（1%）才生成新信号
   # 相关性过滤器配置 - 风险分散
@@ -192,14 +211,22 @@ institutional:
 ensemble:
   enable: true
   method: confidence_weight
-  min_strategies_agreement: 1
-  confidence_threshold: 0.02
+  min_strategies_agreement: 2
+  confidence_threshold: 0.05
   reweight_frequency: 100
   strategy_weights:
     lstm: 0.2
     technical: 0.2
     sec: 0.2
     volume_anomaly: 0.4
+  # 触发策略：只有这些策略产生BUY/SELL时才能发起交易
+  trigger_strategies:
+    - volume_anomaly
+    - sec
+  # 辅助策略：仅用于确认方向和调节置信度，不能独立触发交易
+  auxiliary_strategies:
+    - lstm
+    - technical
   strategies:
     - lstm
     - technical

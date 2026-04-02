@@ -213,7 +213,11 @@ class OrderValidator:
             return True, "未知市场，假设可交易"
             
         except Exception as e:
-            self.logger.warning(f"检查市场时间失败: {e}，默认允许交易")
+            strict = self.config.get("execution.strict_validation", True)
+            if strict:
+                self.logger.warning(f"检查市场时间失败: {e}，严格模式拒绝交易")
+                return False, f"市场时间检查异常，严格模式拒绝: {str(e)}"
+            self.logger.warning(f"检查市场时间失败: {e}，宽松模式默认允许交易")
             return True, f"市场时间检查异常，默认允许: {str(e)}"
     
     def _check_lot_size(self, symbol: str, quantity: int) -> Tuple[bool, str]:
@@ -254,7 +258,11 @@ class OrderValidator:
             return True, f"数量{quantity}符合手数要求(每手{lot_size}股)"
             
         except Exception as e:
-            self.logger.warning(f"检查手数失败: {e}")
+            strict = self.config.get("execution.strict_validation", True)
+            if strict:
+                self.logger.warning(f"检查手数失败: {e}，严格模式拒绝交易")
+                return False, f"手数检查异常，严格模式拒绝: {str(e)}"
+            self.logger.warning(f"检查手数失败: {e}，宽松模式默认通过")
             return True, f"手数检查异常，默认通过: {str(e)}"
     
     def _check_position_for_sell(self, symbol: str, quantity: int) -> Tuple[bool, str]:
@@ -373,7 +381,11 @@ class OrderValidator:
             return True, f"价格合理: 订单价${order_price:.2f}, 市价${current_price:.2f}, 偏离{deviation:.1%}"
             
         except Exception as e:
-            self.logger.warning(f"检查价格失败: {e}")
+            strict = self.config.get("execution.strict_validation", True)
+            if strict:
+                self.logger.warning(f"检查价格失败: {e}，严格模式拒绝交易")
+                return False, f"价格检查异常，严格模式拒绝: {str(e)}"
+            self.logger.warning(f"检查价格失败: {e}，宽松模式默认通过")
             return True, f"价格检查异常，默认通过: {str(e)}"
     
     def _check_daily_order_limit(self) -> Tuple[bool, str]:
@@ -394,7 +406,11 @@ class OrderValidator:
             return True, f"日内订单: {daily_count}/{max_daily}, 剩余{remaining}笔"
             
         except Exception as e:
-            self.logger.warning(f"检查日内订单限制失败: {e}")
+            strict = self.config.get("execution.strict_validation", True)
+            if strict:
+                self.logger.warning(f"检查日内订单限制失败: {e}，严格模式拒绝交易")
+                return False, f"订单限制检查异常，严格模式拒绝: {str(e)}"
+            self.logger.warning(f"检查日内订单限制失败: {e}，宽松模式默认通过")
             return True, f"订单限制检查异常，默认通过: {str(e)}"
     
     def validate_order_sync(

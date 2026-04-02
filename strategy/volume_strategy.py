@@ -115,9 +115,10 @@ class VolumeStrategy:
             self.logger.debug(f"Volume 无 {symbol} 异常数据，弃权")
             return None
 
-        # 汇总所有信号的方向和置信度
         buy_score = 0.0
         sell_score = 0.0
+        buy_count = 0
+        sell_count = 0
         anomaly_types = set()
         reasons = []
 
@@ -130,10 +131,25 @@ class VolumeStrategy:
 
             if vs.signal_type == "BUY":
                 buy_score += vs.confidence
+                buy_count += 1
             elif vs.signal_type == "SELL":
                 sell_score += vs.confidence
+                sell_count += 1
 
-        # 多种异常类型叠加增强（每增加一种 +15%）
+        total_directional = buy_count + sell_count
+        if total_directional == 0:
+            return None
+
+        # 方向一致性检查：主方向信号占比需 >= 70%
+        dominant_count = max(buy_count, sell_count)
+        consistency = dominant_count / total_directional
+        if consistency < 0.7 and total_directional >= 3:
+            self.logger.info(
+                f"Volume {symbol} 方向不一致(buy={buy_count}, sell={sell_count}, "
+                f"一致性={consistency:.0%})，弃权"
+            )
+            return None
+
         type_bonus = 1.0 + 0.15 * max(0, len(anomaly_types) - 1)
 
         if buy_score >= sell_score and buy_score > 0:
@@ -143,10 +159,11 @@ class VolumeStrategy:
             sig_type = SignalType.SELL
             raw_confidence = sell_score / len(recent)
         else:
-            # 有异常但无明确方向 → 弃权
             return None
 
         confidence = min(0.95, raw_confidence * type_bonus)
+        # 方向一致性越高，置信度越高
+        confidence *= consistency
 
         return Signal(
             symbol=symbol,

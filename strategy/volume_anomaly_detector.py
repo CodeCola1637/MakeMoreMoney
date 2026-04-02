@@ -110,6 +110,10 @@ class VolumeAnomalyDetector:
         self.profiles: Dict[str, SymbolVolumeProfile] = {}
         self._started = False
         self._signal_history: List[dict] = self._load_signal_history()
+        
+        # 并发保护：per-symbol lock + 文件写入锁
+        self._symbol_locks: Dict[str, asyncio.Lock] = {}
+        self._file_lock = asyncio.Lock()
 
         self.logger.info(
             f"异常成交量检测器初始化: surge={self.surge_multiplier}x, "
@@ -117,6 +121,12 @@ class VolumeAnomalyDetector:
             f"block_pct={self.block_trade_pct*100:.1f}%, "
             f"divergence_vol={self.divergence_volume_ratio}x"
         )
+
+    def _get_symbol_lock(self, symbol: str) -> asyncio.Lock:
+        """按需创建 per-symbol lock"""
+        if symbol not in self._symbol_locks:
+            self._symbol_locks[symbol] = asyncio.Lock()
+        return self._symbol_locks[symbol]
 
     # ----------------------------------------------------------
     # 信号持久化（供 Web Dashboard 读取）
@@ -134,8 +144,8 @@ class VolumeAnomalyDetector:
             pass
         return []
 
-    def _persist_anomaly(self, anomaly: 'VolumeAnomaly'):
-        """将异常事件追加到持久化文件"""
+    async def _persist_anomaly(self, anomaly: 'VolumeAnomaly'):
+        """将异常事件追加到持久化文件（async，内部加文件锁）"""
         entry = {
             "symbol": anomaly.symbol,
             "type": anomaly.anomaly_type.value,
@@ -149,18 +159,21 @@ class VolumeAnomalyDetector:
             "details": anomaly.details,
             "direction": anomaly.direction,
         }
-        self._signal_history.append(entry)
-        # 限制总量
-        if len(self._signal_history) > 1000:
-            self._signal_history = self._signal_history[-500:]
-        self._save_signal_history()
+        async with self._file_lock:
+            self._signal_history.append(entry)
+            if len(self._signal_history) > 1000:
+                self._signal_history = self._signal_history[-500:]
+            self._save_signal_history_sync()
 
-    def _save_signal_history(self):
-        """保存信号到文件"""
+    def _save_signal_history_sync(self):
+        """保存信号到文件（原子写入：先写 .tmp 再 os.replace，须在 _file_lock 内调用）"""
         try:
-            os.makedirs(os.path.dirname(SIGNAL_STORE_PATH), exist_ok=True)
-            with open(SIGNAL_STORE_PATH, "w", encoding="utf-8") as f:
+            dirpath = os.path.dirname(SIGNAL_STORE_PATH)
+            os.makedirs(dirpath, exist_ok=True)
+            tmp_path = SIGNAL_STORE_PATH + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(self._signal_history, f, ensure_ascii=False, indent=1)
+            os.replace(tmp_path, SIGNAL_STORE_PATH)
         except Exception as e:
             self.logger.debug(f"保存信号历史失败: {e}")
 
@@ -237,60 +250,65 @@ class VolumeAnomalyDetector:
             pass
 
     async def _on_quote(self, symbol: str, quote: Any):
-        """每次行情推送时更新跟踪数据并检测异常"""
+        """每次行情推送时更新跟踪数据并检测异常（per-symbol lock 保护）"""
         if symbol not in self.profiles:
             return
-
-        profile = self.profiles[symbol]
-        now = time.time()
-        ts = datetime.now()
 
         price = float(getattr(quote, 'last_done', 0))
         volume = int(getattr(quote, 'volume', 0))
         if price <= 0 or volume <= 0:
             return
 
-        # 重置每日计数器
-        if ts.date() != profile.last_anomaly_reset.date():
-            profile.daily_anomaly_count = 0
-            profile.last_anomaly_reset = ts
+        new_anomalies: List[VolumeAnomaly] = []
 
-        # 计算成交量增量
-        volume_delta = 0
-        if profile.last_cumulative_volume > 0 and volume >= profile.last_cumulative_volume:
-            volume_delta = volume - profile.last_cumulative_volume
+        async with self._get_symbol_lock(symbol):
+            profile = self.profiles[symbol]
+            now = time.time()
+            ts = datetime.now()
 
-        time_delta = now - profile.last_tick_time if profile.last_tick_time > 0 else 0
+            # 重置每日计数器
+            if ts.date() != profile.last_anomaly_reset.date():
+                profile.daily_anomaly_count = 0
+                profile.last_anomaly_reset = ts
 
-        # Tick Rule: 通过价格变动推断买卖方向
-        if profile.last_price > 0:
-            if price > profile.last_price:
-                profile.last_tick_direction = "buy"
-            elif price < profile.last_price:
-                profile.last_tick_direction = "sell"
-            # 价格不变时保留上一次方向
+            # 计算成交量增量
+            volume_delta = 0
+            if profile.last_cumulative_volume > 0 and volume >= profile.last_cumulative_volume:
+                volume_delta = volume - profile.last_cumulative_volume
 
-        # 记录 tick
-        profile.volume_ticks.append((now, volume, volume_delta))
-        profile.price_ticks.append((now, price))
+            # Tick Rule: 通过价格变动推断买卖方向
+            if profile.last_price > 0:
+                if price > profile.last_price:
+                    profile.last_tick_direction = "buy"
+                elif price < profile.last_price:
+                    profile.last_tick_direction = "sell"
 
-        # 运行检测（需要至少有前一次数据）
-        if profile.last_cumulative_volume > 0 and profile.daily_anomaly_count < self.MAX_ANOMALIES_PER_DAY:
-            self._check_volume_surge(symbol, profile, volume, price, ts)
-            self._check_volume_spike(symbol, profile, volume_delta, price, ts, now)
-            self._check_block_trade(symbol, profile, volume_delta, price, ts)
-            self._check_price_volume_divergence(symbol, profile, price, ts, now)
+            # 记录 tick
+            profile.volume_ticks.append((now, volume, volume_delta))
+            profile.price_ticks.append((now, price))
 
-        profile.last_cumulative_volume = volume
-        profile.last_price = price
-        profile.last_tick_time = now
+            # 运行检测（需要至少有前一次数据）
+            if profile.last_cumulative_volume > 0 and profile.daily_anomaly_count < self.MAX_ANOMALIES_PER_DAY:
+                self._check_volume_surge(symbol, profile, volume, price, ts, new_anomalies)
+                self._check_volume_spike(symbol, profile, volume_delta, price, ts, now, new_anomalies)
+                self._check_block_trade(symbol, profile, volume_delta, price, ts, new_anomalies)
+                self._check_price_volume_divergence(symbol, profile, price, ts, now, new_anomalies)
+
+            profile.last_cumulative_volume = volume
+            profile.last_price = price
+            profile.last_tick_time = now
+
+        # 持久化在 symbol lock 外部，使用 file lock
+        for anomaly in new_anomalies:
+            await self._persist_anomaly(anomaly)
 
     # ----------------------------------------------------------
     # 检测算法
     # ----------------------------------------------------------
 
     def _check_volume_surge(self, symbol: str, profile: SymbolVolumeProfile,
-                            cumulative_volume: int, price: float, ts: datetime):
+                            cumulative_volume: int, price: float, ts: datetime,
+                            out_anomalies: List['VolumeAnomaly']):
         """检测 1: 累计成交量远超日均"""
         if profile.avg_daily_volume <= 0:
             return
@@ -299,10 +317,7 @@ class VolumeAnomalyDetector:
         if ratio < self.surge_multiplier:
             return
 
-        # 按当前时间占交易时段的比例调整阈值
         hour = ts.hour
-        # 美股交易时段大约 9:30-16:00 ET, 港股 9:30-16:00 HKT
-        # 使用粗略的 fraction-of-day 校正
         trading_fraction = max(0.1, min(1.0, (hour - 9) / 6.5)) if 9 <= hour <= 16 else 1.0
         adjusted_threshold = self.surge_multiplier * trading_fraction
 
@@ -331,16 +346,16 @@ class VolumeAnomalyDetector:
         )
         profile.anomaly_queue.append(anomaly)
         profile.daily_anomaly_count += 1
-        self._persist_anomaly(anomaly)
+        out_anomalies.append(anomaly)
         self.logger.info(f"[SURGE] {symbol}: {anomaly.details}, 价格变动={price_change*100:.2f}%")
 
     def _check_volume_spike(self, symbol: str, profile: SymbolVolumeProfile,
-                            volume_delta: int, price: float, ts: datetime, now: float):
+                            volume_delta: int, price: float, ts: datetime, now: float,
+                            out_anomalies: List['VolumeAnomaly']):
         """检测 2: 短窗口内成交量突然加速"""
         if len(profile.volume_ticks) < 10:
             return
 
-        # 计算过去 5 分钟内的成交量增速
         window_start = now - self.spike_window_seconds
         recent_deltas = [
             delta for t, _, delta in profile.volume_ticks
@@ -350,7 +365,6 @@ class VolumeAnomalyDetector:
         if len(recent_deltas) < 3:
             return
 
-        # 全部 tick 的平均增量
         all_deltas = [delta for _, _, delta in profile.volume_ticks if delta > 0]
         if not all_deltas:
             return
@@ -386,11 +400,12 @@ class VolumeAnomalyDetector:
         )
         profile.anomaly_queue.append(anomaly)
         profile.daily_anomaly_count += 1
-        self._persist_anomaly(anomaly)
+        out_anomalies.append(anomaly)
         self.logger.info(f"[SPIKE] {symbol}: {anomaly.details}")
 
     def _check_block_trade(self, symbol: str, profile: SymbolVolumeProfile,
-                           volume_delta: int, price: float, ts: datetime):
+                           volume_delta: int, price: float, ts: datetime,
+                           out_anomalies: List['VolumeAnomaly']):
         """检测 3: 单次推送间出现超大成交量跳变（推断大宗交易）"""
         if profile.avg_daily_volume <= 0 or volume_delta <= 0:
             return
@@ -404,7 +419,6 @@ class VolumeAnomalyDetector:
         if confidence < self.min_confidence:
             return
 
-        # Tick Rule 推断买卖方向
         direction = profile.last_tick_direction or "unknown"
         if direction == "buy":
             dir_label = "主买"
@@ -413,7 +427,6 @@ class VolumeAnomalyDetector:
         else:
             dir_label = "方向不明"
 
-        # 价格相对前一tick的变动
         price_chg = 0
         if profile.last_price > 0:
             price_chg = (price - profile.last_price) / profile.last_price
@@ -436,18 +449,18 @@ class VolumeAnomalyDetector:
         )
         profile.anomaly_queue.append(anomaly)
         profile.daily_anomaly_count += 1
-        self._persist_anomaly(anomaly)
+        out_anomalies.append(anomaly)
         self.logger.info(
             f"[BLOCK] {symbol}: {anomaly.details}, 方向={dir_label}"
         )
 
     def _check_price_volume_divergence(self, symbol: str, profile: SymbolVolumeProfile,
-                                       price: float, ts: datetime, now: float):
+                                       price: float, ts: datetime, now: float,
+                                       out_anomalies: List['VolumeAnomaly']):
         """检测 4: 量增价平 —— 机构静默吸筹/出货"""
         if len(profile.price_ticks) < 20 or len(profile.volume_ticks) < 20:
             return
 
-        # 过去 5 分钟的价格变动
         window_start = now - self.spike_window_seconds
         recent_prices = [p for t, p in profile.price_ticks if t >= window_start]
         recent_volumes = [d for t, _, d in profile.volume_ticks if t >= window_start and d > 0]
@@ -457,11 +470,9 @@ class VolumeAnomalyDetector:
 
         price_change = abs(recent_prices[-1] - recent_prices[0]) / recent_prices[0] if recent_prices[0] > 0 else 0
 
-        # 价格几乎不动
         if price_change > self.divergence_price_threshold:
             return
 
-        # 但成交量远超正常水平
         all_deltas = [d for _, _, d in profile.volume_ticks if d > 0]
         if not all_deltas:
             return
@@ -477,7 +488,6 @@ class VolumeAnomalyDetector:
         if confidence < self.min_confidence:
             return
 
-        # 判断微弱的价格方向
         slight_direction = recent_prices[-1] - recent_prices[0]
 
         dir_str = "buy" if slight_direction > 0 else "sell"
@@ -498,7 +508,7 @@ class VolumeAnomalyDetector:
         )
         profile.anomaly_queue.append(anomaly)
         profile.daily_anomaly_count += 1
-        self._persist_anomaly(anomaly)
+        out_anomalies.append(anomaly)
         self.logger.info(f"[DIVERGE] {symbol}: {anomaly.details}")
 
     # ----------------------------------------------------------
@@ -506,15 +516,16 @@ class VolumeAnomalyDetector:
     # ----------------------------------------------------------
 
     async def check_and_generate_signals(self) -> List[VolumeSignal]:
-        """整合异常队列，生成交易信号"""
+        """整合异常队列，生成交易信号（per-symbol lock 保护队列读写）"""
         signals = []
 
         for symbol, profile in self.profiles.items():
             if not profile.anomaly_queue:
                 continue
 
-            anomalies = profile.anomaly_queue.copy()
-            profile.anomaly_queue.clear()
+            async with self._get_symbol_lock(symbol):
+                anomalies = profile.anomaly_queue.copy()
+                profile.anomaly_queue.clear()
 
             signal = self._anomalies_to_signal(symbol, anomalies)
             if signal and signal.confidence >= self.min_confidence:

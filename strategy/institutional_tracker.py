@@ -80,6 +80,7 @@ class InstitutionalSignal:
     insider_sell_count: int = 0
     institutions_buying: int = 0
     institutions_selling: int = 0
+    filing_date: str = ""
 
 
 # ============================================================
@@ -890,6 +891,15 @@ class InstitutionalTracker:
                     score['sell_sources'].append(f"{inst_name}({h.shares_change_pct:.0f}%)")
                     score['inst_selling'] += 1
 
+        # 收集每个 symbol 最新的 filing_date
+        symbol_filing_dates: Dict[str, str] = {}
+        for inst_key, holdings in self._holdings_cache.items():
+            for h in holdings:
+                if h.filing_date:
+                    prev = symbol_filing_dates.get(h.symbol, "")
+                    if h.filing_date > prev:
+                        symbol_filing_dates[h.symbol] = h.filing_date
+
         for symbol, score in symbol_scores.items():
             net_score = score['buy_score'] - score['sell_score']
             total_institutions = score['inst_buying'] + score['inst_selling']
@@ -897,6 +907,7 @@ class InstitutionalTracker:
             if abs(net_score) < 1.0 or total_institutions < self.min_institutions_for_signal:
                 continue
 
+            fd = symbol_filing_dates.get(symbol, "")
             if net_score > 0:
                 confidence = min(0.9, 0.3 + net_score * 0.1)
                 signals.append(InstitutionalSignal(
@@ -908,6 +919,7 @@ class InstitutionalTracker:
                     institutional_score=net_score,
                     institutions_buying=score['inst_buying'],
                     institutions_selling=score['inst_selling'],
+                    filing_date=fd,
                 ))
             else:
                 confidence = min(0.9, 0.3 + abs(net_score) * 0.1)
@@ -920,6 +932,7 @@ class InstitutionalTracker:
                     institutional_score=net_score,
                     institutions_buying=score['inst_buying'],
                     institutions_selling=score['inst_selling'],
+                    filing_date=fd,
                 ))
 
         return signals
@@ -940,7 +953,8 @@ class InstitutionalTracker:
             total_buy_value = sum(t.total_value for t in buys)
             total_sell_value = sum(t.total_value for t in sells)
 
-            # 内部人买入是非常强的看多信号（高管花自己的钱买公司股票）
+            latest_filing = max((t.filing_date for t in txns if t.filing_date), default="")
+
             if buys and total_buy_value > total_sell_value:
                 buy_names = [f"{t.insider_name}({t.role})" for t in buys[:3]]
                 confidence = min(0.85, 0.4 + len(buys) * 0.1 + (total_buy_value / 1_000_000) * 0.05)
@@ -953,9 +967,9 @@ class InstitutionalTracker:
                     reason=f"内部人买入: {len(buys)}笔, 总额${total_buy_value:,.0f}",
                     insider_buy_count=len(buys),
                     insider_sell_count=len(sells),
+                    filing_date=latest_filing,
                 ))
 
-            # 大量内部人卖出可能是警告信号（但需注意：很多卖出是计划内的）
             elif sells and len(sells) >= 3 and total_sell_value > total_buy_value * 3:
                 sell_names = [f"{t.insider_name}({t.role})" for t in sells[:3]]
                 confidence = min(0.6, 0.2 + len(sells) * 0.05)
@@ -968,6 +982,7 @@ class InstitutionalTracker:
                     reason=f"内部人集中卖出: {len(sells)}笔, 总额${total_sell_value:,.0f}",
                     insider_buy_count=len(buys),
                     insider_sell_count=len(sells),
+                    filing_date=latest_filing,
                 ))
 
         return signals

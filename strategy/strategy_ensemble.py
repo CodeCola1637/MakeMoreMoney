@@ -42,7 +42,7 @@ class StrategyPerformance:
 class StrategyEnsemble:
     """策略组合器"""
     
-    def __init__(self, config, strategies: Dict[str, Any], ensemble_method: EnsembleMethod = EnsembleMethod.CONFIDENCE_WEIGHT):
+    def __init__(self, config, strategies: Dict[str, Any], ensemble_method: EnsembleMethod = EnsembleMethod.CONFIDENCE_WEIGHT, order_manager=None):
         """
         初始化策略组合器
         
@@ -50,10 +50,12 @@ class StrategyEnsemble:
             config: 配置对象
             strategies: 策略字典 {strategy_name: strategy_instance}
             ensemble_method: 组合方法
+            order_manager: 订单管理器实例（用于获取实时账户余额）
         """
         self.config = config
         self.strategies = strategies
         self.ensemble_method = ensemble_method
+        self._order_manager = order_manager
         
         # 设置日志
         self.logger = setup_logger(
@@ -77,10 +79,17 @@ class StrategyEnsemble:
         # 组合配置
         self.min_strategies_agreement = config.get("ensemble.min_strategies_agreement", 2)
         self.confidence_threshold = config.get("ensemble.confidence_threshold", 0.1)
-        self.reweight_frequency = config.get("ensemble.reweight_frequency", 100)  # 每100个信号重新计算权重
+        self.reweight_frequency = config.get("ensemble.reweight_frequency", 100)
         self.signal_count = 0
         
-        # 🔧 新增：信号过滤器 - 防止重复信号和过度交易
+        # 触发策略 vs 辅助策略
+        self.trigger_strategies = set(config.get("ensemble.trigger_strategies", []))
+        self.auxiliary_strategies = set(config.get("ensemble.auxiliary_strategies", []))
+        if self.trigger_strategies:
+            self.logger.info(f"触发策略（可发起交易）: {self.trigger_strategies}")
+            self.logger.info(f"辅助策略（仅确认方向）: {self.auxiliary_strategies}")
+        
+        # 信号过滤器
         self.signal_filter = SignalFilter(config, self.logger)
         
         self.logger.info(f"策略组合器初始化完成 - 方法: {ensemble_method.value}, 策略数: {len(strategies)}")
@@ -148,13 +157,13 @@ class StrategyEnsemble:
                 return None
             
             # 🔧 新增：信号过滤检查 - 防止重复信号和过度交易
-            should_emit, filter_reason = self.signal_filter.should_emit_signal(ensemble_signal)
+            should_emit, filter_reason = await self.signal_filter.should_emit_signal(ensemble_signal)
             if not should_emit:
                 self.logger.info(f"信号被过滤: {symbol} - {filter_reason}")
                 return None
             
             # 记录信号到过滤器（用于冷却期和统计）
-            self.signal_filter.record_signal(ensemble_signal)
+            await self.signal_filter.record_signal(ensemble_signal)
             
             # 记录信号历史
             self._record_signal_history(strategy_signals, ensemble_signal)
@@ -285,9 +294,31 @@ class StrategyEnsemble:
         return valid_signals
         
     def _combine_signals(self, valid_signals: Dict[str, Signal], symbol: str, data: Dict[str, Any]) -> Signal:
-        """组合多个信号（弃权策略的权重按比例分配给参与者）"""
+        """组合多个信号（触发策略 + 辅助策略模式）"""
         try:
-            # 计算参与策略的归一化权重
+            # ── 触发检查：只有触发策略产生 BUY/SELL 才能发起交易 ──
+            if self.trigger_strategies:
+                trigger_fired = False
+                trigger_direction = None
+                for sname, sig in valid_signals.items():
+                    if sname in self.trigger_strategies and sig.signal_type in (SignalType.BUY, SignalType.SELL):
+                        trigger_fired = True
+                        trigger_direction = sig.signal_type
+                        self.logger.info(f"🔔 触发策略 [{sname}] 发出 {sig.signal_type.value} 信号: {symbol}, 置信度={sig.confidence:.3f}")
+                        break
+
+                if not trigger_fired:
+                    aux_dirs = {sn: s.signal_type.value for sn, s in valid_signals.items()
+                                if sn in self.auxiliary_strategies and s.signal_type != SignalType.HOLD}
+                    if aux_dirs:
+                        self.logger.info(f"⏸ 辅助策略有方向 {aux_dirs}，但无触发策略信号，不交易: {symbol}")
+                    return Signal(
+                        symbol=symbol, signal_type=SignalType.HOLD,
+                        price=data.get('last_done', 0), confidence=0.05,
+                        quantity=0, strategy_name="ensemble_no_trigger"
+                    )
+
+            # ── 正常加权组合（所有参与策略） ──
             participating = list(valid_signals.keys())
             raw_weights = {s: self.strategy_weights.get(s, 0.0) for s in participating}
             total_raw = sum(raw_weights.values())
@@ -321,7 +352,6 @@ class StrategyEnsemble:
             hold_strength = sum(hold_signals)
             total_confidence = sum(confidences)
             
-            # 确定最终信号类型 - 考虑HOLD信号
             if buy_strength > sell_strength and buy_strength > hold_strength and buy_strength > 0:
                 signal_type = SignalType.BUY
                 final_confidence = buy_strength
@@ -330,7 +360,7 @@ class StrategyEnsemble:
                 final_confidence = sell_strength
             else:
                 signal_type = SignalType.HOLD
-                final_confidence = max(hold_strength, 0.05)  # HOLD信号也保持一定置信度
+                final_confidence = max(hold_strength, 0.05)
                 
             # 计算平均价格
             avg_price = np.mean(prices) if prices else data.get('last_done', 0)
@@ -338,6 +368,13 @@ class StrategyEnsemble:
             # Lot-aware quantity calculation
             target_value = self.config.get("execution.risk_control.position_pct", 5.0) / 100.0
             total_equity = self.config.get("execution.initial_capital", 15000.0)
+            if self._order_manager:
+                try:
+                    real_equity = self._order_manager.get_account_balance()
+                    if real_equity > 0:
+                        total_equity = real_equity
+                except Exception:
+                    pass
             try:
                 max_trade_value = total_equity * target_value
             except Exception:
@@ -350,21 +387,31 @@ class StrategyEnsemble:
             
             lot_size = 1
             if '.HK' in symbol:
-                hk_lots = {
-                    '700.HK': 100, '9988.HK': 100, '388.HK': 100,
-                    '1299.HK': 500, '941.HK': 500, '9992.HK': 200,
-                }
-                lot_size = hk_lots.get(symbol, 100)
+                if self._order_manager:
+                    try:
+                        lot_size = self._order_manager.get_lot_size(symbol)
+                    except Exception:
+                        lot_size = self.config.get("execution.lot_sizes", {}).get(symbol, 100)
+                else:
+                    lot_size = self.config.get("execution.lot_sizes", {}).get(symbol, 100)
             
             suggested_quantity = max(lot_size, (raw_quantity // lot_size) * lot_size)
             
-            confidence_scale = min(total_confidence * 2, 2.0)
+            confidence_scale = max(0.5, min(1.0, total_confidence))
             suggested_quantity = max(lot_size, int(suggested_quantity * confidence_scale))
             suggested_quantity = (suggested_quantity // lot_size) * lot_size
             if suggested_quantity <= 0:
                 suggested_quantity = lot_size
             
-            # 创建组合信号
+            # 识别触发源
+            trigger_sources = [sn for sn in valid_signals if sn in self.trigger_strategies
+                               and valid_signals[sn].signal_type in (SignalType.BUY, SignalType.SELL)]
+            aux_agree = [sn for sn in valid_signals if sn in self.auxiliary_strategies
+                         and valid_signals[sn].signal_type == signal_type]
+            aux_oppose = [sn for sn in valid_signals if sn in self.auxiliary_strategies
+                          and valid_signals[sn].signal_type != SignalType.HOLD
+                          and valid_signals[sn].signal_type != signal_type]
+
             ensemble_signal = Signal(
                 symbol=symbol,
                 signal_type=signal_type,
@@ -378,13 +425,16 @@ class StrategyEnsemble:
                     'hold_strength': hold_strength,
                     'total_confidence': total_confidence,
                     'contributing_strategies': list(valid_signals.keys()),
-                    'strategy_weights': {k: round(v, 3) for k, v in norm_weights.items()}
+                    'strategy_weights': {k: round(v, 3) for k, v in norm_weights.items()},
+                    'trigger_sources': trigger_sources,
+                    'auxiliary_agree': aux_agree,
+                    'auxiliary_oppose': aux_oppose,
                 }
             )
             
             self.logger.info(f"组合信号生成: {symbol} - {signal_type.value}, 置信度: {final_confidence:.3f}, "
                            f"买入: {buy_strength:.3f}, 卖出: {sell_strength:.3f}, 持有: {hold_strength:.3f}, "
-                           f"参与策略: {list(valid_signals.keys())}")
+                           f"触发: {trigger_sources}, 辅助同意: {aux_agree}, 辅助反对: {aux_oppose}")
             
             return ensemble_signal
             

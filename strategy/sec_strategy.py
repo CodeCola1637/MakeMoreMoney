@@ -47,8 +47,10 @@ class SECStrategy:
         now = datetime.now()
         with self._lock:
             for sig in signals:
+                filing_dt = self._parse_filing_date(getattr(sig, 'filing_date', ''))
                 self._cache[sig.symbol] = {
                     "signal": sig,
+                    "filing_at": filing_dt or now,
                     "updated_at": now,
                 }
             self._cleanup_expired(now)
@@ -58,9 +60,21 @@ class SECStrategy:
                 f"symbols={[s.symbol for s in signals]}"
             )
 
+    @staticmethod
+    def _parse_filing_date(filing_date_str: str) -> Optional[datetime]:
+        """将 filing_date 字符串解析为 datetime"""
+        if not filing_date_str:
+            return None
+        for fmt in ('%Y-%m-%d', '%Y-%m-%dT%H:%M:%S', '%m/%d/%Y'):
+            try:
+                return datetime.strptime(filing_date_str, fmt)
+            except ValueError:
+                continue
+        return None
+
     def _cleanup_expired(self, now: datetime):
         cutoff = now - timedelta(hours=self.expiry_hours)
-        expired = [k for k, v in self._cache.items() if v["updated_at"] < cutoff]
+        expired = [k for k, v in self._cache.items() if v["filing_at"] < cutoff]
         for k in expired:
             del self._cache[k]
 
@@ -82,7 +96,7 @@ class SECStrategy:
         with self._lock:
             entry = self._cache.get(symbol)
 
-        if entry and entry["updated_at"] >= cutoff:
+        if entry and entry["filing_at"] >= cutoff:
             inst_sig = entry["signal"]
             if inst_sig.signal_type == "BUY":
                 sig_type = SignalType.BUY

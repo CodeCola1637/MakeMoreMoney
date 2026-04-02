@@ -105,7 +105,11 @@ class FundGuard:
             if total_equity > 0:
                 max_single_trade = total_equity * self.max_single_trade_pct
                 if amount > max_single_trade:
-                    return False, f"超过单笔交易限制: ${amount:.2f} > ${max_single_trade:.2f} ({self.max_single_trade_pct:.1%})"
+                    is_min_lot = self._is_minimum_lot_order(symbol, quantity, amount)
+                    if is_min_lot:
+                        self.logger.info(f"单笔超限但为最小手数，放行: {symbol} ${amount:.2f} > ${max_single_trade:.2f}")
+                    else:
+                        return False, f"超过单笔交易限制: ${amount:.2f} > ${max_single_trade:.2f} ({self.max_single_trade_pct:.1%})"
             
             # 4. 检查日亏损限制
             daily_loss_check, daily_loss_msg = self._check_daily_loss_limit(total_equity)
@@ -124,6 +128,18 @@ class FundGuard:
             self.logger.error(f"资金检查异常: {e}")
             return False, f"资金检查异常: {str(e)}"
     
+    def _is_minimum_lot_order(self, symbol: str, quantity: int, amount: Decimal) -> bool:
+        """判断是否为最小手数订单（1手）"""
+        try:
+            lot_size = self.order_manager.get_lot_size(symbol)
+            return quantity <= lot_size
+        except Exception:
+            pass
+        if symbol.endswith('.HK'):
+            lot = self.config.get("execution.lot_sizes", {}).get(symbol, 100)
+            return quantity <= lot
+        return quantity <= 1
+
     def _get_total_equity(self) -> Decimal:
         """
         获取账户总权益
@@ -138,16 +154,21 @@ class FundGuard:
             position_value = Decimal('0')
             for pos in positions:
                 qty = Decimal(str(getattr(pos, 'quantity', 0)))
-                cost = Decimal(str(getattr(pos, 'cost_price', 0)))
-                if qty > 0 and cost > 0:
-                    position_value += qty * cost
+                if qty <= 0:
+                    continue
+                market_val = getattr(pos, 'market_val', None)
+                if market_val and float(market_val) > 0:
+                    position_value += Decimal(str(market_val))
+                else:
+                    cost = Decimal(str(getattr(pos, 'cost_price', 0)))
+                    if cost > 0:
+                        position_value += qty * cost
             
             total = max(Decimal('0'), balance + position_value)
             return total
             
         except Exception as e:
             self.logger.error(f"获取总权益失败: {e}")
-            # 返回余额作为后备
             try:
                 return Decimal(str(self.order_manager.get_account_balance()))
             except:
@@ -166,9 +187,15 @@ class FundGuard:
             total_value = Decimal('0')
             for pos in positions:
                 qty = Decimal(str(abs(getattr(pos, 'quantity', 0))))
-                cost = Decimal(str(abs(getattr(pos, 'cost_price', 0))))
-                if qty > 0 and cost > 0:
-                    total_value += qty * cost
+                if qty <= 0:
+                    continue
+                market_val = getattr(pos, 'market_val', None)
+                if market_val and float(market_val) > 0:
+                    total_value += Decimal(str(abs(float(market_val))))
+                else:
+                    cost = Decimal(str(abs(getattr(pos, 'cost_price', 0))))
+                    if cost > 0:
+                        total_value += qty * cost
             
             return total_value
             
