@@ -84,7 +84,7 @@ async def stock_discovery_task(ctx: TradingContext):
 
 
 async def institutional_tracking_task(ctx: TradingContext):
-    """机构交易跟踪任务 — 扫描 SEC 数据并更新策略缓存"""
+    """机构交易跟踪任务 — 扫描 SEC 数据并更新策略缓存，同时发现新标的"""
     if not ctx.institutional_tracker:
         return
 
@@ -104,5 +104,55 @@ async def institutional_tracking_task(ctx: TradingContext):
                     f"{inst_sig.reason}"
                 )
 
+        await _discover_and_add_symbols(ctx)
+
     except Exception as e:
         logger.error(f"机构交易跟踪任务错误: {e}")
+
+
+_MAX_SEC_DISCOVERED = 10
+
+
+async def _discover_and_add_symbols(ctx: TradingContext):
+    """从全量 13F 缓存中发现显著机构活动的新标的并动态加入关注列表。"""
+    try:
+        discovered = ctx.institutional_tracker.discover_new_symbols(
+            current_symbols=ctx.symbols,
+            min_confidence=0.5,
+            min_institutions=2,
+        )
+
+        if not discovered:
+            return
+
+        added_count = 0
+        for sig in discovered:
+            if len(ctx._sec_discovered) >= _MAX_SEC_DISCOVERED:
+                logger.info(
+                    f"SEC 发现标的已达上限 ({_MAX_SEC_DISCOVERED})，跳过剩余"
+                )
+                break
+
+            if sig.symbol in ctx._sec_discovered:
+                continue
+
+            ok = await ctx.add_symbol(sig.symbol)
+            if ok:
+                ctx._sec_discovered.add(sig.symbol)
+                added_count += 1
+                logger.info(
+                    f"🏦 SEC 发现新标的 {sig.symbol} 已加入关注列表 "
+                    f"({sig.signal_type}, 置信度={sig.confidence:.2f}, "
+                    f"{sig.reason})"
+                )
+
+                if ctx.sec_strategy:
+                    ctx.sec_strategy.update_signals([sig])
+
+        if added_count:
+            logger.info(
+                f"🏦 本轮 SEC 扫描新增 {added_count} 只标的, "
+                f"累计 SEC 发现: {len(ctx._sec_discovered)} 只"
+            )
+    except Exception as e:
+        logger.error(f"SEC 标的发现失败: {e}")

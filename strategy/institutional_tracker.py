@@ -853,6 +853,46 @@ class InstitutionalTracker:
 
         return signals
 
+    def discover_new_symbols(
+        self,
+        current_symbols: List[str],
+        min_confidence: float = 0.5,
+        min_institutions: int = 2,
+    ) -> List[InstitutionalSignal]:
+        """扫描全量 13F 缓存，返回不在当前关注列表中、但有显著机构活动的信号。
+
+        仅基于已缓存的 13F 数据（不做额外网络请求），用于动态扩展关注列表。
+        """
+        all_signals = self._generate_13f_signals(watch_symbols=None)
+        all_signals = self._consolidate_signals(all_signals)
+
+        current_set = {s.upper() for s in current_symbols}
+        discovered: List[InstitutionalSignal] = []
+
+        for sig in all_signals:
+            if sig.symbol.upper() in current_set:
+                continue
+            if sig.confidence < min_confidence:
+                continue
+            total_inst = sig.institutions_buying + sig.institutions_selling
+            if total_inst < min_institutions:
+                continue
+            discovered.append(sig)
+
+        if discovered:
+            self.logger.info(
+                f"🔍 从 13F 数据中发现 {len(discovered)} 只新标的:"
+            )
+            for sig in discovered:
+                self.logger.info(
+                    f"  {sig.symbol}: {sig.signal_type}, "
+                    f"置信度={sig.confidence:.2f}, "
+                    f"机构数={sig.institutions_buying + sig.institutions_selling}, "
+                    f"{sig.reason}"
+                )
+
+        return discovered
+
     def _generate_13f_signals(self, watch_symbols: List[str] = None) -> List[InstitutionalSignal]:
         """基于 13F 变动生成信号"""
         signals = []
