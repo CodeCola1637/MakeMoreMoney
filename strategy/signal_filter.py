@@ -39,6 +39,7 @@ class SignalFilter:
         self.max_signals_per_day = config.get("strategy.max_signals_per_day", 10)
         self.price_change_threshold = config.get("strategy.price_change_threshold", 0.01)
         self.min_confidence = config.get("strategy.signal_processing.confidence_threshold", 0.15)
+        self.min_holding_seconds = config.get("strategy.min_holding_seconds", 300)
         
         # 止损后再入场冷却期（防止 止损→买入→止损 循环）
         self._stop_loss_reentry_cooldown = config.get("strategy.stop_loss_reentry_cooldown", 1800)
@@ -113,6 +114,23 @@ class SignalFilter:
                         self._record_filter(symbol, "cooldown_period")
                         return False, f"冷却期内: 距上次{last_type}信号仅{elapsed}秒, 还需等待{remaining}秒 (冷却期={cooldown}s)"
             
+            # 3.5 最小持仓时间 — 防止秒级买卖
+            if symbol in self.signal_history and self.signal_history[symbol]:
+                last_ts, last_type, _ = self.signal_history[symbol][-1]
+                is_reversal = (
+                    (last_type == "BUY" and signal_type_str == "SELL") or
+                    (last_type == "SELL" and signal_type_str == "BUY")
+                )
+                if is_reversal:
+                    elapsed = (now - last_ts).total_seconds()
+                    if elapsed < self.min_holding_seconds:
+                        remaining = int(self.min_holding_seconds - elapsed)
+                        self._record_filter(symbol, "min_holding_time")
+                        return False, (
+                            f"最小持仓时间未到: {last_type}→{signal_type_str} "
+                            f"仅{int(elapsed)}秒, 需等待{remaining}秒"
+                        )
+
             # 4. 检查每日信号数量限制
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             today_signals = [

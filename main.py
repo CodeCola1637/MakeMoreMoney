@@ -31,6 +31,7 @@ from strategy.institutional_tracker import InstitutionalTracker
 from strategy.volume_anomaly_detector import VolumeAnomalyDetector
 from strategy.sec_strategy import SECStrategy
 from strategy.volume_strategy import VolumeStrategy
+from strategy.breakout_strategy import BreakoutStrategy
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
 from tasks import (
@@ -243,12 +244,16 @@ async def main():
         volume_strategy = VolumeStrategy(config, logger)
         logger.info("异常成交量策略适配器初始化完成")
         
-        # 创建策略字典（4 策略投票）
+        breakout_strategy = BreakoutStrategy(config, hist_loader, logger)
+        logger.info("通道突破策略初始化完成")
+        
+        # 创建策略字典（5 策略投票）
         strategies = {
             'lstm': lstm_signal_gen,
             'technical': technical_strategy,
             'sec': sec_strategy,
             'volume_anomaly': volume_strategy,
+            'breakout': breakout_strategy,
         }
         
         # 获取组合方法

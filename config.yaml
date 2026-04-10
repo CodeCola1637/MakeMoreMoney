@@ -110,6 +110,10 @@ quote:
   use_mock_data: false
 strategy:
   lookback_period: 90
+  breakout:
+    lookback_days: 20
+    atr_period: 14
+    margin_pct: 0.002
   model_path: ./models/lstm_model.h5
   training:
     features:
@@ -135,9 +139,10 @@ strategy:
     volume_confirmation: true
   # 信号过滤器配置 - 触发驱动模式下仅做去重，不限流
   signal_cooldown: 60             # 同一股票相同信号去重窗口（秒）
-  stop_loss_reentry_cooldown: 900   # 止损后再入场冷却期（秒），防止止损→买入→止损循环
+  stop_loss_reentry_cooldown: 3600  # 止损后再入场冷却期（秒），防止止损→买入→止损循环
   max_signals_per_day: 10        # 每个股票每日最大信号数量
-  price_change_threshold: 0.01   # 价格变化阈值（1%）才生成新信号
+  min_holding_seconds: 300       # 最小持仓时间（秒），防止秒级买卖
+  price_change_threshold: 0.003  # 价格变化阈值（0.3%）才生成新信号
   # 相关性过滤器配置 - 风险分散
   correlation_lookback_days: 60  # 相关性计算回看天数
   correlation_update_interval: 24 # 相关性矩阵更新间隔（小时）
@@ -212,13 +217,14 @@ ensemble:
   enable: true
   method: confidence_weight
   min_strategies_agreement: 2
-  confidence_threshold: 0.05
+  confidence_threshold: 0.02
   reweight_frequency: 100
   strategy_weights:
-    lstm: 0.2
-    technical: 0.2
+    lstm: 0.15
+    technical: 0.15
     sec: 0.2
-    volume_anomaly: 0.4
+    volume_anomaly: 0.35
+    breakout: 0.15
   # 触发策略：只有这些策略产生BUY/SELL时才能发起交易
   trigger_strategies:
     - volume_anomaly
@@ -227,11 +233,13 @@ ensemble:
   auxiliary_strategies:
     - lstm
     - technical
+    - breakout
   strategies:
     - lstm
     - technical
     - sec
     - volume_anomaly
+    - breakout
   training:
     batch_size: 64
     early_stopping_patience: 15
