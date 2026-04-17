@@ -54,6 +54,14 @@ class SignalFilter:
         # 港股开盘噪声过滤（开盘前 N 分钟的集合竞价放量不作为交易信号）
         self._hk_open_filter_minutes = config.get("strategy.hk_open_filter_minutes", 10)
         
+        # P1-10: 美股噪声窗口过滤
+        # - 开盘 09:30-09:30+N 与 盘后 19:30-20:00 的 BUY 信号点差宽、流动性差，过滤
+        self._us_open_filter_minutes = config.get("strategy.us_open_filter_minutes", 15)
+        # 盘后窗口（ET 时区，24h 制）
+        self._us_after_hours_buy_filter = bool(
+            config.get("strategy.us_after_hours_buy_filter", True)
+        )
+        
         # 反向回补价护栏（24h 内 SELL→BUY 时，BUY 价不得高于最近 SELL 价）
         self._cover_guard_enable = bool(config.get("strategy.cover_price_guard.enable", True))
         self._cover_guard_lookback_hours = float(config.get("strategy.cover_price_guard.lookback_hours", 24))
@@ -145,6 +153,32 @@ class SignalFilter:
                         f"港股开盘噪声过滤: {symbol} 在 09:30-09:{30+self._hk_open_filter_minutes} "
                         f"期间的 BUY 信号被抑制（集合竞价放量噪声）"
                     )
+            
+            # P1-10: 美股开盘 / 盘后噪声过滤
+            if symbol.endswith('.US') and signal.signal_type == SignalType.BUY:
+                try:
+                    import pytz
+                    et_now = datetime.now(pytz.timezone('US/Eastern'))
+                    et_time = et_now.time()
+                    # 开盘前 N 分钟噪声
+                    if self._us_open_filter_minutes > 0:
+                        us_open = dtime(9, 30)
+                        us_open_end = dtime(9, 30 + self._us_open_filter_minutes)
+                        if us_open <= et_time < us_open_end:
+                            self._record_filter(symbol, "us_open_noise")
+                            return False, (
+                                f"美股开盘噪声过滤: {symbol} 在 ET 09:30-09:"
+                                f"{30+self._us_open_filter_minutes} 的 BUY 被抑制"
+                            )
+                    # 盘后 19:30-20:00 流动性差
+                    if self._us_after_hours_buy_filter:
+                        if dtime(19, 30) <= et_time < dtime(20, 0):
+                            self._record_filter(symbol, "us_after_hours_noise")
+                            return False, (
+                                f"美股盘后噪声过滤: {symbol} 在 ET 19:30-20:00 的 BUY 被抑制（流动性差）"
+                            )
+                except Exception as e:
+                    self.logger.debug(f"美股时段过滤异常 {symbol}: {e}")
             
             # 2. 止损后再入场冷却
             if signal.signal_type == SignalType.BUY and symbol in self._stop_loss_exits:

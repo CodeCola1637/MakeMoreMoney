@@ -198,7 +198,9 @@ class OrderResult:
                  status: OrderStatus,
                  submitted_at: datetime,
                  msg: str = "",
-                 strategy_name: str = ""):
+                 strategy_name: str = "",
+                 signal_source: str = "",
+                 signal_confidence: float = 0.0):
         """
         初始化订单结果
 
@@ -212,6 +214,8 @@ class OrderResult:
             submitted_at: 提交时间
             msg: 消息（通常用于错误信息）
             strategy_name: 策略名称
+            signal_source: 触发策略来源（如 "volume_anomaly,ccass"），用于事后归因
+            signal_confidence: 信号置信度（0~1），用于事后胜率统计
         """
         self.order_id = order_id
         self.symbol = symbol
@@ -225,6 +229,10 @@ class OrderResult:
         self.last_updated = submitted_at
         self.msg = msg
         self.strategy_name = strategy_name
+        self.signal_source = signal_source
+        self.signal_confidence = float(signal_confidence) if signal_confidence else 0.0
+        self.realized_pnl = 0.0
+        self.reject_reason = ""
         
     def update_from_order_info(self, info: OrderInfo):
         """根据订单信息更新状态"""
@@ -268,7 +276,11 @@ class OrderResult:
             "executed_quantity": self.filled_quantity,
             "executed_price": float(self.avg_price) if self.avg_price else None,
             "msg": self.msg,
-            "strategy_name": self.strategy_name
+            "strategy_name": self.strategy_name,
+            "signal_source": self.signal_source,
+            "signal_confidence": self.signal_confidence,
+            "realized_pnl": self.realized_pnl,
+            "reject_reason": self.reject_reason,
         }
         
     def __str__(self) -> str:
@@ -373,6 +385,10 @@ class OrderManager:
         # Symbols that the exchange rejected for short selling (e.g. 603301 error)
         self._short_blacklist: set = set()
         self._short_sell_order_ids: set = set()
+        
+        # 持仓加权平均成本追踪（用于 SELL 成交时计算 realized_pnl）
+        # {symbol: {"qty": int, "cost": float}} —— qty 仅记录多头加权，简化版
+        self._position_cost: Dict[str, Dict[str, float]] = {}
         
         # 🏗️ 初始化子服务
         self.position_service = PositionService(self)
@@ -972,7 +988,9 @@ class OrderManager:
             strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
             if hasattr(signal, 'confidence'):
                 strategy_info += f" confidence={signal.confidence:.3f} (COVER)"
-            return await self._submit_order(symbol, price, cover_quantity, "buy", strategy_info)
+            sig_src, sig_conf = self._extract_signal_meta(signal)
+            return await self._submit_order(symbol, price, cover_quantity, "buy", strategy_info,
+                                             signal_source=sig_src, signal_confidence=sig_conf)
         
         # 获取可用资金和总权益（优先使用券商 net_assets）
         available_cash = self.get_account_balance()
@@ -1166,7 +1184,9 @@ class OrderManager:
         strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
         if hasattr(signal, 'confidence'):
             strategy_info += f" confidence={signal.confidence:.3f}"
-        return await self._submit_order(symbol, price, quantity, "buy", strategy_info)
+        sig_src, sig_conf = self._extract_signal_meta(signal)
+        return await self._submit_order(symbol, price, quantity, "buy", strategy_info,
+                                         signal_source=sig_src, signal_confidence=sig_conf)
 
     async def _create_sell_order(self, signal):
         """
@@ -1244,7 +1264,9 @@ class OrderManager:
                 strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
                 if hasattr(signal, 'confidence'):
                     strategy_info += f" confidence={signal.confidence:.3f}"
-                result = await self._submit_order(symbol, price, quantity, "sell", strategy_info)
+                sig_src, sig_conf = self._extract_signal_meta(signal)
+                result = await self._submit_order(symbol, price, quantity, "sell", strategy_info,
+                                                   signal_source=sig_src, signal_confidence=sig_conf)
                 if result and result.order_id:
                     self._short_sell_order_ids.add(result.order_id)
                 return result
@@ -1310,12 +1332,18 @@ class OrderManager:
         strategy_info = signal.strategy_name if hasattr(signal, 'strategy_name') else ""
         if hasattr(signal, 'confidence'):
             strategy_info += f" confidence={signal.confidence:.3f}"
-        return await self._submit_order(symbol, price, adjusted_quantity, "sell", strategy_info)
+        sig_src, sig_conf = self._extract_signal_meta(signal)
+        return await self._submit_order(symbol, price, adjusted_quantity, "sell", strategy_info,
+                                         signal_source=sig_src, signal_confidence=sig_conf)
                 
     # ── Delegation to OrderExecutor ──
 
-    async def _submit_order(self, symbol, price, quantity, order_type, strategy_name):
-        return await self.order_executor._submit_order(symbol, price, quantity, order_type, strategy_name)
+    async def _submit_order(self, symbol, price, quantity, order_type, strategy_name,
+                             signal_source: str = "", signal_confidence: float = 0.0):
+        return await self.order_executor._submit_order(
+            symbol, price, quantity, order_type, strategy_name,
+            signal_source=signal_source, signal_confidence=signal_confidence,
+        )
 
     def get_lot_size(self, symbol: str) -> int:
         return self.order_executor.get_lot_size(symbol)
@@ -1349,6 +1377,47 @@ class OrderManager:
     def _save_order_to_csv(self, result):
         self.order_tracker._save_order_to_csv(result)
     
+    # ── 持仓加权平均成本追踪（用于 realized_pnl 计算） ──
+    
+    def update_position_cost_on_fill(self, order: 'OrderResult', filled_price: float, filled_qty: int):
+        """订单成交时更新持仓加权平均成本，并对 SELL 计算 realized_pnl。
+        
+        简化模型：
+        - BUY 成交：qty += filled_qty，cost = (old_cost*old_qty + filled_price*filled_qty) / new_qty
+        - SELL 成交：realized_pnl = (filled_price - avg_cost) * filled_qty；qty -= filled_qty
+        - 仅追踪多头；空头不在此模型内（设 realized_pnl=0，需要时另行扩展）
+        """
+        try:
+            from longport.openapi import OrderSide
+            symbol = order.symbol
+            entry = self._position_cost.setdefault(symbol, {"qty": 0.0, "cost": 0.0})
+            
+            if order.side == OrderSide.Buy:
+                old_qty = entry["qty"]
+                old_cost = entry["cost"]
+                new_qty = old_qty + filled_qty
+                if new_qty > 0:
+                    entry["cost"] = (old_cost * old_qty + filled_price * filled_qty) / new_qty
+                    entry["qty"] = new_qty
+                order.realized_pnl = 0.0
+            elif order.side == OrderSide.Sell and entry["qty"] > 0:
+                avg_cost = entry["cost"]
+                pnl = (filled_price - avg_cost) * filled_qty
+                order.realized_pnl = float(round(pnl, 4))
+                entry["qty"] = max(0.0, entry["qty"] - filled_qty)
+                if entry["qty"] <= 0:
+                    entry["cost"] = 0.0
+            else:
+                order.realized_pnl = 0.0
+        except Exception as e:
+            self.logger.debug(f"更新持仓成本/计算 PnL 失败 {order.symbol}: {e}")
+    
+    def seed_position_cost(self, symbol: str, qty: float, cost_price: float):
+        """启动时从 broker 同步持仓 → 初始化加权平均成本。"""
+        if qty <= 0 or cost_price <= 0:
+            return
+        self._position_cost[symbol] = {"qty": float(qty), "cost": float(cost_price)}
+    
     # ── Delegation to PositionService ──
 
     def get_account_balance(self):
@@ -1362,6 +1431,29 @@ class OrderManager:
 
     async def get_position(self, symbol: str):
         return await self.position_service.get_position(symbol)
+    
+    def seed_position_costs_from_broker(self):
+        """启动时同步 broker 持仓的成本价到本地加权平均成本表，
+        供后续 SELL 成交时计算 realized_pnl。"""
+        try:
+            positions = self.get_positions(None)
+            if not positions:
+                return 0
+            seeded = 0
+            for pos in positions:
+                sym = getattr(pos, 'symbol', None)
+                qty = float(getattr(pos, 'quantity', 0) or 0)
+                cost = getattr(pos, 'cost_price', None)
+                if not sym or qty <= 0 or cost is None:
+                    continue
+                self.seed_position_cost(sym, qty, float(cost))
+                seeded += 1
+            if seeded:
+                self.logger.info(f"已从 broker 同步 {seeded} 个标的的初始成本价用于 PnL 追踪")
+            return seeded
+        except Exception as e:
+            self.logger.warning(f"从 broker 同步成本价失败: {e}")
+            return 0
     
     def _validate_risk_control(self, signal: Signal) -> bool:
         """
@@ -1519,11 +1611,34 @@ class OrderManager:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
-    async def submit_buy_order(self, symbol, price, quantity, strategy_name="default"):
-        return await self.order_executor.submit_buy_order(symbol, price, quantity, strategy_name)
+    async def submit_buy_order(self, symbol, price, quantity, strategy_name="default",
+                                signal_source: str = "", signal_confidence: float = 0.0):
+        return await self.order_executor.submit_buy_order(
+            symbol, price, quantity, strategy_name,
+            signal_source=signal_source, signal_confidence=signal_confidence,
+        )
 
-    async def submit_sell_order(self, symbol, price, quantity, strategy_name="default"):
-        return await self.order_executor.submit_sell_order(symbol, price, quantity, strategy_name)
+    async def submit_sell_order(self, symbol, price, quantity, strategy_name="default",
+                                 signal_source: str = "", signal_confidence: float = 0.0):
+        return await self.order_executor.submit_sell_order(
+            symbol, price, quantity, strategy_name,
+            signal_source=signal_source, signal_confidence=signal_confidence,
+        )
+    
+    @staticmethod
+    def _extract_signal_meta(signal):
+        """从 Signal 对象提取 (signal_source, signal_confidence) 用于 CSV 归因。"""
+        confidence = float(getattr(signal, 'confidence', 0.0) or 0.0)
+        extra = getattr(signal, 'extra_data', None) or {}
+        triggers = extra.get('trigger_sources', []) if isinstance(extra, dict) else []
+        if not triggers:
+            sname = getattr(signal, 'strategy_name', '') or ''
+            triggers = [sname] if sname else []
+        if isinstance(triggers, (list, tuple, set)):
+            source = ",".join(str(t) for t in triggers if t)
+        else:
+            source = str(triggers)
+        return source, confidence
 
     async def _init_trade_context(self):
         """初始化交易上下文，带重试机制"""

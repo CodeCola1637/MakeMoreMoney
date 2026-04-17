@@ -67,6 +67,14 @@ execution:
     max_leverage: 2.5              # 最大杠杆倍数（总持仓/净资产），当前2.31x
     margin_warning_pct: 35.0       # 保证金缓冲预警线（净资产-维持保证金）/净资产
     margin_danger_pct: 25.0        # 保证金缓冲危险线，触发建议减仓
+    # P2-14: 半凯利动态仓位 — 根据近 N 日 orders.csv 已成交订单 PnL 调整 position_pct
+    kelly_sizing:
+      enable: true
+      lookback_days: 30   # 回看天数
+      min_trades: 10      # 最少样本数，少于则回退基础 position_pct
+      min_pct: 1.0        # 钳制下界 (%)
+      max_pct: 10.0       # 钳制上界 (%)
+      refresh_hours: 6    # 多久刷新一次
   # 资金守卫配置
   min_reserve: 1000                # 最小储备金（保留不交易的金额）
   small_trade_max_cost_ratio: 2.5
@@ -77,8 +85,44 @@ execution:
     fixed_stop_pct: 5.0
     max_loss_per_day: 3.0
     trailing_stop_pct: 4.0
+    # P1-7: ATR 动态止损 — 高波动标的拉宽止损，低波动收紧
+    atr_dynamic:
+      enable: true
+      period: 14            # ATR 计算回看天数
+      multiplier: 2.0       # stop_distance = max(fixed_pct, multiplier × ATR%)
   leveraged_symbols: []
   leveraged_overrides: {}
+  # P1-6: 按市场分组的覆盖配置（覆盖上方全局 stop_loss/profit_taking/price_adjust_rate/signal_cooldown）
+  # 港股波动较大，止损放宽；美股流动性好，止损可紧。
+  market_overrides:
+    hk:
+      stop_loss:
+        fixed_stop_pct: 6.0
+        emergency_stop_pct: 12.0
+        trailing_stop_pct: 5.0
+      profit_taking:
+        fixed_profit_pct: 18.0
+        partial_profit_pct: 9.0
+        trailing_profit_pct: 5.5
+        trailing_profit_step: 1.8
+      price_adjust_rate:
+        buy: 0.004
+        sell: 0.004
+      signal_cooldown: 90       # 港股冷却稍长，避免午盘集合竞价噪声反复触发
+    us:
+      stop_loss:
+        fixed_stop_pct: 4.0
+        emergency_stop_pct: 8.0
+        trailing_stop_pct: 3.5
+      profit_taking:
+        fixed_profit_pct: 12.0
+        partial_profit_pct: 7.0
+        trailing_profit_pct: 4.0
+        trailing_profit_step: 1.2
+      price_adjust_rate:
+        buy: 0.003
+        sell: 0.003
+      signal_cooldown: 60
   us_commission_rate: 0.005
   us_platform_fee: 0.99
 logging:
@@ -133,6 +177,7 @@ strategy:
   signal_interval: 600
   signal_processing:
     buy_threshold: 0.04
+    # P2-12 输出门：合成信号 confidence 低于此阈值即不下单（覆盖见 trigger_confidence_overrides）
     confidence_threshold: 0.08
     enable_hold: true
     min_signal_strength: 0.02
@@ -157,6 +202,9 @@ strategy:
   min_holding_seconds: 300       # 最小持仓时间（秒），防止秒级买卖
   price_change_threshold: 0.003  # 价格变化阈值（0.3%）才生成新信号
   hk_open_filter_minutes: 10    # 港股开盘后N分钟内过滤BUY信号（集合竞价噪声）
+  # P1-10: 美股开盘后 N 分钟与盘后 19:30-20:00 过滤 BUY（流动性差、点差宽）
+  us_open_filter_minutes: 15
+  us_after_hours_buy_filter: true
   # 相关性过滤器配置 - 风险分散
   correlation_lookback_days: 60  # 相关性计算回看天数
   correlation_update_interval: 24 # 相关性矩阵更新间隔（小时）
@@ -241,8 +289,30 @@ ensemble:
   enable: true
   method: confidence_weight
   min_strategies_agreement: 2
+  # P2-12 双门禁分层：
+  #   ensemble.confidence_threshold = 输入门（过滤单策略的极弱信号，建议 ≤ 0.05）
+  #   strategy.signal_processing.confidence_threshold = 输出门（最终是否下单，建议 ≥ 0.08）
+  # 触发驱动模式下，输入门保持低位以保留所有候选信号，输出门把控最终质量。
   confidence_threshold: 0.02
   reweight_frequency: 100
+  # P2-13 Pyramid 加仓：已盈利 ≥ min_profit_pct% 且再次出现同向触发时，suggested_quantity × (1 + boost_pct)
+  pyramid:
+    enable: true
+    min_profit_pct: 5.0
+    boost_pct: 0.5
+  # P2-15 策略权重 PnL 反馈：每日聚合 orders.csv 中各 signal_source 胜率，平滑调整 strategy_weights
+  weight_feedback:
+    enable: true
+    lookback_days: 14
+    min_trades_per_source: 3
+    alpha: 0.3                # EWMA 学习率（0=不更新, 1=完全用最新, 0.3=温和反馈）
+    refresh_hours: 24
+  # P1-8: 波动率自适应仓位（高波动收紧、低波动放大）
+  position_sizing:
+    vol_adaptive: true
+    target_vol_pct: 1.5        # 目标日波动率 1.5%
+    scale_min: 0.5             # 最低仓位缩放（避免过度收紧）
+    scale_max: 1.3             # 最高仓位放大（仍受 fund_guard 单标的上限保护）
   strategy_weights:
     lstm: 0.10
     technical: 0.10

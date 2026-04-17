@@ -84,6 +84,31 @@ class OrderTracker:
                             old_status = order.status
                             self.logger.info(f"订单状态更新: {order_id}, {old_status} -> {latest_order.status}")
                             order.status = latest_order.status
+                            
+                            # 同步成交数量与执行价（若 broker 已返回）
+                            try:
+                                exec_qty_raw = getattr(latest_order, 'executed_quantity', None)
+                                if exec_qty_raw is not None:
+                                    order.filled_quantity = int(exec_qty_raw)
+                                exec_price_raw = getattr(latest_order, 'executed_price', None)
+                                if exec_price_raw:
+                                    order.avg_price = float(exec_price_raw)
+                            except Exception:
+                                pass
+                            
+                            # 成交时更新加权平均成本，对 SELL 计算 realized_pnl
+                            if order.is_filled():
+                                try:
+                                    fill_qty = int(order.filled_quantity or order.quantity)
+                                    fill_price = float(order.avg_price or order.price)
+                                    self._mgr.update_position_cost_on_fill(order, fill_price, fill_qty)
+                                except Exception as e:
+                                    self.logger.debug(f"realized_pnl 计算失败 {order_id}: {e}")
+                            
+                            # 拒单时若上游未填，则补一个 reason
+                            if order.is_rejected() and not getattr(order, 'reject_reason', ''):
+                                msg = getattr(order, 'msg', '') or ''
+                                order.reject_reason = self._infer_reject_reason(msg)
 
                             self._update_order_csv(order)
 
@@ -299,8 +324,36 @@ class OrderTracker:
 
         return True
 
+    @staticmethod
+    def _infer_reject_reason(msg: str) -> str:
+        """从订单消息推断标准化拒单原因（兜底，executor 已经分类则不会走到这里）。"""
+        if not msg:
+            return "unknown"
+        s = msg.lower()
+        if "603301" in msg or "short" in s:
+            return "short_not_supported"
+        if "insufficient" in s or "余额" in msg or "buying power" in s:
+            return "insufficient_funds"
+        if "close" in s and "market" in s:
+            return "market_closed"
+        if "tick" in s or "invalid price" in s:
+            return "invalid_price"
+        return "exchange_rejected"
+    
+    # 当前 CSV schema（v2，2026-04 增加 signal_source/signal_confidence/realized_pnl/reject_reason）
+    CSV_HEADER = [
+        'timestamp', 'order_id', 'symbol', 'side', 'quantity',
+        'price', 'status', 'executed_quantity',
+        'signal_source', 'signal_confidence', 'realized_pnl', 'reject_reason',
+        'filled_at',
+    ]
+
     def _update_order_csv(self, order):
-        """订单状态变更时，回写 CSV 中对应行的 status 字段（原子写入）。"""
+        """订单状态变更时，回写 CSV 行（status / filled_at / executed_quantity / realized_pnl / reject_reason）。
+        
+        采用 csv 模块按列处理，避免简单字符串替换带来的歧义。
+        若历史 CSV 没有新增列，会在重写时自动补齐表头。
+        """
         csv_file = "logs/orders.csv"
         if not os.path.exists(csv_file):
             return
@@ -313,38 +366,60 @@ class OrderTracker:
 
         try:
             with open(csv_file, "r", newline="", encoding="utf-8") as f:
-                lines = f.readlines()
-
+                reader = csv.reader(f)
+                rows = list(reader)
+            if not rows:
+                return
+            
+            header = rows[0]
+            data_rows = rows[1:]
+            
+            # 若旧表头缺新列，扩展表头并补空
+            need_migrate = False
+            for col in self.CSV_HEADER:
+                if col not in header:
+                    header.append(col)
+                    need_migrate = True
+            if need_migrate:
+                width = len(header)
+                data_rows = [r + [""] * (width - len(r)) for r in data_rows]
+            
             updated = False
-            new_lines = []
-            for line in lines:
-                if order_id_str in line:
-                    cols = line.rstrip("\n").split(",")
-                    for i, col in enumerate(cols):
-                        if "NotReported" in col or "OrderStatus" in col:
-                            cols[i] = new_status_str
-                            updated = True
-                            break
-                    if updated and order.is_filled():
-                        # Try to fill the filled_at column if it exists and is empty
-                        for i, col in enumerate(cols):
-                            if col == "" and i > 0 and updated:
-                                cols[i] = now_iso
-                                break
-                    line = ",".join(cols) + "\n"
-                new_lines.append(line)
-
-            if updated:
+            idx = {name: i for i, name in enumerate(header)}
+            
+            for r in data_rows:
+                if len(r) <= idx['order_id']:
+                    continue
+                if r[idx['order_id']] != order_id_str:
+                    continue
+                r[idx['status']] = new_status_str
+                if order.is_filled():
+                    if 'filled_at' in idx:
+                        r[idx['filled_at']] = now_iso
+                    if 'executed_quantity' in idx:
+                        r[idx['executed_quantity']] = str(order.filled_quantity or order.quantity)
+                    if 'realized_pnl' in idx and order.realized_pnl:
+                        r[idx['realized_pnl']] = f"{order.realized_pnl:.4f}"
+                if order.is_rejected():
+                    if 'reject_reason' in idx and order.reject_reason:
+                        r[idx['reject_reason']] = order.reject_reason
+                updated = True
+                break
+            
+            if updated or need_migrate:
                 tmp_fd, tmp_path = tempfile.mkstemp(
                     dir=os.path.dirname(csv_file) or ".", suffix=".tmp"
                 )
                 try:
                     with os.fdopen(tmp_fd, "w", newline="", encoding="utf-8") as f:
-                        f.writelines(new_lines)
+                        writer = csv.writer(f)
+                        writer.writerow(header)
+                        writer.writerows(data_rows)
                     os.replace(tmp_path, csv_file)
-                    self.logger.info(
-                        f"CSV 订单状态已更新: {order_id_str} -> {new_status_str}"
-                    )
+                    if updated:
+                        self.logger.info(
+                            f"CSV 订单状态已更新: {order_id_str} -> {new_status_str}"
+                        )
                 except Exception:
                     try:
                         os.unlink(tmp_path)
@@ -395,25 +470,58 @@ class OrderTracker:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
 
     def _save_order_to_csv(self, result):
-        """保存订单信息到CSV文件"""
+        """保存订单信息到 CSV（v2 schema）。
+        
+        新增列：signal_source / signal_confidence / realized_pnl / reject_reason / filled_at
+        旧文件首次写入时若表头缺失，会自动扩展（不破坏已有行）。
+        """
         try:
             os.makedirs("logs", exist_ok=True)
 
             csv_file = "logs/orders.csv"
             file_exists = os.path.exists(csv_file)
+            
+            if file_exists:
+                # 检查是否需要扩展旧表头
+                try:
+                    with open(csv_file, 'r', newline='', encoding='utf-8') as fr:
+                        reader = csv.reader(fr)
+                        existing_header = next(reader, [])
+                    missing = [c for c in self.CSV_HEADER if c not in existing_header]
+                    if missing:
+                        # 重写表头与所有现有数据行（在末尾追加缺失列的空值）
+                        with open(csv_file, 'r', newline='', encoding='utf-8') as fr:
+                            reader = csv.reader(fr)
+                            rows = list(reader)
+                        new_header = existing_header + missing
+                        width = len(new_header)
+                        new_rows = [r + [""] * (width - len(r)) for r in rows[1:]]
+                        tmp_fd, tmp_path = tempfile.mkstemp(
+                            dir=os.path.dirname(csv_file) or ".", suffix=".tmp"
+                        )
+                        with os.fdopen(tmp_fd, 'w', newline='', encoding='utf-8') as fw:
+                            w = csv.writer(fw)
+                            w.writerow(new_header)
+                            w.writerows(new_rows)
+                        os.replace(tmp_path, csv_file)
+                        self.logger.info(f"CSV 表头已扩展，新增列: {missing}")
+                except Exception as e:
+                    self.logger.warning(f"扩展 CSV 表头失败: {e}")
 
             with open(csv_file, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
 
                 if not file_exists:
-                    writer.writerow([
-                        'timestamp', 'order_id', 'symbol', 'side', 'quantity',
-                        'price', 'status', 'executed_quantity'
-                    ])
+                    writer.writerow(self.CSV_HEADER)
 
                 side_str = str(result.side.value) if hasattr(result.side, 'value') else str(result.side)
                 status_str = str(result.status.value) if hasattr(result.status, 'value') else str(result.status)
                 executed_qty = getattr(result, 'executed_quantity', getattr(result, 'filled_quantity', 0))
+                signal_source = getattr(result, 'signal_source', '') or ''
+                signal_conf = getattr(result, 'signal_confidence', 0.0) or 0.0
+                realized_pnl = getattr(result, 'realized_pnl', 0.0) or 0.0
+                reject_reason = getattr(result, 'reject_reason', '') or ''
+                filled_at = ''
                 writer.writerow([
                     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     result.order_id,
@@ -422,7 +530,12 @@ class OrderTracker:
                     result.quantity,
                     result.price,
                     status_str,
-                    executed_qty
+                    executed_qty,
+                    signal_source,
+                    f"{signal_conf:.4f}" if signal_conf else "",
+                    f"{realized_pnl:.4f}" if realized_pnl else "",
+                    reject_reason,
+                    filled_at,
                 ])
 
             self.logger.info(f"订单信息已保存到 {csv_file}")

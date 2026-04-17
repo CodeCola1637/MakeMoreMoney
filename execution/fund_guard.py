@@ -38,7 +38,19 @@ class FundGuard:
         
         # 配置参数
         self.min_reserve = Decimal(str(config.get("execution.min_reserve", 1000)))  # 最小储备金
-        self.max_single_trade_pct = Decimal(str(config.get("execution.risk_control.position_pct", 5.0))) / 100  # 单笔最大比例
+        self._base_single_trade_pct = Decimal(str(config.get("execution.risk_control.position_pct", 5.0))) / 100  # 基础单笔最大比例
+        self.max_single_trade_pct = self._base_single_trade_pct
+        
+        # P2-14: 半凯利仓位上限
+        self._kelly_enabled = bool(config.get("execution.risk_control.kelly_sizing.enable", True))
+        self._kelly_lookback_days = int(config.get("execution.risk_control.kelly_sizing.lookback_days", 30))
+        self._kelly_min_trades = int(config.get("execution.risk_control.kelly_sizing.min_trades", 10))
+        self._kelly_max_pct = Decimal(str(config.get("execution.risk_control.kelly_sizing.max_pct", 10.0))) / 100
+        self._kelly_min_pct = Decimal(str(config.get("execution.risk_control.kelly_sizing.min_pct", 1.0))) / 100
+        self._kelly_orders_csv = str(config.get("logging.orders_csv", "logs/orders.csv"))
+        self._kelly_last_refresh: Optional[datetime] = None
+        self._kelly_refresh_interval = timedelta(hours=int(config.get("execution.risk_control.kelly_sizing.refresh_hours", 6)))
+        self._kelly_current_fraction = 0.0  # 0 表示尚未生效
         self.max_daily_loss_pct = Decimal(str(config.get("execution.risk_control.max_daily_loss_pct", 3.0))) / 100  # 日亏损限制
         self.max_total_position_pct = Decimal(str(config.get("execution.risk_control.max_total_position_pct", 80.0))) / 100  # 总仓位限制
         
@@ -109,6 +121,9 @@ class FundGuard:
             
             if amount > available:
                 return False, f"交易金额超过可用资金: ${amount:.2f} > ${available:.2f}"
+            
+            # P2-14: 半凯利仓位上限刷新
+            self._maybe_refresh_kelly_fraction()
             
             # 3. 检查单笔交易限制
             total_equity = self._get_total_equity()
@@ -620,3 +635,49 @@ class FundGuard:
                 
         except Exception as e:
             return False, f"检查异常: {str(e)}"
+    
+    def _maybe_refresh_kelly_fraction(self):
+        """P2-14: 周期性根据 orders.csv 历史 PnL 重算半凯利仓位上限。"""
+        if not self._kelly_enabled:
+            return
+        now = datetime.now()
+        if (self._kelly_last_refresh is not None
+                and (now - self._kelly_last_refresh) < self._kelly_refresh_interval):
+            return
+        self._kelly_last_refresh = now
+        try:
+            from analytics.pnl_analytics import compute_global_kelly
+            half_kelly, stats = compute_global_kelly(
+                self._kelly_orders_csv,
+                lookback_days=self._kelly_lookback_days,
+                min_trades=self._kelly_min_trades,
+                logger=self.logger,
+            )
+        except Exception as e:
+            self.logger.debug(f"半凯利刷新失败: {e}")
+            return
+        
+        if half_kelly <= 0:
+            # 数据不足或负期望 → 回退到基础 position_pct
+            if self.max_single_trade_pct != self._base_single_trade_pct:
+                self.logger.info(
+                    f"半凯利数据不足/负期望 (trades={stats.trades}, "
+                    f"win_rate={stats.win_rate:.1%}, payoff={stats.payoff_ratio:.2f}) → "
+                    f"回退基础仓位 {float(self._base_single_trade_pct):.1%}"
+                )
+                self.max_single_trade_pct = self._base_single_trade_pct
+                self._kelly_current_fraction = 0.0
+            return
+        
+        # 钳制到 [min, max]
+        kelly_dec = Decimal(str(half_kelly))
+        new_pct = max(self._kelly_min_pct, min(self._kelly_max_pct, kelly_dec))
+        
+        if abs(float(new_pct) - float(self.max_single_trade_pct)) > 1e-4:
+            self.logger.info(
+                f"📈 半凯利仓位刷新: trades={stats.trades}, win_rate={stats.win_rate:.1%}, "
+                f"payoff={stats.payoff_ratio:.2f}, half_kelly={half_kelly:.3f} → "
+                f"max_single_trade_pct: {float(self.max_single_trade_pct):.1%} → {float(new_pct):.1%}"
+            )
+        self.max_single_trade_pct = new_pct
+        self._kelly_current_fraction = float(new_pct)

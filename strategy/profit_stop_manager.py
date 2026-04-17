@@ -40,10 +40,11 @@ class ExitSignal:
 class ProfitStopManager:
     """止盈止损管理器"""
     
-    def __init__(self, config, order_manager, logger=None):
+    def __init__(self, config, order_manager, logger=None, historical_loader=None):
         self.config = config
         self.order_manager = order_manager
         self.logger = logger or logging.getLogger(__name__)
+        self.historical_loader = historical_loader  # P1-7: ATR 动态止损所需
         
         # 配置参数
         self.profit_config = config.get('execution.profit_taking', {})
@@ -71,6 +72,29 @@ class ProfitStopManager:
         if self._leveraged_symbols:
             self.logger.info(f"杠杆产品特殊阈值已加载: {self._leveraged_symbols}, 覆盖: {self._leveraged_overrides}")
         
+        # P1-7: ATR 动态止损配置
+        self._atr_enabled = bool(config.get('execution.stop_loss.atr_dynamic.enable', True))
+        self._atr_period = int(config.get('execution.stop_loss.atr_dynamic.period', 14))
+        self._atr_multiplier = float(config.get('execution.stop_loss.atr_dynamic.multiplier', 2.0))
+        self._atr_cache: Dict[str, Tuple[datetime, float]] = {}  # symbol -> (cached_at, atr_pct)
+        self._atr_cache_ttl = timedelta(hours=4)
+        if self._atr_enabled and self.historical_loader:
+            self.logger.info(
+                f"ATR 动态止损启用: period={self._atr_period}, multiplier={self._atr_multiplier}x"
+            )
+        
+        # P1-6: 按市场分组的阈值覆盖（HK / US）
+        market_overrides = config.get('execution.market_overrides', {}) or {}
+        self._hk_overrides = (market_overrides.get('hk') or {}).get('stop_loss', {}) or {}
+        self._hk_profit_overrides = (market_overrides.get('hk') or {}).get('profit_taking', {}) or {}
+        self._us_overrides = (market_overrides.get('us') or {}).get('stop_loss', {}) or {}
+        self._us_profit_overrides = (market_overrides.get('us') or {}).get('profit_taking', {}) or {}
+        if self._hk_overrides or self._us_overrides:
+            self.logger.info(
+                f"市场分组阈值已加载 - HK: stop={self._hk_overrides}, profit={self._hk_profit_overrides} | "
+                f"US: stop={self._us_overrides}, profit={self._us_profit_overrides}"
+            )
+        
         # 持仓状态追踪
         self.position_status: Dict[str, PositionStatus] = {}
         self.daily_pnl = 0.0
@@ -81,6 +105,10 @@ class ProfitStopManager:
         self._exit_pending: Dict[str, dict] = {}
         self._exit_retry_cooldown = timedelta(minutes=5)
         self._exit_max_retries = 5
+        
+        # P1-11: 部分止盈后剩余仓位"保本"状态机
+        # symbol → 保本基准价（>= 该价位即开始按浮动止盈管理；低于则按 trailing 触发保本止损）
+        self._breakeven_anchor: Dict[str, float] = {}
         
         self.logger.info(f"止盈止损管理器初始化完成 - 止盈启用: {self.profit_enabled}, 止损启用: {self.stop_enabled}")
     
@@ -136,6 +164,11 @@ class ProfitStopManager:
     async def update_position_status(self, symbol: str, quantity: int, cost_price: float, current_price: float):
         """更新持仓状态"""
         try:
+            # P1-11: 若已经历部分止盈，使用保本锚价覆盖 broker 的原始成本（实现"保本"止损）
+            anchor = self._breakeven_anchor.get(symbol)
+            if anchor is not None and quantity > 0:
+                cost_price = max(float(cost_price or 0), float(anchor))
+            
             # 计算盈亏（自动处理多空方向）
             # 多头：价格上涨盈利
             # 空头：价格下跌盈利（quantity为负数时自动反转）
@@ -152,7 +185,7 @@ class ProfitStopManager:
             
             # 更新或创建持仓状态
             t = self._get_thresholds(symbol)
-            trailing_pct = t['trailing_stop_pct']
+            trailing_pct = self._get_effective_trailing_pct(symbol, t['trailing_stop_pct'])
 
             if symbol not in self.position_status:
                 self.position_status[symbol] = PositionStatus(
@@ -175,18 +208,20 @@ class ProfitStopManager:
                 status.unrealized_pnl_pct = float(unrealized_pnl_pct)
                 status.last_update = datetime.now()
                 
+                # P1-7: 每次更新使用 ATR 调整后的 trailing_pct（高波动股票止损放宽，低波动收紧）
+                eff_trailing_pct = self._get_effective_trailing_pct(symbol, trailing_pct)
                 is_short = quantity < 0
                 if is_short:
                     if float(current_price) < status.highest_price:
                         status.highest_price = float(current_price)
-                        new_trailing_stop = float(current_price) * (1 + trailing_pct / 100)
+                        new_trailing_stop = float(current_price) * (1 + eff_trailing_pct / 100)
                         if new_trailing_stop < status.trailing_stop_price:
                             status.trailing_stop_price = new_trailing_stop
                             self.logger.debug(f"更新空头追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
                 else:
                     if float(current_price) > status.highest_price:
                         status.highest_price = float(current_price)
-                        new_trailing_stop = float(current_price) * (1 - trailing_pct / 100)
+                        new_trailing_stop = float(current_price) * (1 - eff_trailing_pct / 100)
                         if new_trailing_stop > status.trailing_stop_price:
                             status.trailing_stop_price = new_trailing_stop
                             self.logger.debug(f"更新多头追踪止损价格: {symbol}, 新止损价: {new_trailing_stop:.2f}")
@@ -271,6 +306,25 @@ class ProfitStopManager:
         if pending.get("order_id") != order_id:
             return
         if is_filled:
+            # P1-11: 部分止盈成交后，将剩余仓位的"成本"上调到当前价（实现保本止损 + 让利润奔跑）
+            if pending.get("signal_type") == "PARTIAL_PROFIT":
+                status = self.position_status.get(symbol)
+                if status:
+                    new_anchor = float(status.current_price)
+                    self._breakeven_anchor[symbol] = new_anchor
+                    # 重置追踪止损起点为当前价
+                    status.cost_price = new_anchor
+                    status.highest_price = new_anchor
+                    t = self._get_thresholds(symbol)
+                    eff_pct = self._get_effective_trailing_pct(symbol, t['trailing_stop_pct'])
+                    if status.quantity < 0:
+                        status.trailing_stop_price = new_anchor * (1 + eff_pct / 100)
+                    else:
+                        status.trailing_stop_price = new_anchor * (1 - eff_pct / 100)
+                    self.logger.info(
+                        f"💰 {symbol} 部分止盈成交 → 启用保本状态: anchor={new_anchor:.4f}, "
+                        f"新止损价={status.trailing_stop_price:.4f}"
+                    )
             self.logger.info(f"止盈止损订单已成交，清除 pending: {symbol}, 订单={order_id}")
             self._exit_pending.pop(symbol, None)
         else:
@@ -287,6 +341,9 @@ class ProfitStopManager:
 
         避免在盘后/盘前因连续 Rejected 耗尽重试次数后，
         正式开盘时无法重新提交止盈止损订单。
+        
+        P0-2: 对硬拒(hard_fail)的标的，需要等待"开盘后 5 分钟"且距离上次尝试 ≥ 5 分钟才清除，
+        防止开盘瞬间集合竞价拒单后立即又重置。
         """
         stale = []
         for symbol, pending in self._exit_pending.items():
@@ -296,11 +353,13 @@ class ProfitStopManager:
                 continue
             last_attempt = pending.get("last_attempt", datetime.now())
             age_min = (datetime.now() - last_attempt).total_seconds() / 60
-            if age_min > 30:
+            min_gap = 5 if pending.get("hard_fail") else 30
+            if age_min > min_gap:
                 stale.append(symbol)
         for symbol in stale:
             self.logger.info(
-                f"市场已开盘且距上次尝试超过30分钟，重置 {symbol} 退出重试计数"
+                f"市场已开盘且距上次尝试超过 {5 if self._exit_pending[symbol].get('hard_fail') else 30} 分钟，"
+                f"重置 {symbol} 退出重试计数"
             )
             self._exit_pending.pop(symbol, None)
 
@@ -344,8 +403,87 @@ class ProfitStopManager:
             
         return exit_signals
     
+    def _get_atr_pct(self, symbol: str) -> Optional[float]:
+        """P1-7: 同步获取标的近 N 日 ATR 百分比（基于 historical_loader 缓存）。
+        
+        异步无法在 update_position_status 中直接 await 历史 K 线，故采用：
+        - cache hit → 直接返回
+        - cache miss → 返回 None，并触发后台异步刷新（下次调用即可命中）
+        """
+        if not self._atr_enabled or not self.historical_loader:
+            return None
+        cached = self._atr_cache.get(symbol)
+        now = datetime.now()
+        if cached and (now - cached[0]) < self._atr_cache_ttl:
+            return cached[1]
+        # 异步刷新（不阻塞当前调用）
+        try:
+            asyncio.create_task(self._refresh_atr_cache(symbol))
+        except RuntimeError:
+            # 没有 running loop（可能在测试/同步上下文）
+            pass
+        return cached[1] if cached else None
+    
+    async def _refresh_atr_cache(self, symbol: str):
+        """异步刷新 ATR 缓存。"""
+        try:
+            df = await self.historical_loader.get_candlesticks(
+                symbol, count=self._atr_period + 5, use_cache=True
+            )
+            if df is None or df.empty or len(df) < self._atr_period + 1:
+                return
+            atr_pct = self._compute_atr_pct(df)
+            if atr_pct and atr_pct > 0:
+                self._atr_cache[symbol] = (datetime.now(), atr_pct)
+                self.logger.debug(f"ATR 缓存刷新: {symbol} = {atr_pct:.2f}%")
+        except Exception as e:
+            self.logger.debug(f"刷新 ATR 缓存失败 {symbol}: {e}")
+    
+    @staticmethod
+    def _compute_atr_pct(df) -> float:
+        """计算 ATR 占当前价格的百分比。"""
+        try:
+            recent = df.tail(20)
+            highs = recent['high'].values.astype(float)
+            lows = recent['low'].values.astype(float)
+            closes = recent['close'].values.astype(float)
+            tr = []
+            for i in range(1, len(highs)):
+                tr.append(max(
+                    highs[i] - lows[i],
+                    abs(highs[i] - closes[i - 1]),
+                    abs(lows[i] - closes[i - 1]),
+                ))
+            if not tr:
+                return 0.0
+            atr = sum(tr) / len(tr)
+            last_close = float(closes[-1])
+            if last_close <= 0:
+                return 0.0
+            return (atr / last_close) * 100.0
+        except Exception:
+            return 0.0
+    
+    def _get_effective_trailing_pct(self, symbol: str, base_pct: float) -> float:
+        """P1-7: stop_distance = max(base_fixed_pct, k * ATR%) — ATR 缺失时回退基线。"""
+        atr_pct = self._get_atr_pct(symbol)
+        if atr_pct is None or atr_pct <= 0:
+            return base_pct
+        atr_based = atr_pct * self._atr_multiplier
+        effective = max(base_pct, atr_based)
+        if abs(effective - base_pct) > 0.1:
+            self.logger.debug(
+                f"{symbol} 追踪止损 ATR 调整: base={base_pct:.2f}% → "
+                f"max(base, {self._atr_multiplier}×ATR={atr_based:.2f}%) = {effective:.2f}%"
+            )
+        return effective
+    
     def _get_thresholds(self, symbol: str) -> dict:
-        """返回适用于该标的的止盈止损阈值（杠杆产品使用放宽阈值）"""
+        """返回适用于该标的的止盈止损阈值。
+        
+        优先级：杠杆产品 override > 市场分组 override (HK/US) > 全局默认
+        """
+        # 优先级 1：杠杆产品
         if symbol in self._leveraged_symbols and self._leveraged_overrides:
             ov = self._leveraged_overrides
             return {
@@ -357,14 +495,20 @@ class ProfitStopManager:
                 'emergency_stop_pct': ov.get('emergency_stop_pct', self.emergency_stop_pct),
                 'trailing_stop_pct': ov.get('trailing_stop_pct', self.trailing_stop_pct),
             }
+        # 优先级 2：市场分组
+        sym_upper = (symbol or "").upper()
+        is_hk = sym_upper.endswith('.HK')
+        is_us = sym_upper.endswith('.US')
+        stop_ov = self._hk_overrides if is_hk else (self._us_overrides if is_us else {})
+        prof_ov = self._hk_profit_overrides if is_hk else (self._us_profit_overrides if is_us else {})
         return {
-            'fixed_profit_pct': self.fixed_profit_pct,
-            'partial_profit_pct': self.partial_profit_pct,
-            'trailing_profit_pct': self.trailing_profit_pct,
-            'trailing_profit_step': self.trailing_profit_step,
-            'fixed_stop_pct': self.fixed_stop_pct,
-            'emergency_stop_pct': self.emergency_stop_pct,
-            'trailing_stop_pct': self.trailing_stop_pct,
+            'fixed_profit_pct': prof_ov.get('fixed_profit_pct', self.fixed_profit_pct),
+            'partial_profit_pct': prof_ov.get('partial_profit_pct', self.partial_profit_pct),
+            'trailing_profit_pct': prof_ov.get('trailing_profit_pct', self.trailing_profit_pct),
+            'trailing_profit_step': prof_ov.get('trailing_profit_step', self.trailing_profit_step),
+            'fixed_stop_pct': stop_ov.get('fixed_stop_pct', self.fixed_stop_pct),
+            'emergency_stop_pct': stop_ov.get('emergency_stop_pct', self.emergency_stop_pct),
+            'trailing_stop_pct': stop_ov.get('trailing_stop_pct', self.trailing_stop_pct),
         }
 
     def _check_profit_taking(self, status: PositionStatus) -> Optional[ExitSignal]:
@@ -531,6 +675,15 @@ class ProfitStopManager:
     async def execute_exit_signal(self, signal: ExitSignal) -> bool:
         """执行退出信号"""
         try:
+            # 🛑 P0-2: 非交易时段硬阻断（紧急止损除外，避免盲目重试触发券商连续拒单）
+            is_emergency_pre = signal.signal_type in ("EMERGENCY_STOP", "DAILY_LOSS_LIMIT")
+            if not self._is_market_open(signal.symbol) and not is_emergency_pre:
+                self.logger.info(
+                    f"⏸ {signal.symbol} 非交易时段，跳过止盈止损单提交 "
+                    f"(signal_type={signal.signal_type})"
+                )
+                return False
+            
             is_short = signal.quantity < 0
             exit_quantity = abs(signal.quantity)
             
@@ -603,6 +756,19 @@ class ProfitStopManager:
                 pending["last_attempt"] = datetime.now()
                 pending["retry_count"] = pending.get("retry_count", 0) + 1
                 pending["signal_type"] = signal.signal_type
+                
+                # 🛑 P0-2: 若被券商拒单且原因属于"硬性失败"（盘后/做空不支持/资金不足），
+                # 直接置 retry_count 为最大值，等待下一开盘日重置（避免 47 笔无效重试）
+                reject_reason = getattr(result, 'reject_reason', '') if result else ''
+                hard_fail_reasons = {"market_closed", "short_not_supported", "insufficient_funds", "exchange_rejected"}
+                if reject_reason in hard_fail_reasons:
+                    pending["retry_count"] = self._exit_max_retries
+                    pending["hard_fail"] = True
+                    self.logger.warning(
+                        f"❌ {signal.symbol} 退出订单被券商硬拒({reject_reason})，"
+                        f"暂停重试至下一开盘窗口"
+                    )
+                
                 self._exit_pending[signal.symbol] = pending
                 self.logger.warning(
                     f"止盈止损订单提交失败: {signal.symbol}, 结果: {result}, "

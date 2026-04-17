@@ -221,8 +221,14 @@ async def main():
     portfolio_mgr = PortfolioManager(config, order_mgr, realtime_mgr)
     logger.info("投资组合管理器初始化完成")
     
-    # 初始化止盈止损管理器
-    profit_stop_mgr = ProfitStopManager(config, order_mgr)
+    # 暴露 historical_loader 给 order_manager（供 ensemble 计算波动率/ATR）
+    try:
+        order_mgr.historical_loader = hist_loader
+    except Exception:
+        pass
+    
+    # 初始化止盈止损管理器（注入 historical_loader 用于 ATR 动态止损）
+    profit_stop_mgr = ProfitStopManager(config, order_mgr, historical_loader=hist_loader)
     logger.info("止盈止损管理器初始化完成")
     
     # 🚀 初始化策略组合器

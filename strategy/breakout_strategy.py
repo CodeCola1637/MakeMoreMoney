@@ -31,10 +31,25 @@ class BreakoutStrategy:
         self.lookback = config.get("strategy.breakout.lookback_days", 20)
         self.atr_period = config.get("strategy.breakout.atr_period", 14)
         self.breakout_margin = config.get("strategy.breakout.margin_pct", 0.002)
+        # P0-5: 成交量确认与"刺破"过滤
+        self.volume_confirm_multiplier = float(
+            config.get("strategy.breakout.volume_confirm_multiplier", 1.5)
+        )
+        # 当日累计成交量需 ≥ 近 N 日均量 × multiplier 才算有效突破
+        self.require_close_above = bool(
+            config.get("strategy.breakout.require_close_above", True)
+        )
+        # 当当日 K 线收盘价仍在突破线之上才算有效（缺当日数据时降级为按 last_done）
+        self.min_breakout_persistence = float(
+            config.get("strategy.breakout.min_breakout_persistence_pct", 0.001)
+        )
+        # 收盘价至少高出突破线 0.1%（避免单 tick 刺破）
 
         self.logger.info(
             f"BreakoutStrategy 初始化: 回看={self.lookback}天, "
-            f"ATR周期={self.atr_period}, 突破余量={self.breakout_margin:.1%}"
+            f"ATR周期={self.atr_period}, 突破余量={self.breakout_margin:.1%}, "
+            f"成交量倍数={self.volume_confirm_multiplier}x, "
+            f"收盘确认={self.require_close_above}"
         )
 
     async def generate_signal(
@@ -69,20 +84,33 @@ class BreakoutStrategy:
         lower_threshold = channel_low * (1 + self.breakout_margin)
 
         position_in_channel = (price - channel_low) / channel_width
+        
+        # P0-5: 成交量确认 — 当日累计成交量需放大
+        volume_ok = self._check_volume_confirmation(recent, data)
+        # P0-5: 收盘确认 — 价格需明显高于突破线（不只是单 tick 刺破）
+        persistence = self.min_breakout_persistence
 
-        if price >= upper_threshold:
+        if price >= upper_threshold * (1 + persistence) and volume_ok:
             sig_type = SignalType.BUY
             raw_conf = min(0.9, 0.4 + (price - upper_threshold) / atr * 0.2) if atr > 0 else 0.5
             reason = (
                 f"突破{self.lookback}日高点 {channel_high:.2f} "
-                f"(通道位置={position_in_channel:.0%})"
+                f"(通道位置={position_in_channel:.0%}, 量能确认✅)"
             )
-        elif price <= lower_threshold:
+        elif price <= lower_threshold * (1 - persistence) and volume_ok:
             sig_type = SignalType.SELL
             raw_conf = min(0.9, 0.4 + (lower_threshold - price) / atr * 0.2) if atr > 0 else 0.5
             reason = (
                 f"跌破{self.lookback}日低点 {channel_low:.2f} "
-                f"(通道位置={position_in_channel:.0%})"
+                f"(通道位置={position_in_channel:.0%}, 量能确认✅)"
+            )
+        elif (price >= upper_threshold or price <= lower_threshold) and not volume_ok:
+            # 价格刺破但成交量不足 → 视为假突破，弃权
+            sig_type = SignalType.HOLD
+            raw_conf = 0.05
+            reason = (
+                f"价格刺破但量能不足 (price={price:.2f}, "
+                f"upper={upper_threshold:.2f}, lower={lower_threshold:.2f})"
             )
         else:
             sig_type = SignalType.HOLD
@@ -111,6 +139,33 @@ class BreakoutStrategy:
             },
         )
 
+    def _check_volume_confirmation(self, recent_df, data: Dict[str, Any]) -> bool:
+        """P0-5: 突破方向需要量能配合 — 当日成交量需 ≥ 近 N 日均量 × multiplier。
+        
+        优先级：
+        1. data 中包含 'today_volume' / 'volume' 字段 → 直接对比 recent 均量
+        2. 否则用 recent_df 最后一根 K 线的 volume 对比再前 N-1 根的均量
+        3. 数据缺失时降级返回 True（避免完全屏蔽信号），但日志告警
+        """
+        try:
+            avg_vol = float(recent_df["volume"].mean()) if "volume" in recent_df.columns else 0.0
+            if avg_vol <= 0:
+                return True
+            today_vol = 0.0
+            if isinstance(data, dict):
+                today_vol = float(data.get("today_volume") or data.get("volume") or 0.0)
+            if today_vol <= 0 and "volume" in recent_df.columns and len(recent_df) > 0:
+                today_vol = float(recent_df["volume"].iloc[-1])
+                if len(recent_df) > 1:
+                    avg_vol = float(recent_df["volume"].iloc[:-1].mean())
+            if today_vol <= 0:
+                self.logger.debug("Breakout: 缺当日成交量数据，量能确认默认通过")
+                return True
+            return today_vol >= avg_vol * self.volume_confirm_multiplier
+        except Exception as e:
+            self.logger.debug(f"Breakout 量能确认异常: {e}")
+            return True
+    
     def _calc_atr(self, df) -> float:
         """计算 Average True Range"""
         if len(df) < self.atr_period + 1:

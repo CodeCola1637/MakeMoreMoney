@@ -235,8 +235,14 @@ class OrderExecutor:
 
     # ── Core submission ──
 
-    async def _submit_order(self, symbol: str, price: float, quantity: int, order_type: str, strategy_name: str):
-        """提交订单"""
+    async def _submit_order(self, symbol: str, price: float, quantity: int, order_type: str, strategy_name: str,
+                            signal_source: str = "", signal_confidence: float = 0.0):
+        """提交订单
+        
+        signal_source / signal_confidence 用于事后归因：
+        - signal_source: 触发源策略名（如 'volume_anomaly,ccass'）
+        - signal_confidence: 信号置信度（0~1）
+        """
         from execution.order_manager import OrderResult
         order_type = order_type.lower()
         try:
@@ -265,7 +271,7 @@ class OrderExecutor:
                     if pending_count >= self._mgr.max_pending_orders:
                         self.logger.info(f"转为市价单执行: {symbol}, 置信度: {confidence:.2%}")
                 else:
-                    return OrderResult(
+                    rej = OrderResult(
                         order_id="",
                         symbol=symbol,
                         side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
@@ -274,8 +280,12 @@ class OrderExecutor:
                         status=OrderStatus.Rejected,
                         submitted_at=datetime.now(),
                         msg=f"挂单限制且置信度低({confidence:.2%})，拒绝执行",
-                        strategy_name=strategy_name
+                        strategy_name=strategy_name,
+                        signal_source=signal_source,
+                        signal_confidence=signal_confidence,
                     )
+                    rej.reject_reason = "pending_limit_low_confidence"
+                    return rej
 
             adjusted_price = self._adjust_price_to_tick(symbol, price)
 
@@ -292,7 +302,7 @@ class OrderExecutor:
                         self.logger.info(f"使用优化后的交易数量: {quantity} -> {optimized_quantity}")
                         quantity = optimized_quantity
                     elif optimized_quantity == 0:
-                        return OrderResult(
+                        rej = OrderResult(
                             order_id="",
                             symbol=symbol,
                             side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
@@ -301,8 +311,12 @@ class OrderExecutor:
                             status=OrderStatus.Rejected,
                             submitted_at=datetime.now(),
                             msg=f"成本效益分析失败: {cost_reason}",
-                            strategy_name=strategy_name
+                            strategy_name=strategy_name,
+                            signal_source=signal_source,
+                            signal_confidence=signal_confidence,
                         )
+                        rej.reject_reason = "cost_benefit_failed"
+                        return rej
 
             self.logger.info(f"准备提交订单 - 股票: {symbol}, 价格: {adjusted_price}, 数量: {quantity}, 类型: {order_type}, 策略: {strategy_name}")
 
@@ -333,7 +347,9 @@ class OrderExecutor:
                 status=OrderStatus.NotReported,
                 submitted_at=datetime.now(),
                 msg="",
-                strategy_name=strategy_name
+                strategy_name=strategy_name,
+                signal_source=signal_source,
+                signal_confidence=signal_confidence,
             )
 
             self._mgr.active_orders[order_resp.order_id] = result
@@ -352,7 +368,7 @@ class OrderExecutor:
                 self._mgr._short_blacklist.add(symbol.upper())
                 self.logger.warning(f"已将 {symbol} 加入做空黑名单 (603301)")
 
-            return OrderResult(
+            err_result = OrderResult(
                 order_id="",
                 symbol=symbol,
                 side=OrderSide.Buy if order_type == "buy" else OrderSide.Sell,
@@ -361,10 +377,33 @@ class OrderExecutor:
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
                 msg=f"提交失败: {error_str}",
-                strategy_name=strategy_name
+                strategy_name=strategy_name,
+                signal_source=signal_source,
+                signal_confidence=signal_confidence,
             )
+            err_result.reject_reason = self._extract_reject_reason(error_str)
+            return err_result
 
-    async def submit_buy_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default"):
+    @staticmethod
+    def _extract_reject_reason(err: str) -> str:
+        """从券商错误字符串中提取标准化拒绝码/类别。"""
+        if not err:
+            return ""
+        s = err.lower()
+        if "603301" in err or "short selling" in s:
+            return "short_not_supported"
+        if "insufficient" in s or "buying power" in s or "余额不足" in err:
+            return "insufficient_funds"
+        if "market" in s and ("close" in s or "not open" in s):
+            return "market_closed"
+        if "price" in s and ("invalid" in s or "tick" in s):
+            return "invalid_price"
+        if "rejected" in s:
+            return "exchange_rejected"
+        return "submit_error"
+    
+    async def submit_buy_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default",
+                                signal_source: str = "", signal_confidence: float = 0.0):
         """提交买入订单"""
         from execution.order_manager import OrderResult
         self.logger.info(f"提交买入订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
@@ -372,7 +411,7 @@ class OrderExecutor:
         is_valid, error_msg, corrected_price, corrected_quantity = self._validate_order_parameters(symbol, price, quantity)
         if not is_valid:
             self.logger.error(f"订单参数验证失败: {error_msg}")
-            return OrderResult(
+            rej = OrderResult(
                 order_id="",
                 symbol=symbol,
                 side=OrderSide.Buy,
@@ -381,8 +420,12 @@ class OrderExecutor:
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
                 msg=error_msg,
-                strategy_name=strategy_name
+                strategy_name=strategy_name,
+                signal_source=signal_source,
+                signal_confidence=signal_confidence,
             )
+            rej.reject_reason = "invalid_params"
+            return rej
 
         price = corrected_price
         quantity = corrected_quantity
@@ -392,7 +435,7 @@ class OrderExecutor:
             self.logger.info(f"止盈止损平仓订单，跳过风控现金检查: {symbol}")
         elif not await self._mgr.risk_control_check(symbol, quantity, price, is_buy=True):
             self.logger.warning(f"买入订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
-            return OrderResult(
+            rej = OrderResult(
                 order_id="",
                 symbol=symbol,
                 side=OrderSide.Buy,
@@ -401,18 +444,25 @@ class OrderExecutor:
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
                 msg="未通过风险控制检查",
-                strategy_name=strategy_name
+                strategy_name=strategy_name,
+                signal_source=signal_source,
+                signal_confidence=signal_confidence,
             )
+            rej.reject_reason = "risk_control_failed"
+            return rej
 
         return await self._submit_order(
             symbol=symbol,
             price=price,
             quantity=quantity,
             order_type="buy",
-            strategy_name=strategy_name
+            strategy_name=strategy_name,
+            signal_source=signal_source,
+            signal_confidence=signal_confidence,
         )
 
-    async def submit_sell_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default"):
+    async def submit_sell_order(self, symbol: str, price: float, quantity: int, strategy_name: str = "default",
+                                 signal_source: str = "", signal_confidence: float = 0.0):
         """提交卖出订单"""
         from execution.order_manager import OrderResult
         self.logger.info(f"提交卖出订单: {symbol}, 价格: {price}, 数量: {quantity}, 策略: {strategy_name}")
@@ -420,7 +470,7 @@ class OrderExecutor:
         is_valid, error_msg, corrected_price, corrected_quantity = self._validate_order_parameters(symbol, price, quantity)
         if not is_valid:
             self.logger.error(f"订单参数验证失败: {error_msg}")
-            return OrderResult(
+            rej = OrderResult(
                 order_id="",
                 symbol=symbol,
                 side=OrderSide.Sell,
@@ -429,8 +479,12 @@ class OrderExecutor:
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
                 msg=error_msg,
-                strategy_name=strategy_name
+                strategy_name=strategy_name,
+                signal_source=signal_source,
+                signal_confidence=signal_confidence,
             )
+            rej.reject_reason = "invalid_params"
+            return rej
 
         price = corrected_price
         quantity = corrected_quantity
@@ -440,7 +494,7 @@ class OrderExecutor:
             self.logger.info(f"止盈止损平仓卖出订单，跳过风控检查: {symbol}")
         elif not await self._mgr.risk_control_check(symbol, quantity, price, is_buy=False):
             self.logger.warning(f"卖出订单未通过风险控制检查: {symbol}, 价格: {price}, 数量: {quantity}")
-            return OrderResult(
+            rej = OrderResult(
                 order_id="",
                 symbol=symbol,
                 side=OrderSide.Sell,
@@ -449,15 +503,21 @@ class OrderExecutor:
                 status=OrderStatus.Rejected,
                 submitted_at=datetime.now(),
                 msg="未通过风险控制检查",
-                strategy_name=strategy_name
+                strategy_name=strategy_name,
+                signal_source=signal_source,
+                signal_confidence=signal_confidence,
             )
+            rej.reject_reason = "risk_control_failed"
+            return rej
 
         return await self._submit_order(
             symbol=symbol,
             price=price,
             quantity=quantity,
             order_type="sell",
-            strategy_name=strategy_name
+            strategy_name=strategy_name,
+            signal_source=signal_source,
+            signal_confidence=signal_confidence,
         )
 
     async def cancel_order(self, order_id: str) -> bool:
