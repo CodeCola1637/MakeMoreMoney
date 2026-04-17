@@ -41,12 +41,23 @@ class SignalFilter:
         self.min_confidence = config.get("strategy.signal_processing.confidence_threshold", 0.15)
         self.min_holding_seconds = config.get("strategy.min_holding_seconds", 300)
         
+        # 按触发策略覆写置信度阈值（如 ccass: 0.05），允许特定弱信号策略通过
+        raw_overrides = config.get("strategy.signal_processing.trigger_confidence_overrides", {}) or {}
+        self.trigger_confidence_overrides: Dict[str, float] = {
+            str(k): float(v) for k, v in raw_overrides.items()
+        }
+        
         # 止损后再入场冷却期（防止 止损→买入→止损 循环）
         self._stop_loss_reentry_cooldown = config.get("strategy.stop_loss_reentry_cooldown", 1800)
         self._stop_loss_exits: Dict[str, datetime] = {}
         
         # 港股开盘噪声过滤（开盘前 N 分钟的集合竞价放量不作为交易信号）
         self._hk_open_filter_minutes = config.get("strategy.hk_open_filter_minutes", 10)
+        
+        # 反向回补价护栏（24h 内 SELL→BUY 时，BUY 价不得高于最近 SELL 价）
+        self._cover_guard_enable = bool(config.get("strategy.cover_price_guard.enable", True))
+        self._cover_guard_lookback_hours = float(config.get("strategy.cover_price_guard.lookback_hours", 24))
+        self._cover_guard_max_premium_pct = float(config.get("strategy.cover_price_guard.max_price_premium_pct", 0.0))
         
         # 并发保护锁
         self._lock = asyncio.Lock()
@@ -66,6 +77,13 @@ class SignalFilter:
                         f"每日上限: {self.max_signals_per_day}, "
                         f"价格阈值: {self.price_change_threshold:.1%}, "
                         f"最低置信度: {self.min_confidence}")
+        if self.trigger_confidence_overrides:
+            self.logger.info(f"触发策略阈值覆写: {self.trigger_confidence_overrides}")
+        if self._cover_guard_enable:
+            self.logger.info(
+                f"回补价护栏: 启用 (回看 {self._cover_guard_lookback_hours}h, "
+                f"最大溢价 {self._cover_guard_max_premium_pct:.2%})"
+            )
     
     async def should_emit_signal(self, signal: Signal) -> Tuple[bool, str]:
         """
@@ -89,11 +107,32 @@ class SignalFilter:
             now = datetime.now()
             signal_type_str = signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type)
             
-            # 1. 检查置信度
+            # 1. 检查置信度（如有触发策略覆写，使用其中最低阈值）
             confidence = getattr(signal, 'confidence', 1.0)
-            if confidence < self.min_confidence:
+            effective_threshold = self.min_confidence
+            applied_override = None
+            if self.trigger_confidence_overrides:
+                trigger_sources = (
+                    getattr(signal, 'extra_data', {}) or {}
+                ).get('trigger_sources', []) or []
+                override_values = [
+                    self.trigger_confidence_overrides[t]
+                    for t in trigger_sources
+                    if t in self.trigger_confidence_overrides
+                ]
+                if override_values:
+                    candidate = min(override_values)
+                    if candidate < effective_threshold:
+                        effective_threshold = candidate
+                        applied_override = trigger_sources
+            if confidence < effective_threshold:
                 self._record_filter(symbol, "confidence_too_low")
-                return False, f"置信度不足: {confidence:.3f} < {self.min_confidence}"
+                return False, f"置信度不足: {confidence:.3f} < {effective_threshold}"
+            if applied_override and confidence < self.min_confidence:
+                self.logger.info(
+                    f"触发策略阈值覆写生效: {symbol} 置信度 {confidence:.3f} "
+                    f">= {effective_threshold} (触发: {applied_override})"
+                )
             
             # 1.5 港股开盘噪声过滤（09:30 后 N 分钟内的 BUY 信号视为集合竞价噪声）
             if symbol.endswith('.HK') and self._hk_open_filter_minutes > 0:
@@ -174,6 +213,28 @@ class SignalFilter:
                 last_signal_type = self.signal_history[symbol][-1][1]
                 if last_signal_type != signal_type_str:
                     self.logger.info(f"信号方向反转: {symbol} {last_signal_type} -> {signal_type_str}")
+            
+            # 6.5 反向回补价护栏 — 防止 SELL 后短期内高位 BUY（追涨）
+            if (self._cover_guard_enable
+                    and signal.signal_type == SignalType.BUY
+                    and signal.price > 0
+                    and symbol in self.signal_history):
+                lookback_cutoff = now - timedelta(hours=self._cover_guard_lookback_hours)
+                recent_sells = [
+                    (ts, price) for ts, st, price in self.signal_history[symbol]
+                    if st == "SELL" and ts >= lookback_cutoff and price > 0
+                ]
+                if recent_sells:
+                    last_sell_ts, last_sell_price = recent_sells[-1]
+                    max_allowed = last_sell_price * (1 + self._cover_guard_max_premium_pct)
+                    if signal.price > max_allowed:
+                        elapsed_hours = (now - last_sell_ts).total_seconds() / 3600
+                        self._record_filter(symbol, "cover_price_guard")
+                        return False, (
+                            f"回补价护栏: {symbol} BUY @ {signal.price:.4f} 高于 "
+                            f"{elapsed_hours:.1f}h 前 SELL @ {last_sell_price:.4f} "
+                            f"(上限 {max_allowed:.4f}, 防止追高回补)"
+                        )
             
             # 7. 通过所有检查 — 原子性记录信号（在同一锁内，防止竞态）
             self.signal_history[symbol].append((now, signal_type_str, signal.price))

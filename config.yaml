@@ -140,6 +140,16 @@ strategy:
     signal_decay_factor: 0.95
     trend_confirmation: true
     volume_confirmation: true
+    # 按触发策略覆写置信度阈值（低于全局 confidence_threshold 时单独放宽）
+    # 适用场景：CCASS 单标的信号置信度天然较低（约 0.06-0.10），
+    # 全局 0.08 阈值会过滤掉绝大多数 CCASS 信号
+    trigger_confidence_overrides:
+      ccass: 0.05  # CCASS 港股持仓变化信号阈值
+  # SELL → BUY 回补价护栏（24h 内同标的反向 BUY 价不得高于最近 SELL 价）
+  cover_price_guard:
+    enable: true
+    lookback_hours: 24            # 回看时长（小时）
+    max_price_premium_pct: 0.0    # BUY 价相对最近 SELL 价的最大溢价比例，0 表示必须 ≤ SELL 价
   # 信号过滤器配置 - 触发驱动模式下仅做去重，不限流
   signal_cooldown: 60             # 同一股票相同信号去重窗口（秒）
   stop_loss_reentry_cooldown: 3600  # 止损后再入场冷却期（秒），防止止损→买入→止损循环
