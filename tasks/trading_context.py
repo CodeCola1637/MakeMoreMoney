@@ -28,6 +28,8 @@ class TradingContext:
     sec_strategy: Optional[Any] = None
     volume_detector: Optional[Any] = None
     volume_strategy: Optional[Any] = None
+    ccass_tracker: Optional[Any] = None
+    ccass_strategy: Optional[Any] = None
     ensemble_enabled: bool = True
 
     _sec_discovered: Set[str] = field(default_factory=set)

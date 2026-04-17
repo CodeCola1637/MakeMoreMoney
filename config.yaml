@@ -18,7 +18,7 @@ execution:
     after_hours_start: "16:00"    # 盘后开始时间
     after_hours_end: "20:00"      # 盘后结束时间
   # 做空交易配置（仅美股支持）
-  allow_sell_to_short: false      # SELL 无持仓时是否自动转为 SHORT
+  allow_sell_to_short: true       # SELL 无持仓时自动转为 SHORT（仅美股生效）
   strict_validation: true         # 验证异常时拒绝交易（fail-closed）
   enable_short_selling: true      # 启用做空交易
   max_short_position: 100         # 单只股票最大空头持仓
@@ -55,7 +55,7 @@ execution:
     fixed_profit_pct: 15.0
     partial_profit_pct: 8.0
     trailing_profit_pct: 5.0
-    trailing_profit_step: 1.0
+    trailing_profit_step: 1.5
   risk_control:
     daily_loss_pct: 3.0
     max_correlation: 0.7
@@ -63,6 +63,10 @@ execution:
     volatility_threshold: 0.25
     max_daily_loss_pct: 3.0        # 日亏损限制（占总权益百分比）
     max_total_position_pct: 80.0   # 总仓位限制（占总权益百分比）
+    max_single_position_pct: 20.0  # 单一标的最大持仓比例（占总权益百分比）
+    max_leverage: 2.5              # 最大杠杆倍数（总持仓/净资产），当前2.31x
+    margin_warning_pct: 35.0       # 保证金缓冲预警线（净资产-维持保证金）/净资产
+    margin_danger_pct: 25.0        # 保证金缓冲危险线，触发建议减仓
   # 资金守卫配置
   min_reserve: 1000                # 最小储备金（保留不交易的金额）
   small_trade_max_cost_ratio: 2.5
@@ -72,8 +76,7 @@ execution:
     enable: true
     fixed_stop_pct: 5.0
     max_loss_per_day: 3.0
-    trailing_stop_pct: 3.0
-  trailing_stop_pct: 2.0
+    trailing_stop_pct: 4.0
   leveraged_symbols: []
   leveraged_overrides: {}
   us_commission_rate: 0.005
@@ -143,6 +146,7 @@ strategy:
   max_signals_per_day: 10        # 每个股票每日最大信号数量
   min_holding_seconds: 300       # 最小持仓时间（秒），防止秒级买卖
   price_change_threshold: 0.003  # 价格变化阈值（0.3%）才生成新信号
+  hk_open_filter_minutes: 10    # 港股开盘后N分钟内过滤BUY信号（集合竞价噪声）
   # 相关性过滤器配置 - 风险分散
   correlation_lookback_days: 60  # 相关性计算回看天数
   correlation_update_interval: 24 # 相关性矩阵更新间隔（小时）
@@ -198,6 +202,16 @@ institutional:
   min_institutions_buying: 2         # 触发信号的最少机构数
   signal_expiry_hours: 48              # SEC 信号有效期（小时）
   auto_trade: false                    # 已集成到 ensemble，不再直接下单
+
+# CCASS 港股中央结算持仓追踪
+ccass:
+  enable: true                         # 是否启用 CCASS 追踪
+  scan_interval: 7200                  # 扫描间隔（秒），默认2小时
+  min_change_pct: 0.5                  # 触发信号的最小持仓变化百分比
+  lookback_days: 5                     # 对比回看天数
+  top_n: 10                            # 追踪前N名参与者
+  signal_expiry_hours: 24              # 信号有效期（小时）
+
   # 跟踪的机构（默认全部跟踪，也可指定子集）
   tracked_institutions:
     - berkshire_hathaway    # 巴菲特 - Berkshire Hathaway
@@ -220,15 +234,17 @@ ensemble:
   confidence_threshold: 0.02
   reweight_frequency: 100
   strategy_weights:
-    lstm: 0.15
-    technical: 0.15
-    sec: 0.2
-    volume_anomaly: 0.35
-    breakout: 0.15
+    lstm: 0.10
+    technical: 0.10
+    sec: 0.20
+    volume_anomaly: 0.30
+    breakout: 0.10
+    ccass: 0.20
   # 触发策略：只有这些策略产生BUY/SELL时才能发起交易
   trigger_strategies:
     - volume_anomaly
     - sec
+    - ccass
   # 辅助策略：仅用于确认方向和调节置信度，不能独立触发交易
   auxiliary_strategies:
     - lstm
@@ -240,6 +256,7 @@ ensemble:
     - sec
     - volume_anomaly
     - breakout
+    - ccass
   training:
     batch_size: 64
     early_stopping_patience: 15

@@ -3,6 +3,7 @@
 import asyncio
 import csv
 import os
+import tempfile
 import traceback
 from datetime import datetime
 from typing import Callable, Dict, List, Optional
@@ -80,8 +81,11 @@ class OrderTracker:
                             continue
 
                         if latest_order.status != order.status:
-                            self.logger.info(f"订单状态更新: {order_id}, {order.status} -> {latest_order.status}")
+                            old_status = order.status
+                            self.logger.info(f"订单状态更新: {order_id}, {old_status} -> {latest_order.status}")
                             order.status = latest_order.status
+
+                            self._update_order_csv(order)
 
                             if order.is_filled() or order.is_canceled() or order.is_rejected():
                                 self.logger.info(f"订单已完成: {order_id}, 状态: {order.status}")
@@ -294,6 +298,61 @@ class OrderTracker:
             return False
 
         return True
+
+    def _update_order_csv(self, order):
+        """订单状态变更时，回写 CSV 中对应行的 status 字段（原子写入）。"""
+        csv_file = "logs/orders.csv"
+        if not os.path.exists(csv_file):
+            return
+
+        order_id_str = str(order.order_id)
+        new_status_str = (
+            str(order.status.value) if hasattr(order.status, "value") else str(order.status)
+        )
+        now_iso = datetime.now().isoformat()
+
+        try:
+            with open(csv_file, "r", newline="", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            updated = False
+            new_lines = []
+            for line in lines:
+                if order_id_str in line:
+                    cols = line.rstrip("\n").split(",")
+                    for i, col in enumerate(cols):
+                        if "NotReported" in col or "OrderStatus" in col:
+                            cols[i] = new_status_str
+                            updated = True
+                            break
+                    if updated and order.is_filled():
+                        # Try to fill the filled_at column if it exists and is empty
+                        for i, col in enumerate(cols):
+                            if col == "" and i > 0 and updated:
+                                cols[i] = now_iso
+                                break
+                    line = ",".join(cols) + "\n"
+                new_lines.append(line)
+
+            if updated:
+                tmp_fd, tmp_path = tempfile.mkstemp(
+                    dir=os.path.dirname(csv_file) or ".", suffix=".tmp"
+                )
+                try:
+                    with os.fdopen(tmp_fd, "w", newline="", encoding="utf-8") as f:
+                        f.writelines(new_lines)
+                    os.replace(tmp_path, csv_file)
+                    self.logger.info(
+                        f"CSV 订单状态已更新: {order_id_str} -> {new_status_str}"
+                    )
+                except Exception:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                    raise
+        except Exception as e:
+            self.logger.warning(f"更新 CSV 订单状态失败: {order_id_str}, {e}")
 
     def _save_order(self, order_result, strategy_name: str):
         """保存订单信息（旧格式兼容）"""

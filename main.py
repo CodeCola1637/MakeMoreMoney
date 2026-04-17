@@ -32,6 +32,8 @@ from strategy.volume_anomaly_detector import VolumeAnomalyDetector
 from strategy.sec_strategy import SECStrategy
 from strategy.volume_strategy import VolumeStrategy
 from strategy.breakout_strategy import BreakoutStrategy
+from strategy.ccass_tracker import CCASTracker
+from strategy.ccass_strategy import CCASStrategy
 from execution.order_manager import OrderManager, OrderResult
 from execution.task_manager import TaskManager
 from tasks import (
@@ -44,6 +46,7 @@ from tasks import (
     health_check,
     stock_discovery_task,
     institutional_tracking_task,
+    ccass_tracking_task,
 )
 
 # 全局变量
@@ -226,6 +229,7 @@ async def main():
     ensemble_enabled = config.get("ensemble.enable", False)
     sec_strategy = None
     volume_strategy = None
+    ccass_strategy = None
     
     if ensemble_enabled:
         logger.info("初始化策略组合器...")
@@ -247,13 +251,17 @@ async def main():
         breakout_strategy = BreakoutStrategy(config, hist_loader, logger)
         logger.info("通道突破策略初始化完成")
         
-        # 创建策略字典（5 策略投票）
+        ccass_strategy = CCASStrategy(config, logger)
+        logger.info("CCASS 港股持仓策略适配器初始化完成")
+        
+        # 创建策略字典（6 策略投票）
         strategies = {
             'lstm': lstm_signal_gen,
             'technical': technical_strategy,
             'sec': sec_strategy,
             'volume_anomaly': volume_strategy,
             'breakout': breakout_strategy,
+            'ccass': ccass_strategy,
         }
         
         # 获取组合方法
@@ -265,7 +273,7 @@ async def main():
             ensemble_method = EnsembleMethod.CONFIDENCE_WEIGHT
         
         # 初始化策略组合器
-        signal_gen = StrategyEnsemble(config, strategies, ensemble_method, order_manager=order_mgr)
+        signal_gen = StrategyEnsemble(config, strategies, ensemble_method, order_manager=order_mgr, profit_stop_mgr=profit_stop_mgr)
         logger.info(f"策略组合器初始化完成 - 方法: {ensemble_method.value}, 策略数: {len(strategies)}")
         
         # 为LSTM策略单独启动
@@ -397,6 +405,18 @@ async def main():
                 logger.warning(f"机构交易跟踪模块初始化失败: {e}")
                 institutional_enabled = False
         
+        # 📈 初始化 CCASS 持仓追踪模块
+        ccass_enabled = config.get("ccass.enable", False)
+        ccass_tracker = None
+        
+        if ccass_enabled:
+            try:
+                ccass_tracker = CCASTracker(config, logger)
+                logger.info("📈 CCASS 持仓追踪模块初始化完成")
+            except Exception as e:
+                logger.warning(f"CCASS 持仓追踪模块初始化失败: {e}")
+                ccass_enabled = False
+        
         # 📊 初始化异常成交量检测模块
         volume_anomaly_enabled = config.get("volume_anomaly.enable", False)
         volume_detector = None
@@ -431,6 +451,8 @@ async def main():
             sec_strategy=sec_strategy if ensemble_enabled else None,
             volume_detector=volume_detector if volume_anomaly_enabled else None,
             volume_strategy=volume_strategy if ensemble_enabled else None,
+            ccass_tracker=ccass_tracker if ccass_enabled else None,
+            ccass_strategy=ccass_strategy if ensemble_enabled else None,
             ensemble_enabled=ensemble_enabled,
         )
 
@@ -503,6 +525,17 @@ async def main():
                 is_critical=False
             )
             logger.info(f"🏦 机构交易跟踪任务已创建（周期性，间隔{inst_interval}秒）")
+        
+        if ccass_enabled and ccass_tracker:
+            ccass_interval = config.get("ccass.scan_interval", 7200)
+            task_manager.create_periodic_task(
+                name="ccass_tracking",
+                coro_func=lambda: ccass_tracking_task(ctx),
+                interval=ccass_interval,
+                max_restarts=5,
+                is_critical=False
+            )
+            logger.info(f"📈 CCASS 持仓追踪任务已创建（周期性，间隔{ccass_interval}秒）")
         
         if volume_anomaly_enabled and volume_detector:
             vol_interval = config.get("volume_anomaly.check_interval", 60)

@@ -458,14 +458,20 @@ class OrderManager:
                                 has_long = True
                                 break
                 if not has_long:
+                    is_us = symbol.upper().endswith('.US')
                     allow_auto_short = self.config.get("execution.allow_sell_to_short", False)
-                    if allow_auto_short and symbol not in self._short_blacklist:
-                        self.logger.info(f"🔄 {symbol} 无多头持仓，SELL 自动转为 SHORT (allow_sell_to_short=true)")
+                    if allow_auto_short and is_us and symbol not in self._short_blacklist:
+                        self.logger.info(f"🔄 {symbol} 无多头持仓，SELL 自动转为 SHORT (美股做空)")
                         signal_type = SignalType.SHORT
                         signal.signal_type = SignalType.SHORT
                         signal_type_str = "SHORT"
                     else:
-                        reason = f"在做空黑名单中" if symbol in self._short_blacklist else "allow_sell_to_short=false"
+                        if symbol in self._short_blacklist:
+                            reason = "在做空黑名单中"
+                        elif not is_us:
+                            reason = "非美股，不支持做空"
+                        else:
+                            reason = "allow_sell_to_short=false"
                         self.logger.info(f"⚠️ {symbol} 无多头持仓，SELL 信号跳过 ({reason})")
                         return None
             
@@ -580,10 +586,6 @@ class OrderManager:
                     "submitted_at": datetime.now()
                 }
                 
-                strategy_name = getattr(signal, 'strategy_name', 'unknown')
-                if hasattr(signal, 'id'):
-                    strategy_name = f"{strategy_name}|{signal.id}"
-                self._save_order(result, strategy_name)
                 return result
             else:
                 self.logger.error(f"订单提交失败: {symbol}, {signal_type_str}, {adjusted_quantity}")
@@ -972,9 +974,13 @@ class OrderManager:
                 strategy_info += f" confidence={signal.confidence:.3f} (COVER)"
             return await self._submit_order(symbol, price, cover_quantity, "buy", strategy_info)
         
-        # 获取可用资金和总权益
+        # 获取可用资金和总权益（优先使用券商 net_assets）
         available_cash = self.get_account_balance()
-        total_equity = available_cash  # 简化处理，实际应该包括持仓市值
+        margin_info = self.get_margin_info()
+        if margin_info and margin_info.get("available") and margin_info["net_assets"] > 0:
+            total_equity = margin_info["net_assets"]
+        else:
+            total_equity = available_cash
         
         # 🔧 应用position_pct限制 - 关键修复！
         max_trade_value = abs(total_equity) * (self.max_position_pct / 100.0)
@@ -1347,6 +1353,9 @@ class OrderManager:
 
     def get_account_balance(self):
         return self.position_service.get_account_balance()
+
+    def get_margin_info(self):
+        return self.position_service.get_margin_info()
 
     def get_positions(self, symbol: str = None):
         return self.position_service.get_positions(symbol)

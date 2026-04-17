@@ -42,7 +42,7 @@ class StrategyPerformance:
 class StrategyEnsemble:
     """策略组合器"""
     
-    def __init__(self, config, strategies: Dict[str, Any], ensemble_method: EnsembleMethod = EnsembleMethod.CONFIDENCE_WEIGHT, order_manager=None):
+    def __init__(self, config, strategies: Dict[str, Any], ensemble_method: EnsembleMethod = EnsembleMethod.CONFIDENCE_WEIGHT, order_manager=None, profit_stop_mgr=None):
         """
         初始化策略组合器
         
@@ -51,11 +51,13 @@ class StrategyEnsemble:
             strategies: 策略字典 {strategy_name: strategy_instance}
             ensemble_method: 组合方法
             order_manager: 订单管理器实例（用于获取实时账户余额）
+            profit_stop_mgr: 止盈止损管理器实例（用于阻止在即将止损时买入）
         """
         self.config = config
         self.strategies = strategies
         self.ensemble_method = ensemble_method
         self._order_manager = order_manager
+        self._profit_stop_mgr = profit_stop_mgr
         
         # 设置日志
         self.logger = setup_logger(
@@ -156,14 +158,20 @@ class StrategyEnsemble:
             if ensemble_signal is None:
                 return None
             
-            # 🔧 新增：信号过滤检查 - 防止重复信号和过度交易
+            # 阻止在即将止损/止盈退出时买入同一标的
+            if (ensemble_signal.signal_type == SignalType.BUY
+                    and self._profit_stop_mgr
+                    and self._profit_stop_mgr.is_near_exit(symbol)):
+                self.logger.info(
+                    f"信号被过滤: {symbol} - 该标的即将触发止盈/止损退出，阻止买入"
+                )
+                return None
+
+            # 信号过滤检查（通过时原子性记录，防止并发竞态）
             should_emit, filter_reason = await self.signal_filter.should_emit_signal(ensemble_signal)
             if not should_emit:
                 self.logger.info(f"信号被过滤: {symbol} - {filter_reason}")
                 return None
-            
-            # 记录信号到过滤器（用于冷却期和统计）
-            await self.signal_filter.record_signal(ensemble_signal)
             
             # 记录信号历史
             self._record_signal_history(strategy_signals, ensemble_signal)

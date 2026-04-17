@@ -105,3 +105,28 @@ async def health_check(ctx: TradingContext):
             f"盈利{summary.get('profitable_positions', 0)}, "
             f"亏损{summary.get('losing_positions', 0)}"
         )
+
+    # 保证金健康检查
+    try:
+        margin_status = ctx.order_mgr.fund_guard.check_margin_health()
+        if margin_status["warnings"]:
+            for w in margin_status["warnings"]:
+                logger.warning(w)
+        if "REDUCE_POSITION" in margin_status.get("actions", []):
+            logger.critical(
+                f"🚨 保证金危险！杠杆={margin_status['leverage']:.2f}x, "
+                f"缓冲={margin_status['margin_buffer_pct']:.1f}%, "
+                f"建议立即减仓"
+            )
+        elif not margin_status["healthy"]:
+            logger.warning(
+                f"⚠️ 保证金预警: 杠杆={margin_status['leverage']:.2f}x, "
+                f"风险等级={margin_status['risk_level']}, 已暂停买入"
+            )
+        else:
+            logger.debug(
+                f"💰 保证金健康: 杠杆={margin_status['leverage']:.2f}x, "
+                f"缓冲={margin_status['margin_buffer_pct']:.1f}%"
+            )
+    except Exception as e:
+        logger.warning(f"保证金检查异常: {e}")

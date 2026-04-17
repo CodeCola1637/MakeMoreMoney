@@ -576,10 +576,16 @@ class VolumeAnomalyDetector:
 
         latest_price = anomalies[-1].price
 
-        # 如果方向不明确，默认按成交量方向 + 价格微动判断
+        # 多空分歧检测：方向不明确时弃权（HOLD），不再强制选方向
         if abs(net_direction) < 0.5:
             avg_price_change = np.mean([a.price_change_pct for a in anomalies])
-            net_direction = 1 if avg_price_change >= 0 else -1
+            if abs(avg_price_change) < 0.002:
+                self.logger.info(
+                    f"Volume {symbol} 多空分歧: net_dir={net_direction:.2f}, "
+                    f"avg_price_chg={avg_price_change:.4f}, 弃权"
+                )
+                return None
+            net_direction = 1 if avg_price_change > 0 else -1
 
         signal_type = "BUY" if net_direction > 0 else "SELL"
 

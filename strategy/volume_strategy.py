@@ -140,9 +140,17 @@ class VolumeStrategy:
         if total_directional == 0:
             return None
 
-        # 方向一致性检查：主方向信号占比需 >= 70%
+        # 多空分歧检测：买卖信号并存且分数接近时弃权
         dominant_count = max(buy_count, sell_count)
         consistency = dominant_count / total_directional
+        if buy_count > 0 and sell_count > 0:
+            score_ratio = min(buy_score, sell_score) / max(buy_score, sell_score) if max(buy_score, sell_score) > 0 else 1
+            if score_ratio > 0.4:
+                self.logger.info(
+                    f"Volume {symbol} 多空分歧: buy={buy_count}({buy_score:.3f}) "
+                    f"vs sell={sell_count}({sell_score:.3f}), 分数比={score_ratio:.2f}, 弃权"
+                )
+                return None
         if consistency < 0.7 and total_directional >= 3:
             self.logger.info(
                 f"Volume {symbol} 方向不一致(buy={buy_count}, sell={sell_count}, "

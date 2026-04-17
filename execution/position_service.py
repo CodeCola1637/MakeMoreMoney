@@ -2,9 +2,10 @@
 
 import time
 import traceback
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 _BALANCE_CACHE_TTL = 30  # seconds
+_MARGIN_CACHE_TTL = 60  # seconds
 
 
 class PositionService:
@@ -14,6 +15,8 @@ class PositionService:
         self._mgr = manager
         self._balance_cache: Optional[float] = None
         self._balance_cache_time: float = 0.0
+        self._margin_cache: Optional[Dict] = None
+        self._margin_cache_time: float = 0.0
 
     @property
     def logger(self):
@@ -38,6 +41,76 @@ class PositionService:
             self._balance_cache = result
             self._balance_cache_time = now
         return result
+
+    def get_margin_info(self) -> Dict:
+        """获取保证金信息 — 带 60s TTL 缓存"""
+        now = time.time()
+        if self._margin_cache is not None and (now - self._margin_cache_time) < _MARGIN_CACHE_TTL:
+            return self._margin_cache
+
+        result = self._fetch_margin_info()
+        if result:
+            self._margin_cache = result
+            self._margin_cache_time = now
+        return result
+
+    def _fetch_margin_info(self) -> Dict:
+        """从券商 API 获取保证金/杠杆状态"""
+        default = {
+            "net_assets": 0.0, "total_cash": 0.0, "buy_power": 0.0,
+            "init_margin": 0.0, "maintenance_margin": 0.0,
+            "margin_call": 0.0, "risk_level": 0,
+            "max_finance_amount": 0.0, "remaining_finance_amount": 0.0,
+            "position_value": 0.0, "leverage": 0.0, "margin_ratio": 0.0,
+            "available": True,
+        }
+        try:
+            resp = self.trade_ctx.account_balance()
+            items = resp if isinstance(resp, list) else [resp]
+
+            for item in items:
+                net_assets = float(getattr(item, 'net_assets', 0) or 0)
+                if net_assets <= 0:
+                    continue
+                total_cash = float(getattr(item, 'total_cash', 0) or 0)
+                buy_power = float(getattr(item, 'buy_power', 0) or 0)
+                init_margin = float(getattr(item, 'init_margin', 0) or 0)
+                maint_margin = float(getattr(item, 'maintenance_margin', 0) or 0)
+                margin_call_val = float(getattr(item, 'margin_call', 0) or 0)
+                risk_level = int(getattr(item, 'risk_level', 0) or 0)
+                max_finance = float(getattr(item, 'max_finance_amount', 0) or 0)
+                remain_finance = float(getattr(item, 'remaining_finance_amount', 0) or 0)
+
+                position_value = net_assets - total_cash
+                leverage = position_value / net_assets if net_assets > 0 else 0
+                margin_ratio = (net_assets / position_value * 100) if position_value > 0 else 100.0
+
+                info = {
+                    "net_assets": net_assets,
+                    "total_cash": total_cash,
+                    "buy_power": buy_power,
+                    "init_margin": init_margin,
+                    "maintenance_margin": maint_margin,
+                    "margin_call": margin_call_val,
+                    "risk_level": risk_level,
+                    "max_finance_amount": max_finance,
+                    "remaining_finance_amount": remain_finance,
+                    "position_value": position_value,
+                    "leverage": leverage,
+                    "margin_ratio": margin_ratio,
+                    "available": True,
+                }
+                self.logger.debug(
+                    f"保证金信息: 净资产={net_assets:.0f}, 杠杆={leverage:.2f}x, "
+                    f"维持保证金={maint_margin:.0f}, 风险等级={risk_level}"
+                )
+                return info
+
+            self.logger.warning("account_balance 中无有效 net_assets 数据")
+            return default
+        except Exception as e:
+            self.logger.error(f"获取保证金信息失败: {e}")
+            return default
 
     def _fetch_account_balance(self) -> float:
         """实际调用 broker API 获取余额 — 优先 buy_power，回退到 available_cash 求和"""

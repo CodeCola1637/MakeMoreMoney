@@ -225,8 +225,15 @@ class ProfitStopManager:
             submitted_at = pending.get("last_attempt", datetime.now())
             age = (datetime.now() - submitted_at).total_seconds()
             if age > 300:
-                self.logger.warning(f"{symbol} exit_pending 已超时 {age:.0f}s，清除阻塞状态")
-                self._exit_pending.pop(symbol, None)
+                pending["submitted"] = False
+                pending["retry_count"] = pending.get("retry_count", 0) + 1
+                pending["last_attempt"] = datetime.now()
+                self.logger.warning(
+                    f"{symbol} exit_pending 已超时 {age:.0f}s，标记为失败 "
+                    f"(重试 {pending['retry_count']}/{self._exit_max_retries})"
+                )
+                if pending["retry_count"] >= self._exit_max_retries:
+                    return True
                 return False
             return True
         if pending["retry_count"] >= self._exit_max_retries:
@@ -234,6 +241,24 @@ class ProfitStopManager:
         elapsed = datetime.now() - pending["last_attempt"]
         return elapsed < self._exit_retry_cooldown
     
+    def is_near_exit(self, symbol: str) -> bool:
+        """检查标的是否即将触发止盈/止损退出（供 ensemble 在买入前调用）。
+
+        Returns True if:
+        - 该标的有 exit_pending（已提交退出订单或即将退出）
+        - 该标的浮亏已超过追踪止损阈值的 60%（即将触发止损）
+        """
+        if symbol in self._exit_pending:
+            return True
+
+        status = self.position_status.get(symbol)
+        if status and status.unrealized_pnl_pct is not None:
+            t = self._get_thresholds(symbol)
+            if status.unrealized_pnl_pct <= -t["trailing_stop_pct"] * 0.6:
+                return True
+
+        return False
+
     def clear_exit_pending(self, symbol: str):
         """Clear exit-pending state for a symbol (e.g. after manual intervention)."""
         self._exit_pending.pop(symbol, None)
@@ -257,11 +282,35 @@ class ProfitStopManager:
                 f"订单={order_id}, 重试次数={pending['retry_count']}/{self._exit_max_retries}"
             )
     
+    def _reset_retries_on_market_open(self):
+        """当市场开盘时，重置已达最大重试次数的退出尝试。
+
+        避免在盘后/盘前因连续 Rejected 耗尽重试次数后，
+        正式开盘时无法重新提交止盈止损订单。
+        """
+        stale = []
+        for symbol, pending in self._exit_pending.items():
+            if pending.get("retry_count", 0) < self._exit_max_retries:
+                continue
+            if not self._is_market_open(symbol):
+                continue
+            last_attempt = pending.get("last_attempt", datetime.now())
+            age_min = (datetime.now() - last_attempt).total_seconds() / 60
+            if age_min > 30:
+                stale.append(symbol)
+        for symbol in stale:
+            self.logger.info(
+                f"市场已开盘且距上次尝试超过30分钟，重置 {symbol} 退出重试计数"
+            )
+            self._exit_pending.pop(symbol, None)
+
     async def check_exit_signals(self) -> List[ExitSignal]:
         """检查止盈止损信号"""
         exit_signals = []
         
         try:
+            self._reset_retries_on_market_open()
+            
             for symbol, status in self.position_status.items():
                 if self._is_exit_pending_cooldown(symbol):
                     pending = self._exit_pending[symbol]
@@ -539,9 +588,10 @@ class ProfitStopManager:
             if result and not result.is_rejected():
                 self.logger.info(f"止盈止损订单提交成功: {signal.symbol}, 订单ID: {result.order_id}")
                 
+                existing = self._exit_pending.get(signal.symbol, {})
                 self._exit_pending[signal.symbol] = {
                     "last_attempt": datetime.now(),
-                    "retry_count": 0,
+                    "retry_count": existing.get("retry_count", 0),
                     "signal_type": signal.signal_type,
                     "order_id": result.order_id,
                     "submitted": True,

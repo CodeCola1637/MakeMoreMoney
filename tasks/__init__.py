@@ -12,6 +12,7 @@ from tasks.monitoring_tasks import (
 from tasks.discovery_tasks import (
     stock_discovery_task,
     institutional_tracking_task,
+    ccass_tracking_task,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "health_check",
     "stock_discovery_task",
     "institutional_tracking_task",
+    "ccass_tracking_task",
 ]

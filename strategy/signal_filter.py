@@ -5,7 +5,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dtime
 from collections import defaultdict
 from typing import Tuple, Optional, List, Dict
 from strategy.signals import Signal, SignalType
@@ -45,6 +45,9 @@ class SignalFilter:
         self._stop_loss_reentry_cooldown = config.get("strategy.stop_loss_reentry_cooldown", 1800)
         self._stop_loss_exits: Dict[str, datetime] = {}
         
+        # 港股开盘噪声过滤（开盘前 N 分钟的集合竞价放量不作为交易信号）
+        self._hk_open_filter_minutes = config.get("strategy.hk_open_filter_minutes", 10)
+        
         # 并发保护锁
         self._lock = asyncio.Lock()
         
@@ -66,7 +69,10 @@ class SignalFilter:
     
     async def should_emit_signal(self, signal: Signal) -> Tuple[bool, str]:
         """
-        判断是否应该发出信号（async，内部加锁防止并发竞态）
+        判断是否应该发出信号，通过时原子性地记录信号（async，内部加锁防止并发竞态）。
+
+        检查通过后立即在同一锁内记录信号，消除 check-then-record 之间的竞态窗口。
+        调用方无需再单独调用 record_signal。
         
         Args:
             signal: 交易信号对象
@@ -88,6 +94,18 @@ class SignalFilter:
             if confidence < self.min_confidence:
                 self._record_filter(symbol, "confidence_too_low")
                 return False, f"置信度不足: {confidence:.3f} < {self.min_confidence}"
+            
+            # 1.5 港股开盘噪声过滤（09:30 后 N 分钟内的 BUY 信号视为集合竞价噪声）
+            if symbol.endswith('.HK') and self._hk_open_filter_minutes > 0:
+                hk_open = dtime(9, 30)
+                hk_filter_end = dtime(9, 30 + self._hk_open_filter_minutes)
+                now_time = now.time()
+                if hk_open <= now_time < hk_filter_end and signal.signal_type == SignalType.BUY:
+                    self._record_filter(symbol, "hk_open_noise")
+                    return False, (
+                        f"港股开盘噪声过滤: {symbol} 在 09:30-09:{30+self._hk_open_filter_minutes} "
+                        f"期间的 BUY 信号被抑制（集合竞价放量噪声）"
+                    )
             
             # 2. 止损后再入场冷却
             if signal.signal_type == SignalType.BUY and symbol in self._stop_loss_exits:
@@ -157,26 +175,22 @@ class SignalFilter:
                 if last_signal_type != signal_type_str:
                     self.logger.info(f"信号方向反转: {symbol} {last_signal_type} -> {signal_type_str}")
             
+            # 7. 通过所有检查 — 原子性记录信号（在同一锁内，防止竞态）
+            self.signal_history[symbol].append((now, signal_type_str, signal.price))
+            self.last_signal_price[symbol] = signal.price
+            self._cleanup_history(symbol)
+            self.logger.debug(f"记录信号: {symbol} {signal_type_str} @ {signal.price}")
+            
             return True, "通过所有过滤条件"
     
     async def record_signal(self, signal: Signal):
         """
-        记录已发出的信号（async，内部加锁）
+        记录已发出的信号（向后兼容，should_emit_signal 通过时已自动记录）。
         
         Args:
             signal: 已发出的信号对象
         """
-        async with self._lock:
-            symbol = signal.symbol
-            signal_type_str = signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type)
-            
-            self.signal_history[symbol].append((datetime.now(), signal_type_str, signal.price))
-            self.last_signal_price[symbol] = signal.price
-            
-            # 清理过期历史（保留最近24小时）
-            self._cleanup_history(symbol)
-            
-            self.logger.debug(f"记录信号: {symbol} {signal_type_str} @ {signal.price}")
+        pass
     
     def _cleanup_history(self, symbol: str):
         """清理过期的信号历史"""

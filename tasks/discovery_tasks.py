@@ -156,3 +156,26 @@ async def _discover_and_add_symbols(ctx: TradingContext):
             )
     except Exception as e:
         logger.error(f"SEC 标的发现失败: {e}")
+
+
+async def ccass_tracking_task(ctx: TradingContext):
+    """CCASS 持仓追踪任务 — 扫描港股 CCASS 数据并更新策略缓存"""
+    if not ctx.ccass_tracker:
+        return
+
+    try:
+        signals = await ctx.ccass_tracker.scan_symbols(ctx.symbols)
+
+        logger.info(ctx.ccass_tracker.get_summary())
+
+        if signals and ctx.ccass_strategy:
+            ctx.ccass_strategy.update_signals(signals)
+            for sig in signals:
+                logger.info(
+                    f"📈 CCASS 信号已缓存: {sig.symbol} "
+                    f"{sig.signal_type}, 置信度={sig.confidence:.3f}, "
+                    f"{sig.reason}"
+                )
+
+    except Exception as e:
+        logger.error(f"CCASS 持仓追踪任务错误: {e}")
