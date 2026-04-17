@@ -551,13 +551,20 @@ class VolumeAnomalyDetector:
         net_direction = 0  # >0 偏多, <0 偏空
         reasons = []
 
+        explicit_dir_weight = 0.0  # 累计带显式方向的异常权重，用于后续分歧判定
         for a in anomalies:
             w = type_weights.get(a.anomaly_type, 1.0)
             weighted_confidence += a.confidence * w
             total_weight += w
 
-            # 方向推断
-            if a.anomaly_type == AnomalyType.PRICE_VOLUME_DIVERGENCE:
+            # 方向推断 — BLOCK / Tick 已识别的"主买/主卖"权威优先于价格变化
+            if a.direction == "buy":
+                net_direction += w * 1.5
+                explicit_dir_weight += w
+            elif a.direction == "sell":
+                net_direction -= w * 1.5
+                explicit_dir_weight += w
+            elif a.anomaly_type == AnomalyType.PRICE_VOLUME_DIVERGENCE:
                 net_direction += (1 if a.price_change_pct >= 0 else -1) * w * 2
             elif a.price_change_pct > 0.005:
                 net_direction += w
@@ -577,7 +584,8 @@ class VolumeAnomalyDetector:
         latest_price = anomalies[-1].price
 
         # 多空分歧检测：方向不明确时弃权（HOLD），不再强制选方向
-        if abs(net_direction) < 0.5:
+        # 例外：若至少有一条异常带显式方向（BLOCK 主买/主卖），跳过分歧弃权
+        if abs(net_direction) < 0.5 and explicit_dir_weight <= 0:
             avg_price_change = np.mean([a.price_change_pct for a in anomalies])
             if abs(avg_price_change) < 0.002:
                 self.logger.info(
@@ -586,6 +594,18 @@ class VolumeAnomalyDetector:
                 )
                 return None
             net_direction = 1 if avg_price_change > 0 else -1
+        elif abs(net_direction) < 0.5 and explicit_dir_weight > 0:
+            # 显式方向相互抵消（同时主买+主卖且权重相当）→ 仍判定为分歧弃权
+            if abs(net_direction) < 0.1:
+                self.logger.info(
+                    f"Volume {symbol} 显式方向完全抵消: net_dir={net_direction:.2f}, "
+                    f"explicit_w={explicit_dir_weight:.2f}, 弃权"
+                )
+                return None
+            self.logger.debug(
+                f"Volume {symbol} 显式方向略偏 (net_dir={net_direction:.2f}) "
+                f"但有 BLOCK 方向权威，按符号继续"
+            )
 
         signal_type = "BUY" if net_direction > 0 else "SELL"
 
